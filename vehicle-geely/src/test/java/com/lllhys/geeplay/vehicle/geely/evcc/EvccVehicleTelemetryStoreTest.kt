@@ -18,7 +18,12 @@ class EvccVehicleTelemetryStoreTest {
 
     @Test
     fun `complete battery state becomes a CarPlay vehicle snapshot`() {
-        accept(EvccLogicalSignal.BATTERY_SOC, 1_051_136L, EvccValue.ofDouble(50.0))
+        accept(
+            EvccLogicalSignal.BATTERY_SOC,
+            1_051_136L,
+            EvccValue.ofDouble(50.0),
+            recordStatus = EvccApiContract.Status.OK,
+        )
         accept(EvccLogicalSignal.RANGE_EV_KM, 1_054_976L, EvccValue.ofDouble(210.4))
         accept(EvccLogicalSignal.CHARGING, 605_225_728L, EvccValue.ofLong(1))
 
@@ -176,6 +181,7 @@ class EvccVehicleTelemetryStoreTest {
         sourceGeneration: Long = 1,
         source: String = EvccApiContract.Source.ADAPT_API,
         gearValues: Map<Long, VehicleGear> = emptyMap(),
+        recordStatus: String = EvccApiContract.Status.AVAILABLE,
     ) {
         val descriptor = EvccPropertyDescriptor(
             source = source,
@@ -203,7 +209,7 @@ class EvccVehicleTelemetryStoreTest {
                     resolvedSource = descriptor.source,
                     descriptor = descriptor,
                     value = value,
-                    status = EvccApiContract.Status.AVAILABLE,
+                    status = recordStatus,
                 ),
             ),
         )

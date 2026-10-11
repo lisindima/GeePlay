@@ -143,7 +143,7 @@ internal class EvccVehicleTelemetryStore(
     @Synchronized
     fun accept(binding: EvccResolvedProperty, record: EvccPropertyRecord): Boolean {
         val value = record.value
-        if (record.status != EvccApiContract.Status.AVAILABLE ||
+        if (record.status !in RECORD_SUCCESS_STATUSES ||
             value == null || !value.initialized || value.status != EvccApiContract.Status.AVAILABLE
         ) {
             return values.remove(binding.signal) != null
@@ -311,6 +311,7 @@ internal class EvccVehicleTelemetryStore(
     private companion object {
         const val MOTION_MAX_AGE_MILLIS = 5_000L
         const val MAX_SPEED_METERS_PER_SECOND = 100.0
+        val RECORD_SUCCESS_STATUSES = setOf(EvccApiContract.Status.OK, EvccApiContract.Status.AVAILABLE)
         val ENUM_OPTION = Regex("^\\s*(?:(-?\\d+)\\s*[:=]\\s*(.+)|(.+?)\\s*[:=]\\s*(-?\\d+))\\s*$")
         val ON_TOKENS = setOf("ON", "ACTIVE", "CHARGING", "CONNECTED", "TRUE")
         val OFF_TOKENS = setOf("OFF", "INACTIVE", "STOPPED", "DISCONNECTED", "FALSE", "NOT")

@@ -146,7 +146,8 @@ class EvccVehicleDataAdapterTest {
                 resolvedSource = selector.source,
                 descriptor = descriptor,
                 value = value,
-                status = EvccApiContract.Status.AVAILABLE,
+                // EVCC 3.3.0 / EvccApi 1.2 wraps an AVAILABLE value in an OK record.
+                status = EvccApiContract.Status.OK,
             )
         }
 
