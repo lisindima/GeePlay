@@ -1,0 +1,10 @@
+<resources>
+    <string name="setup_error_auth">تعذّر تحميل مصادقة CarPlay. ثبّت نسخة GeePlay الكاملة فوق هذا التطبيق. لا حاجة لإلغاء التثبيت أو تغيير إعدادات نقطة الاتصال.</string>
+    <string name="make_diplay_feel_right_for_your_car">اجعل GeePlay مناسبًا لسيارتك.</string>
+    <string name="settings_language_summary">اختر لغة GeePlay</string>
+    <string name="about_diplay">حول GeePlay</string>
+    <string name="reports_save_to_downloads_diplay">تُحفظ التقارير في Downloads/GeePlay.\u0020</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">في CarPlay، اسحب لأسفل بثلاثة أصابع لفتح إعدادات GeePlay.</string>
+    <string name="diplay">GeePlay</string>
+    <string name="settings_interface_size_hint">حجم النص وعناصر التحكم في شاشات GeePlay. يكبّرها الوضع التلقائي على الشاشات الكبيرة منخفضة الكثافة. لا يتأثر CarPlay.</string>
+</resources>

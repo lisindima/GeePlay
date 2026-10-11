@@ -1,0 +1,10 @@
+<resources>
+    <string name="setup_error_auth">無法載入 CarPlay 認證。請在此 App 上覆蓋安裝完整的 GeePlay 建置版本。無需解除安裝或變更熱點設定。</string>
+    <string name="make_diplay_feel_right_for_your_car">依需求調整 GeePlay 設定。</string>
+    <string name="settings_language_summary">選擇 GeePlay 的語言</string>
+    <string name="about_diplay">關於 GeePlay</string>
+    <string name="reports_save_to_downloads_diplay">報告會儲存至 Downloads/GeePlay。</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">在 CarPlay 介面用三指向下滑動，即可開啟 GeePlay 設定。</string>
+    <string name="diplay">GeePlay</string>
+    <string name="settings_interface_size_hint">GeePlay 自身畫面中文字與控制項的大小。自動模式會在大尺寸低密度螢幕上放大它們。不影響 CarPlay。</string>
+</resources>

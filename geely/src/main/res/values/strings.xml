@@ -1,3 +1,11 @@
 <resources>
-    <string name="app_name">GeePlay</string>
+    <string name="app_name" translatable="false">GeePlay</string>
+    <string name="setup_error_auth">CarPlay authentication could not be loaded. Install the complete GeePlay build over this app. No uninstall or hotspot change is needed.</string>
+    <string name="make_diplay_feel_right_for_your_car">Make GeePlay feel right for your car.</string>
+    <string name="settings_language_summary">Choose a language for GeePlay</string>
+    <string name="about_diplay">About GeePlay</string>
+    <string name="reports_save_to_downloads_diplay">Reports save to Downloads/GeePlay.\u0020</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">In CarPlay, swipe down with three fingers to open GeePlay settings.</string>
+    <string name="diplay">GeePlay</string>
+    <string name="settings_interface_size_hint">Size of text and controls on GeePlay\'s own screens. Automatic enlarges them on large screens with a low density. CarPlay is not affected.</string>
 </resources>

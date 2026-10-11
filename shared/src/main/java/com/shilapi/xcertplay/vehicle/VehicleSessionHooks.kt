@@ -47,8 +47,12 @@ interface VehicleIntegrationProvider {
     fun createVehicleSessionHooks(context: Context): VehicleSessionHooks
     fun mediaAudioPolicy(context: Context): LocalMediaAudioPolicy = LocalMediaAudioPolicy.DIPLAY
     fun vehicleSettings(context: Context): VehicleSettingsController? = null
+    /** Whether this product should render DiPlay's legacy BYD settings and availability copy. */
+    fun legacyBydSettingsAvailable(context: Context): Boolean = true
     /** Whether this product exposes DiPlay's launcher-facing map embedding feature. */
     fun externalMapEmbeddingAvailable(context: Context): Boolean = true
+    /** Visible subdirectory below Downloads used for exported diagnostic reports. */
+    fun diagnosticExportDirectoryName(context: Context): String = "DiPlay"
     fun clusterDisplayPolicy(context: Context): VehicleClusterDisplayPolicy? = null
     fun requiresClusterStream(context: Context): Boolean = false
     fun productDisplayName(context: Context): String = "DiPlay"

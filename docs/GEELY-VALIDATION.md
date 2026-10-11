@@ -6,7 +6,7 @@
 
 - application ID：`com.lllhys.geeplay`
 - debug application ID：`com.lllhys.geeplay.debug`
-- version：`0.2.17-geely.1` / versionCode `1`
+- version：`0.2.17-geely.3` / versionCode `3`
 - update API：`https://api.github.com/repos/lllhys/GeePlay/releases?per_page=3`
 - ECARX permission declaration：`com.permission.adnaviservice`
 - AutoDisplay：不属于产品范围，无模块、查询、权限、action、广播或 service
@@ -302,6 +302,98 @@ Final level:
 
 ## 9. 当前实车结论
 
-`GeelyClusterDisplayPolicy.VALIDATED_PROFILES` 当前故意为空。现有设备为 Google `sdk_gphone64_arm64` 模拟器，仅有内置 display 0，不具备 ECARX/OneOS 服务，也不能授予厂商 signature permission。
+### 9.1 ECARX G636 ADB 证据（2026-10-11）
+
+```text
+Vehicle/head unit: ECARX G636
+Manufacturer/brand/device: QTI / qti / ecarx
+Android: 11 / API 30
+Build fingerprint: qti/ecarx/ecarx:11/RQ3A.211001.001/eng.jenkin.32980801.222706:user/test-keys
+CPU ABI: arm64-v8a, armeabi-v7a, armeabi
+Physical display: 1440x1920 at 160 dpi
+Data free space before install: about 7.9 GiB
+APK: geely-debug.apk
+APK SHA-256 local/device: fcb4d5f2bb2a1f9fc709390d71a0036ab935e3eeb2cf4b14394d6a802d2f660c / same
+Install: pm install -r -t -> Success
+Installed version: 0.2.17-geely.1-debug / versionCode 1
+Cold launch: Status ok / COLD / 2067 ms
+```
+
+厂商接口探测：
+
+| 项目 | 结果 | 结论 |
+| --- | --- | --- |
+| `ecarx.naviservice` | system app 存在 | `AVAILABLE` |
+| `com.ecarx.sdk.openapi` | system app 存在 | `AVAILABLE` |
+| `com.geely.inputservice` | system app 存在 | `AVAILABLE`，协议未确认 |
+| `com.geely.service.oneosapi` | package 不存在 | 当前 OneOS adapter 不可用 |
+| `com.permission.adnaviservice` | source=`ecarx.naviservice`、normal、GeePlay granted | permission `AVAILABLE`；不代表 SDK publish 成功 |
+| GeePlay generic/product MapEmbed action | query-services 0 命中 | 外部 MapEmbed 未暴露 |
+| AutoDisplay package | `pm path`/`pm list packages` 0 命中 | 未安装；GeePlay 无交互入口 |
+
+ADB 恢复后补充结果：
+
+- GeePlay PID 15541 持续存活，process exit history 无 GeePlay 退出记录；
+- TOTAL PSS 约 65.9 MiB，TOTAL RSS 约 151 MiB；
+- AndroidRuntime 唯一 fatal 为车机 `uiautomator` PID 23440 的 Looper NPE，不属于 GeePlay；
+- 主界面、设置 Overview、Navigation 和 Diagnostics 均在 1440×1920 实车屏正确渲染；
+- Navigation 默认关闭 Geely navigation、lane 和 simplified junction，未触发 OEM 写入；
+- Diagnostics：SDK available、permission true、Driver IDLE、failure none、cleanupPending false、OEM method none、session inactive、`0x5201/0x5202/0x5204` 均为 0；
+- media owner 为 `OEM_BLUETOOTH`，retainBluetooth=true；input profile 为 disabled；
+- display 0 为 1440×1920 HDMI，display 1 为 2880×1080 HDMI；validatedProfiles=0、selectedProfile=none、surfaceCreation=not_attempted。
+
+实车截图位于 `docs/images/geely-validation/`。这些证据证明 UI、默认门禁、SDK/permission probe 和进程稳定性，不证明导航已发布到仪表。
+
+### 9.2 一期修复包（待覆盖安装）
+
+```text
+Version: 0.2.17-geely.2-debug / versionCode 2
+First phase-one APK SHA-256: 5cc88dcaec6ec1024141a84e643b4d74f9f014c0dc673f85a12d1a2659e01a3f
+Full CI: BUILD SUCCESSFUL
+Tests: 2439 / failures 0 / errors 0 / skipped 1
+Lint: mobile/home/maphost/vehicle-geely/geely all 0 errors
+Authentication assets: exactly identity.pk8 + certificate.p7b; byte-matched to selected official 0.2.13 inputs
+Repository credential files: 0
+Install state: geely.2 installed with pm install -r -t; firstInstallTime and preference hashes preserved
+Authentication: ready on the real head unit; no missing-identity warning
+Interface size: 150 percent app-only override; system remains 160 dpi
+Final branding-resource APK SHA-256: c38bf62853058e5fc94272f8aff6aeb2a97d6036a78a77cba22254011fb6f347
+Final branding-resource install: pending the next G636 ADB recovery
+```
+
+该包还修复 GeePlay 品牌文案、隐藏遗留 BYD unavailable 提示，并把诊断报告目录切换为 `Downloads/GeePlay`。
+
+### 9.3 当前结论
+
+`GeelyClusterDisplayPolicy.VALIDATED_PROFILES` 当前故意为空。G636 已证明安装、产品隔离、厂商导航 permission grant 和 Activity cold-launch 可用，但没有导航字段、lane、音频、按键或物理仪表的持续运行证据。
 
 因此当前只能确认软件门禁和安全降级；ECARX 导航、lane、媒体 owner、方向盘、junction 和物理仪表仍为 `VEHICLE_PENDING`。GeePlay 不使用 AutoDisplay 作为替代交付路径。
+
+### 9.4 G636 状态栏与 CarPlay 圆角调查
+
+实车复现截图：`docs/images/geely-validation/g636-statusbar-black-repro.png`。
+
+- G636 的 `TopCarSystemBar` 高 88 px 且保持 visible；用户设置 `hide_top_bar=false`。
+- CarPlayHost window 原先固定继承 dark theme 的 `statusBarColor=#0C111B`，即使 CarPlay 已切到日间浅色地图也不刷新。
+- 修复后 host root、status bar、navigation bar 统一跟随 `DiPlayPalette`：日间 `#E9EEF6` 且深色图标，夜间 `#0C111B` 且浅色图标；焦点恢复和外观切换均重申该状态。
+- 回归测试 `visibleSystemBarsFollowTheLiveCarPlayAppearance` 覆盖日/夜两组颜色与 icon appearance。
+
+圆角证据：
+
+- GeePlay video view 没有 outline/clip/corner radius；SurfaceFlinger 对 app window/task 报 `cornerRadius=0`。
+- 当前 `/info` viewArea 和 safeArea 都是完整矩形，inset 全 0，`drawUIOutsideSafeArea=true`。
+- Apple WWDC23 说明 CarPlay 默认自行绘制圆角；corner clipping mask 用于把圆角外黑色三角与车机背景透明混合，不是关闭圆角。
+- 未发现受支持的 corner-radius=0 或 rectangular-corner 属性。按用户要求不裁切视频、不缩放画面、不写未知私有字段。
+- 作为无损试验，CarPlay host root 背景与状态栏使用同一日/夜颜色；若 iPhone 输出角落可透明混合，实车将直接消除色差；若黑色已编码在 H.264 帧内，则该背景不会穿透。
+
+geely.3 构建：
+
+```text
+Version: 0.2.17-geely.3-debug / versionCode 3
+APK SHA-256: b1d2bc90c4290a459af281e904c1d3200e971c247b68b59a0fad12f9eb3a42f8
+Full CI: BUILD SUCCESSFUL in 3m 41s
+Tasks: 358 actionable, 344 executed, 14 up-to-date
+Tests: 2440 / failures 0 / errors 0 / skipped 1
+Credential entries: exactly identity.pk8 + certificate.p7b; selected bytes matched
+Install: pending G636 ADB recovery
+```

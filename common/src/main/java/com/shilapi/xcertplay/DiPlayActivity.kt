@@ -1282,7 +1282,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         settingsPageTitle(content, getString(R.string.settings_navigation), getString(R.string.settings_navigation_summary))
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.NAVIGATION))
         // The BYD card is hidden without its receiver; say so instead of leaving a gap.
-        if (!BydOutputSettings.available(this)) {
+        if (legacyBydSettingsAvailable() && !BydOutputSettings.available(this)) {
             content.addView(label(getString(R.string.settings_byd_navigation_unavailable), 15, MUTED).apply {
                 setPadding(dp(4), 0, dp(4), dp(SETTINGS_BLOCK_GAP_DP))
             })
@@ -2180,7 +2180,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
             }
         }
-        if (BydOutputSettings.available(this)) filteredSection(content, SettingsSection.BYD_NAVIGATION,
+        if (legacyBydSettingsAvailable() && BydOutputSettings.available(this)) filteredSection(content, SettingsSection.BYD_NAVIGATION,
             getString(R.string.byd_navigation), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
                 getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
@@ -2205,6 +2205,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun vehicleSettingsController(): VehicleSettingsController? =
         (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
             ?.vehicleSettings(applicationContext)
+
+    private fun legacyBydSettingsAvailable(): Boolean =
+        (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.legacyBydSettingsAvailable(applicationContext) != false
 
     private fun vehicleSettingsSections(content: LinearLayout) {
         val controller = vehicleSettingsController() ?: return
@@ -5144,7 +5148,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                         .setMessage(when {
                             savedReport.savedInApp -> getString(R.string.diagnostic_report_saved_in_app)
                             savedReport.savedPath != null -> getString(R.string.diagnostic_report_saved_to_path, savedReport.savedPath)
-                            uri == null -> "Downloads/DiPlay/$fileName"
+                            uri == null -> "Downloads/${DiagnosticExportStore.directoryName(this)}/$fileName"
                             else -> getString(R.string.your_report_was_saved_to_the_selected_location)
                         })
                         .setPositiveButton(getString(R.string.view_diagnostic_report)) { _, _ -> showDiagnosticReport(report) }

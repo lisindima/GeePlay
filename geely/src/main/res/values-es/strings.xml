@@ -1,0 +1,10 @@
+<resources>
+    <string name="setup_error_auth">No se pudo cargar la autenticación de CarPlay. Instala la compilación completa de GeePlay sobre esta aplicación. No es necesario desinstalar ni cambiar la configuración del punto de acceso.</string>
+    <string name="make_diplay_feel_right_for_your_car">Haz que GeePlay encaje con tu coche.</string>
+    <string name="settings_language_summary">Elige un idioma para GeePlay</string>
+    <string name="about_diplay">Acerca de GeePlay</string>
+    <string name="reports_save_to_downloads_diplay">Los informes se guardan en Downloads/GeePlay.\u0020</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">En CarPlay, desliza hacia abajo con tres dedos para abrir los ajustes de GeePlay.</string>
+    <string name="diplay">GeePlay</string>
+    <string name="settings_interface_size_hint">Tamaño del texto y los controles en las pantallas de GeePlay. Automático los agranda en pantallas grandes de baja densidad. No afecta a CarPlay.</string>
+</resources>

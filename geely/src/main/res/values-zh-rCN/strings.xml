@@ -1,0 +1,10 @@
+<resources>
+    <string name="setup_error_auth">无法加载 CarPlay 认证。请在本应用之上覆盖安装完整的 GeePlay 构建。无需卸载或更改热点设置。</string>
+    <string name="make_diplay_feel_right_for_your_car">按需调整 GeePlay 设置。</string>
+    <string name="settings_language_summary">选择 GeePlay 的语言</string>
+    <string name="about_diplay">关于 GeePlay</string>
+    <string name="reports_save_to_downloads_diplay">报告将保存到 Downloads/GeePlay。</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">在 CarPlay 界面用三指向下滑动，可打开 GeePlay 设置。</string>
+    <string name="diplay">GeePlay</string>
+    <string name="settings_interface_size_hint">GeePlay 自身界面中文字和控件的大小。自动模式会在大尺寸低密度屏幕上放大它们。不影响 CarPlay。</string>
+</resources>
