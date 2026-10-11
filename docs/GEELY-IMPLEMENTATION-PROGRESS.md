@@ -223,13 +223,81 @@ BUILD SUCCESSFUL in 3m 29s
 - 清空 logcat 后未发现该进程的 `FATAL EXCEPTION`；
 - 未提供 `DIPLAY_AUTH_ASSETS_DIR` 时只出现预期的 `offline-mfi/identity.pk8` 缺失提示。
 
-当前可用设备是 Google `sdk_gphone64_arm64` 模拟器，不是吉利车机；它不能验证：
+### G636 实车 ADB 安装与初步探测
 
-- `com.permission.adnaviservice` 的实际授予和 ECARX 物理仪表输出；
+2026-10-11 连接到 ECARX `G636` 物理车机并完成以下验证：
+
+- Android 11 / API 30，build fingerprint 为 `qti/ecarx/ecarx:11/RQ3A.211001.001/eng.jenkin.32980801.222706:user/test-keys`；
+- 物理显示为 1440×1920、160 dpi，`/data` 剩余约 7.9 GiB；
+- 系统存在 `ecarx.naviservice`、`com.ecarx.sdk.openapi`、`com.geely.inputservice`；
+- Spec 当前 OneOS Binder target `com.geely.service.oneosapi` 不存在，不能把 `com.geely.inputservice` 直接当成同一协议；
+- `com.permission.adnaviservice` 由 `ecarx.naviservice` 定义为 normal permission；GeePlay 安装后显示 `granted=true`；
+- 使用禁用 sync compression 的 USB push 后，车机端 APK SHA-256 与本地一致；`pm install -r -t` 成功；
+- 已安装版本为 `0.2.17-geely.1-debug`，versionCode 1；
+- 通用和 GeePlay 两个 MapEmbed action 都不能解析到 GeePlay service；
+- AutoDisplay package 未安装，GeePlay 也没有相关 service/action；
+- `DiPlayActivity` cold launch 返回 `Status: ok`、`LaunchState: COLD`、`TotalTime: 2067 ms`。
+
+ADB 后续恢复并补齐了启动后证据：GeePlay PID 15541 持续存活，Activity task 保留，process exit history 为空；TOTAL PSS 约 65.9 MiB、RSS 约 151 MiB。AndroidRuntime 中唯一 fatal 来自车机 `uiautomator` 自身的 Looper 空指针（PID 23440），不是 GeePlay。
+
+实车截图确认主界面、设置 Overview、Navigation 和 Diagnostics 正常渲染。诊断显示 `sdk=true`、`adnaviservicePermission=true`、Driver=`IDLE`、cleanupPending=false、OEM method=`none`、route frames 全部为 0；默认没有写 OEM。显示探测发现 display 0 `HDMI 屏幕` 1440×1920 和 display 1 `HDMI 屏幕` 2880×1080，但 `validatedProfiles=0`、selectedProfile=none、surfaceCreation=not_attempted，因此没有误投物理仪表。
+
+该 G636 证据仍不能验证：
+
+- ECARX Driver connect/publish 和原车仪表实际显示；
 - 真实 `0x5204`/junction TLV、laneNumber/Bitmap/iconId 语义；
 - OneOS 注册/注销/death 和方向盘一次一动作；
 - Flyme 广播 sender；
 - 物理 display profile、OEM enter/restore 和强停恢复；
 - 原车蓝牙音乐 owner 的可听结果。
 
-这些门禁保持 `VEHICLE_PENDING`，不会由模拟器或类探测升级为已支持。
+这些门禁保持 `VEHICLE_PENDING`，不会由安装成功、permission granted 或类探测升级为已支持。下一步在含认证资产的新包上连接 iPhone，验证路线开始/更新/结束清理。
+
+### 2026-10-11：一期实车反馈修复包
+
+- 版本提升为 `0.2.17-geely.2-debug` / versionCode 2，便于确认覆盖升级。
+- 从 G636 已安装的官方 DiPlay 0.2.13 只读提取两项 runtime authentication asset 到仓库外临时目录；PKCS#8/PKCS#7 解析通过。
+- Gradle 仅允许 `identity.pk8` 和 `certificate.p7b`，APK 内条目与选定输入逐字节一致；本机构建后已删除临时私钥目录，仓库仍为 0 credential 文件。
+- GeePlay 七个 locale 覆盖实车可见品牌文案；设置 Overview、语言、About、认证错误、三指手势和报告目录不再显示 DiPlay。
+- `VehicleIntegrationProvider` 增加 legacy BYD 设置和诊断目录 seam；GeePlay 隐藏 BYD unavailable 文案，普通 DiPlay 默认行为不变。
+- 诊断报告实际写入 `Downloads/GeePlay`，不再出现文案与落盘路径不一致。
+
+完整门禁最终有效结果：
+
+```text
+BUILD SUCCESSFUL in 2s
+358 actionable tasks: 22 executed, 336 up-to-date
+```
+
+测试合计 2439 项（0 failures、0 errors、1 skipped）；五个 lint 目标均为 0 errors。第一次全量运行中 3 个 `LocalAdb` 时序测试在高并发下失败，专项复跑全部通过，随后完整命令通过。
+
+新 APK：
+
+- `geely/build/outputs/apk/debug/geely-debug.apk`
+- 首次一期包 SHA-256：`5cc88dcaec6ec1024141a84e643b4d74f9f014c0dc673f85a12d1a2659e01a3f`
+- 认证条目：恰好两项，且与选定输入匹配
+- merged manifest / APK AutoDisplay 专用项：0 命中
+- G636 已用 `pm install -r -t` 从 geely.1 覆盖到 geely.2：firstInstallTime 和五份 shared preferences 的 hash 全部保持，未卸载、未清数据。
+- 新包冷启动后认证错误消失，原配对手机仍被识别，证明 runtime authentication asset 已成功加载。
+- G636 的 InterfaceSize AUTO 因 `smallestWidthDp=1440` 放大到 200%；按用户反馈改为应用内 150%（等效 240 dpi），不修改车机全局 160 dpi，也不影响 CarPlay 画面。
+- 实车截图：`docs/images/geely-validation/g636-geely.2-size150.png`。
+- 150% 截图发现首页标题资源仍为 DiPlay；补充 `diplay` 与 interface-size hint 的七 locale 覆盖后，完整 CI 再次通过。
+- 最终品牌资源包 SHA-256：`c38bf62853058e5fc94272f8aff6aeb2a97d6036a78a77cba22254011fb6f347`；当前等待 G636 ADB 恢复后再覆盖一次并清理 `/data/local/tmp` 安装文件。
+
+### 2026-10-11：G636 投屏外观修复
+
+- 实车确认顶部 88 px 是 visible `TopCarSystemBar`，并非视频黑边；CarPlayHost 的 window 仍使用 dark theme 初始色，未随日间 CarPlay 切换。
+- 新增 `applySystemBarAppearance()`，在创建、焦点恢复、fullscreen 重申和实时日夜切换时同步 host root/status/navigation bar 的颜色与 icon appearance。
+- 用户建议用相同背景融合 CarPlay 圆角：host root 不再固定 `Color.BLACK`，改为与 system bar 共用日/夜 palette。
+- SurfaceFlinger 显示 app/task corner radius 为 0；`/info` 为全屏矩形 safe/view area。Apple 公开能力只有 corner clipping mask 混合，不提供关闭 CarPlay 自绘圆角的 radius 属性。
+- 明确未采用视频裁切、overscan、缩放或未知私有协议字段。
+- 版本提升为 `0.2.17-geely.3-debug` / versionCode 3。
+
+最终完整 CI：
+
+```text
+BUILD SUCCESSFUL in 3m 41s
+358 actionable tasks: 344 executed, 14 up-to-date
+```
+
+测试合计 2440 项（0 failures、0 errors、1 skipped），五个 lint 目标均为 0 errors。APK SHA-256 为 `b1d2bc90c4290a459af281e904c1d3200e971c247b68b59a0fad12f9eb3a42f8`；等待 G636 ADB 恢复后覆盖安装并采集同一 CarPlay 日间画面的对比截图。

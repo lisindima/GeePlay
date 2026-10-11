@@ -14,6 +14,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.math.roundToInt
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,6 +53,11 @@ class GeePlaySettingsScreenshotsTest {
                 layout(root, widthDp)
                 assertTrue(descendants(root).filterIsInstance<TextView>().any {
                     it.text == activity.getString(GeelyR.string.settings_geely_navigation_title)
+                })
+                assertFalse(descendants(root).filterIsInstance<TextView>().any {
+                    it.text == activity.getString(
+                        com.shilapi.xcertplay.host.R.string.settings_byd_navigation_unavailable,
+                    )
                 })
                 writeScreenshot(root, "$locale-${widthDp}dp-font-$fontScale.png")
             } finally {

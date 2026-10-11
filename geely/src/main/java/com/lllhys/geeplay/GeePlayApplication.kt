@@ -56,7 +56,11 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
     override fun vehicleSettings(context: Context): VehicleSettingsController =
         GeelyVehicleSettingsController()
 
+    override fun legacyBydSettingsAvailable(context: Context): Boolean = false
+
     override fun externalMapEmbeddingAvailable(context: Context): Boolean = false
+
+    override fun diagnosticExportDirectoryName(context: Context): String = "GeePlay"
 
     override fun clusterDisplayPolicy(context: Context): VehicleClusterDisplayPolicy =
         GeelyClusterDisplayPolicy(enabled = GeelyClusterDisplaySettings.enabled(context))

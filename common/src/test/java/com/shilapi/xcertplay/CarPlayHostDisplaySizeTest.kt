@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay
 
 import android.graphics.Matrix
+import android.graphics.drawable.ColorDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
@@ -242,6 +243,27 @@ class CarPlayHostDisplaySizeTest {
                 assertWindowBars(hideTop, hideBottom)
             }
         }
+    }
+
+    @Suppress("DEPRECATION")
+    @Test fun visibleSystemBarsFollowTheLiveCarPlayAppearance() {
+        val root = android.widget.FrameLayout(activity)
+        setField("hostRoot", root)
+        setField("appNight", false)
+        invoke("applySystemBarAppearance")
+        assertEquals(DiPlayPalette.LIGHT.systemBar, activity.window.statusBarColor)
+        assertEquals(DiPlayPalette.LIGHT.systemBar, activity.window.navigationBarColor)
+        assertEquals(DiPlayPalette.LIGHT.systemBar, (root.background as ColorDrawable).color)
+        assertTrue(activity.window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR != 0)
+        assertTrue(activity.window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR != 0)
+
+        setField("appNight", true)
+        invoke("applySystemBarAppearance")
+        assertEquals(DiPlayPalette.DARK.systemBar, activity.window.statusBarColor)
+        assertEquals(DiPlayPalette.DARK.systemBar, activity.window.navigationBarColor)
+        assertEquals(DiPlayPalette.DARK.systemBar, (root.background as ColorDrawable).color)
+        assertFalse(activity.window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR != 0)
+        assertFalse(activity.window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR != 0)
     }
 
     @Test fun menuBarChangesPreviewWithoutSavingAndCancelRestoresTheSavedValues() {

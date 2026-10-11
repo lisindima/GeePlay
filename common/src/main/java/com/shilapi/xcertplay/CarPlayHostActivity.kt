@@ -311,6 +311,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
 
     // The full-window viewport stays independent of the letterboxed SurfaceView dimensions.
+    private var hostRoot: FrameLayout? = null
     private var videoView: View? = null
     private var fallbackVideoView: SurfaceView? = null
     private var fallbackVideoBounds: CarPlaySurfaceBounds? = null
@@ -1568,7 +1569,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun buildContentView(): View {
-        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        val root = FrameLayout(this).also { hostRoot = it }
         val video = TextureView(this).apply {
             isOpaque = false
             surfaceTextureListener = textureListener
@@ -2356,8 +2357,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun refreshAppAppearance() {
         val nextNight = resolveAppNightNow(darkMode)
-        if (nextNight == appNight) return
+        if (nextNight == appNight) {
+            applySystemBarAppearance()
+            return
+        }
         appNight = nextNight
+        applySystemBarAppearance()
 
         settingsMenu?.let { previous ->
             val parent = previous.parent as? ViewGroup ?: return@let
@@ -5893,6 +5898,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun applyFullscreenMode() {
+        applySystemBarAppearance()
         val multiWindow = isMultiWindowActive()
         val hideTop = hideTopBar && !multiWindow
         val hideBottom = hideBottomBar && !multiWindow
@@ -5910,6 +5916,18 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         controller.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    @Suppress("DEPRECATION")
+    private fun applySystemBarAppearance() {
+        val palette = DiPlayPalette.of(appNight)
+        hostRoot?.setBackgroundColor(palette.systemBar)
+        window.statusBarColor = palette.systemBar
+        window.navigationBarColor = palette.systemBar
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = palette.systemBarIconsAreDark
+            isAppearanceLightNavigationBars = palette.systemBarIconsAreDark
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()

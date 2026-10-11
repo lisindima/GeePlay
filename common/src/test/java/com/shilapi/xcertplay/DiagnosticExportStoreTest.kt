@@ -45,6 +45,12 @@ class DiagnosticExportStoreTest {
         assertFalse(provider.deleted)
     }
 
+    @Test fun productDirectoryIsUsedForTheMediaStorePath() {
+        DiagnosticExportStore.saveToDownloads(resolver, "GeePlay-test.txt", "report", "GeePlay")
+
+        assertEquals("Download/GeePlay", provider.insertValues!!.getAsString(MediaStore.Downloads.RELATIVE_PATH))
+    }
+
     @Test fun unavailableDownloadsDoesNotReturnFalseSuccess() {
         provider.refuseInsert = true
         assertThrows(IOException::class.java) {
