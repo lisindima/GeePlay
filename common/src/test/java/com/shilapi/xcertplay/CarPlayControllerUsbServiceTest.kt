@@ -12,6 +12,7 @@ import com.shilapi.xcertplay.hud.BydNavigationOutputs
 import com.shilapi.xcertplay.orchestration.*
 import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
 import com.shilapi.xcertplay.transport.UsbDeviceId
+import com.shilapi.xcertplay.vehicle.CarPlayVehicleDataSession
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
@@ -89,6 +90,23 @@ class CarPlayControllerUsbServiceTest {
         assertEquals(1, context.unregistered)
     }
 
+    @Test fun controllerClosesItsVehicleDataSessionExactlyOnce() {
+        val context = UsbContext(false)
+        var releases = 0
+        val controller = controller(
+            context,
+            CarPlayTransport.WIRED,
+            MfiTarget.LOCAL,
+            CarPlayVehicleDataSession(release = { releases++ }),
+        )
+
+        controller.close()
+        assertTrue(controller.awaitClosed(2_000))
+        controller.close()
+
+        assertEquals(1, releases)
+    }
+
     private fun missingServiceFailsNormally(transport: CarPlayTransport, target: MfiTarget) {
         val context = UsbContext(false)
         val controller = controller(context, transport, target)
@@ -99,7 +117,12 @@ class CarPlayControllerUsbServiceTest {
         assertEquals(0, context.receivers.size)
     }
 
-    private fun controller(context: Context, transport: CarPlayTransport, target: MfiTarget): CarPlayController =
+    private fun controller(
+        context: Context,
+        transport: CarPlayTransport,
+        target: MfiTarget,
+        vehicleDataSession: CarPlayVehicleDataSession? = null,
+    ): CarPlayController =
         CarPlayController(context, CarPlayRuntimeConfig(
             mfiTarget = target, transport = transport,
             ch341Devices = if (target == MfiTarget.USB_CH341) listOf(UsbDeviceId(0x1a86, 0x7523)) else emptyList(),
@@ -107,7 +130,9 @@ class CarPlayControllerUsbServiceTest {
                 serialNumber = "test", firmwareVersion = "1", hardwareVersion = "1", carPlayUsbInterfaceNumber = 3),
         ), AirPlayConfig("test", "test", "", "1", AirPlayDisplayConfig(800, 480)),
             AirPlayIdentity(ByteArray(32), ByteArray(32), "test"), PairingStore(),
-            object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, statuses::add).also(controllers::add)
+            object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, statuses::add,
+            vehicleDataSession = vehicleDataSession,
+        ).also(controllers::add)
 
     private class UsbContext(private val hasUsb: Boolean) : ContextWrapper(RuntimeEnvironment.getApplication()) {
         val receivers = mutableMapOf<BroadcastReceiver, IntentFilter>()

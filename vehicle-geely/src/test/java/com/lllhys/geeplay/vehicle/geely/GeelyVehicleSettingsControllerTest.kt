@@ -4,6 +4,7 @@ import android.content.Context
 import com.shilapi.xcertplay.media.MediaOutputOwner
 import com.shilapi.xcertplay.vehicle.VehicleSettingRow
 import com.shilapi.xcertplay.vehicle.VehicleSettingsPlacement
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataSettings
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +26,8 @@ class GeelyVehicleSettingsControllerTest {
         )
         GeelyMediaSettings.saveOwner(context, MediaOutputOwner.OEM_BLUETOOTH)
         GeelyInputSettings.saveProfile(context, GeelyInputProfile.DISABLED)
+        EvccVehicleDataSettings.saveVehicleStatusEnabled(context, false)
+        EvccVehicleDataSettings.saveVehicleSpeedEnabled(context, false)
     }
 
     @Test
@@ -50,7 +53,7 @@ class GeelyVehicleSettingsControllerTest {
             GeelyNavigationConfig(true, GeelyNavigationBackend.AUTO, true, false, 0),
         )
         val backend = GeelyVehicleSettingsController().cards(context)
-            .single { it.placement == VehicleSettingsPlacement.NAVIGATION }
+            .single { it.id == "geely_navigation" }
             .rows.filterIsInstance<VehicleSettingRow.Choice>()
             .single { it.id == "geely_navigation_backend" }
 
@@ -93,10 +96,10 @@ class GeelyVehicleSettingsControllerTest {
     @Test
     fun `unvalidated physical display and junction rendering remain disabled`() {
         val cards = GeelyVehicleSettingsController().cards(context)
-        val display = cards.single { it.placement == VehicleSettingsPlacement.ADVANCED }
+        val display = cards.single { it.id == "geely_cluster_display" }
             .rows.filterIsInstance<VehicleSettingRow.Toggle>()
             .single { it.id == "geely_cluster_display_enabled" }
-        val junction = cards.single { it.placement == VehicleSettingsPlacement.NAVIGATION }
+        val junction = cards.single { it.id == "geely_navigation" }
             .rows.filterIsInstance<VehicleSettingRow.Toggle>()
             .single { it.id == "geely_semantic_junction_enabled" }
 
@@ -117,6 +120,27 @@ class GeelyVehicleSettingsControllerTest {
 
         assertEquals(com.shilapi.xcertplay.vehicle.VehicleSettingEffect.REFRESH_SETTINGS, input.effect)
         assertEquals(com.shilapi.xcertplay.vehicle.VehicleSettingEffect.NEXT_CONNECTION, media.effect)
+    }
+
+    @Test
+    fun `EVCC vehicle data is opt in and connection scoped`() {
+        val card = GeelyVehicleSettingsController().cards(context)
+            .single { it.id == "geely_evcc_vehicle_data" }
+        val toggles = card.rows.filterIsInstance<VehicleSettingRow.Toggle>().associateBy { it.id }
+
+        assertEquals(VehicleSettingsPlacement.ADVANCED, card.placement)
+        assertFalse(toggles.getValue("geely_evcc_vehicle_status").checked)
+        assertFalse(toggles.getValue("geely_evcc_vehicle_speed").checked)
+        assertEquals(
+            com.shilapi.xcertplay.vehicle.VehicleSettingEffect.NEXT_CONNECTION,
+            toggles.getValue("geely_evcc_vehicle_status").effect,
+        )
+
+        toggles.getValue("geely_evcc_vehicle_status").save(true)
+        toggles.getValue("geely_evcc_vehicle_speed").save(true)
+
+        assertTrue(EvccVehicleDataSettings.vehicleStatusEnabled(context))
+        assertTrue(EvccVehicleDataSettings.vehicleSpeedEnabled(context))
     }
 
     @Test

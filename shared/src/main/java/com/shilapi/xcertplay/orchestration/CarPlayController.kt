@@ -172,6 +172,7 @@ class CarPlayController(
     private val clearPairRecord: () -> Unit = {},
     private val locationProvider: Iap2LocationProvider? = null,
     private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
+    private val vehicleDataSession: com.shilapi.xcertplay.vehicle.CarPlayVehicleDataSession? = null,
     private val vehicleHooks: VehicleSessionHooks = VehicleSessionHooks.NONE,
 ) : Closeable {
     init {
@@ -669,6 +670,7 @@ class CarPlayController(
                     wirelessRuntimeIdentification = null
                     wirelessAirPlayEndpoint = null
                     closeBestEffort("location provider") { locationProvider?.close() }
+                    closeBestEffort("vehicle data session") { vehicleDataSession?.close() }
                 } finally {
                     executor.shutdownNow()
                     var executorTerminated = false

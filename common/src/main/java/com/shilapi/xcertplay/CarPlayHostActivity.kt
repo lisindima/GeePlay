@@ -112,6 +112,7 @@ import com.shilapi.xcertplay.transport.Iap2LocationProvider
 import com.shilapi.xcertplay.transport.IphoneUsbMatcher
 import com.shilapi.xcertplay.transport.UsbDeviceId
 import com.shilapi.xcertplay.transport.VehicleSpeedLocationProvider
+import com.shilapi.xcertplay.vehicle.CarPlayVehicleDataSession
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
@@ -154,7 +155,9 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     // CH341 USB\VID_1A86&PID_5512&REV_0304 is the deployment-supplied bridge identity.
-    private fun createRuntimeConfig(): CarPlayRuntimeConfig = CarPlayRuntimeConfig(
+    private fun createRuntimeConfig(): CarPlayRuntimeConfig = createRuntimeConfig(null)
+
+    private fun createRuntimeConfig(vehicleData: CarPlayVehicleDataSession?): CarPlayRuntimeConfig = CarPlayRuntimeConfig(
         mfiTarget = mfiTarget,
         ch341Devices = if (mfiTarget == MfiTarget.USB_CH341) {
             listOf(UsbDeviceId(0x1a86, 0x5512))
@@ -180,9 +183,14 @@ class CarPlayHostActivity : ComponentActivity() {
             hardwareVersion = "1.0",
             carPlayUsbInterfaceNumber = 3,
             locationInformationEnabled = locationReportingEnabled,
-            vehicleStatusEnabled = com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this),
-            chargingConnectors = com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
-            vehicleSpeedEnabled = locationReportingEnabled && com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this),
+            vehicleStatusEnabled = vehicleData?.statusProvider != null ||
+                vehicleData == null && com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this),
+            chargingConnectors = vehicleData?.chargingConnectors
+                ?: com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
+            vehicleSpeedEnabled = locationReportingEnabled && (
+                vehicleData?.speedSource != null ||
+                    vehicleData == null && com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this)
+                ),
         ),
         label = productDisplayName(),
         hostName = productIdentifierPrefix().lowercase(Locale.ROOT) + "-" +
@@ -4911,7 +4919,16 @@ class CarPlayHostActivity : ComponentActivity() {
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || controller != null) return
         val controllerGeneration = restartGeneration
-        val config = createRuntimeConfig()
+        val vehicleDataAdapter = (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.carPlayVehicleDataAdapter(applicationContext)
+            ?: com.shilapi.xcertplay.hud.BydVehicleDataAdapter(applicationContext)
+        val vehicleData = runCatching {
+            vehicleDataAdapter.prepare()
+            vehicleDataAdapter.createSession()
+        }.onFailure { error ->
+            appendLog("Vehicle data unavailable: ${error.javaClass.simpleName}")
+        }.getOrElse { CarPlayVehicleDataSession() }
+        val config = createRuntimeConfig(vehicleData)
         val effectiveSize = if (isMultiWindowActive() && !AirPlayPersistence.loadAdaptPipResolution(this) &&
             maximumDetectedWidthPixels >= size.width && maximumDetectedHeightPixels >= size.height &&
             (maximumDetectedWidthPixels > size.width || maximumDetectedHeightPixels > size.height)) {
@@ -4925,7 +4942,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 !config.locationReportingEnabled -> null
                 config.identification.vehicleSpeedEnabled -> VehicleSpeedLocationProvider(
                     AndroidCarPlayLocationProvider(this),
-                    com.shilapi.xcertplay.hud.BydNavigationOutputs.wheelSpeed(applicationContext),
+                    vehicleData.speedSource!!,
                 )
                 else -> AndroidCarPlayLocationProvider(this)
             }
@@ -4980,11 +4997,8 @@ class CarPlayHostActivity : ComponentActivity() {
             savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
             clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
             locationProvider = locationProvider,
-            vehicleStatusProvider = if (com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this)) {
-                com.shilapi.xcertplay.hud.BydNavigationOutputs.batteryStatus(applicationContext)
-            } else {
-                null
-            },
+            vehicleStatusProvider = vehicleData.statusProvider,
+            vehicleDataSession = vehicleData,
             vehicleHooks = (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
                 ?.createVehicleSessionHooks(applicationContext)
                 ?: com.shilapi.xcertplay.hud.BydVehicleSessionHooks(applicationContext),

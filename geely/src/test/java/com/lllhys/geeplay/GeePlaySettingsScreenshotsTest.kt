@@ -46,7 +46,7 @@ class GeePlaySettingsScreenshotsTest {
             Triple("en", 1280, 1.5f),
             Triple("ar", 600, 1.3f),
         ).forEach { (locale, widthDp, fontScale) ->
-            val activity = openNavigationSettings(locale, widthDp, fontScale)
+            val activity = openSettings(locale, widthDp, fontScale, "NAVIGATION")
             try {
                 val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
                 layout(root, widthDp)
@@ -61,7 +61,37 @@ class GeePlaySettingsScreenshotsTest {
         }
     }
 
-    private fun openNavigationSettings(locale: String, widthDp: Int, fontScale: Float): DiPlayActivity {
+    @Test
+    fun writesCompactFullAndArabicEvccSettingsScreenshots() {
+        listOf(
+            Triple("en", 600, 1.3f),
+            Triple("en", 1280, 1.5f),
+            Triple("ar", 600, 1.3f),
+        ).forEach { (locale, widthDp, fontScale) ->
+            val activity = openSettings(locale, widthDp, fontScale, "ADVANCED")
+            try {
+                val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+                layout(root, widthDp)
+                val evccTitle = descendants(root).filterIsInstance<TextView>().firstOrNull {
+                    it.text == activity.getString(GeelyR.string.settings_geely_evcc_title)
+                }
+                assertTrue(evccTitle != null)
+                val evccCard = settingsCardFor(evccTitle!!)
+                assertTrue(evccCard.width > 0 && evccCard.height > 0)
+                writeScreenshot(evccCard, "evcc-$locale-${widthDp}dp-font-$fontScale.png")
+            } finally {
+                activity.finish()
+                shadowOf(Looper.getMainLooper()).idle()
+            }
+        }
+    }
+
+    private fun openSettings(
+        locale: String,
+        widthDp: Int,
+        fontScale: Float,
+        categoryName: String,
+    ): DiPlayActivity {
         RuntimeEnvironment.setQualifiers("$locale-w${widthDp}dp-h960dp-mdpi")
         val app = RuntimeEnvironment.getApplication()
         app.resources.updateConfiguration(
@@ -77,10 +107,10 @@ class GeePlaySettingsScreenshotsTest {
             Intent(app, DiPlayActivity::class.java).putExtra("page", "settings"),
         ).setup().get()
         val categoryClass = Class.forName("com.shilapi.xcertplay.SettingsCategory") as Class<out Enum<*>>
-        val navigation = categoryClass.enumConstants.single { it.name == "NAVIGATION" }
+        val category = categoryClass.enumConstants.single { it.name == categoryName }
         DiPlayActivity::class.java.getDeclaredField("settingsCategory").apply {
             isAccessible = true
-            set(activity, navigation)
+            set(activity, category)
         }
         DiPlayActivity::class.java.getDeclaredMethod("render").apply { isAccessible = true }.invoke(activity)
         shadowOf(Looper.getMainLooper()).idle()
@@ -112,6 +142,10 @@ class GeePlaySettingsScreenshotsTest {
             bitmap.recycle()
         }
     }
+
+    private fun settingsCardFor(target: View): View =
+        generateSequence(target.parent as? View) { it.parent as? View }
+            .first { it is ViewGroup && it.background != null }
 
     private fun descendants(view: View): Sequence<View> = sequence {
         yield(view)

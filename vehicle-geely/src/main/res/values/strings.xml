@@ -44,4 +44,17 @@
     <string name="settings_geely_diagnostics_status">Navigation SDK: %1$s\nDriver: %2$s\nLast failure: %3$s</string>
     <string name="settings_geely_available">available</string>
     <string name="settings_geely_unavailable">not detected</string>
+    <string name="settings_geely_evcc_title">EVCC vehicle data (experimental)</string>
+    <string name="settings_geely_evcc_description">Reads approved vehicle data from EVCC 1.2 and sends supported battery, range, speed and gear information to the connected iPhone. Changes apply on the next connection.</string>
+    <string name="settings_geely_evcc_vehicle_status">Send battery and range to CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_status_description">Shares traction-battery percentage, remaining range and charging state with the connected iPhone when EVCC provides a verified reading. Applies on the next connection.</string>
+    <string name="settings_geely_evcc_vehicle_speed">Send vehicle speed to CarPlay positioning</string>
+    <string name="settings_geely_evcc_vehicle_speed_description">Adds EVCC wheel speed and gear to location updates requested by the iPhone. Location sharing must also be enabled. Applies on the next connection.</string>
+    <string name="settings_geely_evcc_low_charge_percent">Low-charge warning</string>
+    <string name="settings_geely_evcc_charging_connectors">Charging connectors</string>
+    <string name="settings_geely_evcc_confirm_title">Enable EVCC vehicle data?</string>
+    <string name="settings_geely_evcc_confirm_message">GeePlay will read the selected vehicle values from EVCC and share them with the connected iPhone. EVCC authorization is still required.</string>
+    <string name="settings_geely_evcc_confirm_action">Enable</string>
+    <string name="settings_geely_evcc_open_settings">Open EVCC authorization</string>
+    <string name="settings_geely_evcc_unavailable">EVCC vehicle-data adapter is unavailable.</string>
 </resources>

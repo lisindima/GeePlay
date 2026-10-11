@@ -44,4 +44,17 @@
     <string name="settings_geely_diagnostics_status">SDK الملاحة: %1$s\nبرنامج التشغيل: %2$s\nآخر فشل: %3$s</string>
     <string name="settings_geely_available">متاح</string>
     <string name="settings_geely_unavailable">غير مكتشف</string>
+    <string name="settings_geely_evcc_title">بيانات مركبة EVCC (تجريبي)</string>
+    <string name="settings_geely_evcc_description">يقرأ بيانات المركبة المصرح بها من EVCC 1.2 ويرسل معلومات البطارية والمدى والسرعة والترس المدعومة إلى iPhone المتصل. تُطبق التغييرات عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_vehicle_status">إرسال البطارية والمدى إلى CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_status_description">يشارك نسبة بطارية الدفع والمدى المتبقي وحالة الشحن عندما يوفر EVCC قراءة موثوقة. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_vehicle_speed">إرسال سرعة المركبة إلى تحديد موقع CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_speed_description">يضيف سرعة العجلات والترس من EVCC إلى بيانات الموقع التي يطلبها iPhone. يجب تفعيل مشاركة الموقع أيضًا. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_low_charge_percent">حد تحذير انخفاض الشحن</string>
+    <string name="settings_geely_evcc_charging_connectors">موصلات الشحن</string>
+    <string name="settings_geely_evcc_confirm_title">هل تريد تفعيل بيانات EVCC؟</string>
+    <string name="settings_geely_evcc_confirm_message">سيقرأ GeePlay قيم المركبة المحددة من EVCC ويشاركها مع iPhone المتصل. ما زال تفويض EVCC مطلوبًا.</string>
+    <string name="settings_geely_evcc_confirm_action">تفعيل</string>
+    <string name="settings_geely_evcc_open_settings">فتح تفويض EVCC</string>
+    <string name="settings_geely_evcc_unavailable">مهايئ بيانات مركبة EVCC غير متاح.</string>
 </resources>

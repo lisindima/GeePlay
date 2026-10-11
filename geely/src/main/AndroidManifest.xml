@@ -4,9 +4,11 @@
 
     <queries>
         <package android:name="com.geely.service.oneosapi" />
+        <package android:name="com.kooo.evcc" />
     </queries>
 
     <uses-permission android:name="com.permission.adnaviservice" />
+    <uses-permission android:name="com.kooo.evcc.permission.ACCESS_EVCC_API" />
 
     <application
         android:name=".GeePlayApplication"

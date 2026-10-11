@@ -34,6 +34,7 @@ class GeePlayApplicationTest {
             application.updateReleasesUrl(application),
         )
         assertEquals(MediaOutputOwner.OEM_BLUETOOTH, application.mediaAudioPolicy(application).owner)
+        assertNotNull(application.carPlayVehicleDataAdapter(application))
         assertEquals(
             setOf(
                 VehicleSettingsPlacement.NAVIGATION,

@@ -1,0 +1,9 @@
+{
+  "archiveFormat": 1,
+  "contractHash": "evccapi-1.2",
+  "demoVersion": "1.2.0",
+  "evccApiMajor": 1,
+  "evccApiMinor": 2,
+  "publicSourceRevision": "46266dfc39c675f903b74a30c6d9a74350a199e70a52286eaba375041c91d335",
+  "releaseSigningMaterialIncluded": false
+}

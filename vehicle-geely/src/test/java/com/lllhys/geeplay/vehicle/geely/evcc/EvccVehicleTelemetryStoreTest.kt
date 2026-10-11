@@ -1,0 +1,211 @@
+package com.lllhys.geeplay.vehicle.geely.evcc
+
+import com.kooo.evcc.evccapi.EvccApiContract
+import com.kooo.evcc.evccapi.EvccPropertyDescriptor
+import com.kooo.evcc.evccapi.EvccPropertyRecord
+import com.kooo.evcc.evccapi.EvccPropertySelector
+import com.kooo.evcc.evccapi.EvccValue
+import com.shilapi.xcertplay.transport.VehicleGear
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class EvccVehicleTelemetryStoreTest {
+    private var now = 1_000L
+    private val store = EvccVehicleTelemetryStore { now }
+
+    @Test
+    fun `complete battery state becomes a CarPlay vehicle snapshot`() {
+        accept(EvccLogicalSignal.BATTERY_SOC, 1_051_136L, EvccValue.ofDouble(50.0))
+        accept(EvccLogicalSignal.RANGE_EV_KM, 1_054_976L, EvccValue.ofDouble(210.4))
+        accept(EvccLogicalSignal.CHARGING, 605_225_728L, EvccValue.ofLong(1))
+
+        val snapshot = store.vehicleStatus(lowChargePercent = 20)!!
+
+        assertEquals(210, snapshot.rangeKm)
+        assertEquals(50.0, snapshot.batteryPercent, 0.0)
+        assertEquals(421, snapshot.maxRangeKm)
+        assertTrue(snapshot.charging)
+        assertFalse(snapshot.rangeWarning)
+        assertNull(snapshot.currentChargeWh)
+        assertNull(snapshot.maxChargeWh)
+    }
+
+    @Test
+    fun `battery snapshot waits for required values and rejects invalid values`() {
+        accept(EvccLogicalSignal.BATTERY_SOC, 1_051_136L, EvccValue.ofDouble(101.0))
+        accept(EvccLogicalSignal.RANGE_EV_KM, 1_054_976L, EvccValue.ofDouble(100.0))
+        accept(EvccLogicalSignal.CHARGING, 605_225_728L, EvccValue.ofLong(0))
+
+        assertNull(store.vehicleStatus(lowChargePercent = 20))
+
+        accept(EvccLogicalSignal.BATTERY_SOC, 1_051_136L, EvccValue.ofDouble(15.0))
+        assertTrue(store.vehicleStatus(lowChargePercent = 20)!!.rangeWarning)
+    }
+
+    @Test
+    fun `charging state is required and accepts only a recognized state`() {
+        accept(EvccLogicalSignal.BATTERY_SOC, 1_051_136L, EvccValue.ofDouble(60.0))
+        accept(EvccLogicalSignal.RANGE_EV_KM, 1_054_976L, EvccValue.ofDouble(240.0))
+
+        assertNull(store.vehicleStatus(lowChargePercent = 20))
+
+        accept(EvccLogicalSignal.CHARGING, 605_225_728L, EvccValue.ofLong(0))
+        assertFalse(store.vehicleStatus(lowChargePercent = 20)!!.charging)
+
+        accept(EvccLogicalSignal.CHARGING, 605_225_728L, EvccValue.ofLong(1))
+        assertTrue(store.vehicleStatus(lowChargePercent = 20)!!.charging)
+    }
+
+    @Test
+    fun `speed and Android gear can be combined across validated sources`() {
+        accept(
+            EvccLogicalSignal.VEHICLE_SPEED,
+            1_048_832L,
+            EvccValue.ofDouble(36.0),
+            scale = 1.0 / 3.6,
+            source = EvccApiContract.Source.ADAPT_API,
+        )
+        accept(
+            EvccLogicalSignal.GEAR,
+            289_408_000L,
+            EvccValue.ofLong(4),
+            source = EvccApiContract.Source.CAPI,
+            gearValues = mapOf(4L to VehicleGear.PARK),
+        )
+
+        val motion = store.motion()!!
+
+        assertEquals(10.0, motion.speedMetersPerSecond, 0.0001)
+        assertEquals(VehicleGear.PARK, motion.gear)
+    }
+
+    @Test
+    fun `enum metadata can translate numeric gear without guessing its ordinal`() {
+        accept(
+            EvccLogicalSignal.VEHICLE_SPEED,
+            1_048_832L,
+            EvccValue.ofDouble(0.0),
+            scale = 1.0 / 3.6,
+            source = EvccApiContract.Source.ADAPT_API,
+        )
+        accept(
+            EvccLogicalSignal.GEAR,
+            2_097_664L,
+            EvccValue.ofLong(4).copy(displayValue = "4"),
+            enumOptions = listOf("1=NEUTRAL", "2=REVERSE", "4=PARK", "8=DRIVE"),
+            source = EvccApiContract.Source.ADAPT_API,
+        )
+
+        assertEquals(VehicleGear.PARK, store.motion()!!.gear)
+    }
+
+    @Test
+    fun `source generation invalidates observations from the previous source instance`() {
+        accept(
+            EvccLogicalSignal.VEHICLE_SPEED,
+            1_048_832L,
+            EvccValue.ofDouble(20.0),
+            scale = 1.0 / 3.6,
+            source = EvccApiContract.Source.ADAPT_API,
+        )
+        accept(
+            EvccLogicalSignal.GEAR,
+            289_408_000L,
+            EvccValue.ofLong(4),
+            source = EvccApiContract.Source.CAPI,
+            gearValues = mapOf(4L to VehicleGear.PARK),
+        )
+        assertTrue(store.motion() != null)
+
+        store.sourceState(EvccApiContract.Source.ADAPT_API, sourceGeneration = 2, EvccApiContract.Status.AVAILABLE)
+
+        assertNull(store.motion())
+    }
+
+    @Test
+    fun `motion never combines speed and gear from different source generations`() {
+        accept(
+            EvccLogicalSignal.VEHICLE_SPEED,
+            1_048_832L,
+            EvccValue.ofDouble(20.0),
+            scale = 1.0 / 3.6,
+            sourceGeneration = 1,
+            source = EvccApiContract.Source.ADAPT_API,
+        )
+        accept(
+            EvccLogicalSignal.GEAR,
+            2_097_664L,
+            EvccValue.ofLong(8).copy(displayValue = "DRIVE"),
+            sourceGeneration = 2,
+            source = EvccApiContract.Source.ADAPT_API,
+        )
+
+        assertNull(store.motion())
+    }
+
+    @Test
+    fun `motion expires without fresh EVCC observations`() {
+        accept(
+            EvccLogicalSignal.VEHICLE_SPEED,
+            1_048_832L,
+            EvccValue.ofDouble(20.0),
+            scale = 1.0 / 3.6,
+            source = EvccApiContract.Source.ADAPT_API,
+        )
+        accept(
+            EvccLogicalSignal.GEAR,
+            289_408_000L,
+            EvccValue.ofLong(4),
+            source = EvccApiContract.Source.CAPI,
+            gearValues = mapOf(4L to VehicleGear.PARK),
+        )
+        now += 5_001
+
+        assertNull(store.motion())
+    }
+
+    private fun accept(
+        signal: EvccLogicalSignal,
+        id: Long,
+        value: EvccValue,
+        scale: Double = 1.0,
+        enumOptions: List<String> = emptyList(),
+        sourceGeneration: Long = 1,
+        source: String = EvccApiContract.Source.ADAPT_API,
+        gearValues: Map<Long, VehicleGear> = emptyMap(),
+    ) {
+        val descriptor = EvccPropertyDescriptor(
+            source = source,
+            canonicalId = id,
+            name = signal.name,
+            areaId = 0,
+            dataType = value.type,
+            access = "R",
+            enumOptions = enumOptions,
+            sourceGeneration = sourceGeneration,
+        )
+        val candidate = EvccPropertyCandidate(id, source = source, scale = scale, gearValues = gearValues)
+        val selector = EvccPropertySelector(
+            id = id,
+            source = source,
+            areaId = 0,
+            resolutionMode = EvccApiContract.ResolutionMode.STRICT_UNIQUE,
+        )
+        val binding = EvccResolvedProperty(signal, candidate, selector, descriptor)
+        assertTrue(
+            store.accept(
+                binding,
+                EvccPropertyRecord(
+                    requestedSelector = selector,
+                    resolvedSource = descriptor.source,
+                    descriptor = descriptor,
+                    value = value,
+                    status = EvccApiContract.Status.AVAILABLE,
+                ),
+            ),
+        )
+    }
+}

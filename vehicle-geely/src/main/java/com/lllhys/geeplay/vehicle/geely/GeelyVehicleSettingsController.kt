@@ -4,12 +4,16 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import com.shilapi.xcertplay.media.MediaOutputOwner
+import com.shilapi.xcertplay.transport.EvChargingConnectors
 import com.shilapi.xcertplay.vehicle.VehicleSettingConfirmation
 import com.shilapi.xcertplay.vehicle.VehicleSettingEffect
 import com.shilapi.xcertplay.vehicle.VehicleSettingRow
 import com.shilapi.xcertplay.vehicle.VehicleSettingsCard
 import com.shilapi.xcertplay.vehicle.VehicleSettingsController
 import com.shilapi.xcertplay.vehicle.VehicleSettingsPlacement
+import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataAdapter
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataSettings
 
 class GeelyVehicleSettingsController : VehicleSettingsController {
     override fun cards(context: Context): List<VehicleSettingsCard> {
@@ -21,6 +25,8 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
         val clusterAvailable = clusterPolicy.hasValidatedFirmware()
         val clusterEnabled = GeelyClusterDisplaySettings.enabled(context)
         val status = GeelyNavigationStatusStore.snapshot()
+        val evccAdapter = (context.applicationContext as? VehicleIntegrationProvider)
+            ?.carPlayVehicleDataAdapter(context) as? EvccVehicleDataAdapter
         return listOf(
             VehicleSettingsCard(
                 id = "geely_navigation",
@@ -123,6 +129,92 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                         )
                     }
                 },
+            ),
+            VehicleSettingsCard(
+                id = "geely_evcc_vehicle_data",
+                placement = VehicleSettingsPlacement.ADVANCED,
+                title = context.getString(R.string.settings_geely_evcc_title),
+                rows = listOf(
+                    VehicleSettingRow.Information(
+                        context.getString(R.string.settings_geely_evcc_description),
+                    ),
+                    VehicleSettingRow.Toggle(
+                        id = "geely_evcc_vehicle_status",
+                        title = context.getString(R.string.settings_geely_evcc_vehicle_status),
+                        description = context.getString(R.string.settings_geely_evcc_vehicle_status_description),
+                        checked = EvccVehicleDataSettings.vehicleStatusEnabled(context),
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        enableConfirmation = VehicleSettingConfirmation(
+                            title = context.getString(R.string.settings_geely_evcc_confirm_title),
+                            message = context.getString(R.string.settings_geely_evcc_confirm_message),
+                            positiveLabel = context.getString(R.string.settings_geely_evcc_confirm_action),
+                        ),
+                        save = { enabled ->
+                            EvccVehicleDataSettings.saveVehicleStatusEnabled(context, enabled)
+                            evccAdapter?.prepare()
+                        },
+                    ),
+                    VehicleSettingRow.Toggle(
+                        id = "geely_evcc_vehicle_speed",
+                        title = context.getString(R.string.settings_geely_evcc_vehicle_speed),
+                        description = context.getString(R.string.settings_geely_evcc_vehicle_speed_description),
+                        checked = EvccVehicleDataSettings.vehicleSpeedEnabled(context),
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        enableConfirmation = VehicleSettingConfirmation(
+                            title = context.getString(R.string.settings_geely_evcc_confirm_title),
+                            message = context.getString(R.string.settings_geely_evcc_confirm_message),
+                            positiveLabel = context.getString(R.string.settings_geely_evcc_confirm_action),
+                        ),
+                        save = { enabled ->
+                            EvccVehicleDataSettings.saveVehicleSpeedEnabled(context, enabled)
+                            evccAdapter?.prepare()
+                        },
+                    ),
+                    VehicleSettingRow.Choice(
+                        id = "geely_evcc_low_charge_percent",
+                        title = context.getString(R.string.settings_geely_evcc_low_charge_percent),
+                        options = EvccVehicleDataSettings.lowChargePresets.map { "$it%" },
+                        selectedIndex = EvccVehicleDataSettings.lowChargePresets
+                            .indexOf(EvccVehicleDataSettings.lowChargePercent(context)),
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        save = { index ->
+                            EvccVehicleDataSettings.saveLowChargePercent(
+                                context,
+                                EvccVehicleDataSettings.lowChargePresets[index],
+                            )
+                        },
+                    ),
+                    VehicleSettingRow.Choice(
+                        id = "geely_evcc_charging_connectors",
+                        title = context.getString(R.string.settings_geely_evcc_charging_connectors),
+                        options = listOf("CCS2 / Type 2", "GB/T", "CCS1 / J1772"),
+                        selectedIndex = when (EvccVehicleDataSettings.chargingConnectors(context)) {
+                            EvChargingConnectors.CCS2_TYPE2 -> 0
+                            EvChargingConnectors.GB_T -> 1
+                            EvChargingConnectors.CCS1_J1772 -> 2
+                        },
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        save = { index ->
+                            EvccVehicleDataSettings.saveChargingConnectors(
+                                context,
+                                listOf(
+                                    EvChargingConnectors.CCS2_TYPE2,
+                                    EvChargingConnectors.GB_T,
+                                    EvChargingConnectors.CCS1_J1772,
+                                )[index],
+                            )
+                        },
+                    ),
+                    VehicleSettingRow.Action(
+                        id = "geely_evcc_open_settings",
+                        title = context.getString(R.string.settings_geely_evcc_open_settings),
+                        run = { evccAdapter?.openEvccSettings() },
+                    ),
+                    VehicleSettingRow.Information(
+                        evccAdapter?.diagnostics()
+                            ?: context.getString(R.string.settings_geely_evcc_unavailable),
+                    ),
+                ),
             ),
             VehicleSettingsCard(
                 id = "geely_audio",

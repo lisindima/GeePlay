@@ -44,4 +44,17 @@
     <string name="settings_geely_diagnostics_status">導航 SDK：%1$s\nDriver：%2$s\n最近失敗：%3$s</string>
     <string name="settings_geely_available">可用</string>
     <string name="settings_geely_unavailable">未偵測到</string>
+    <string name="settings_geely_evcc_title">EVCC 車輛資料（實驗性）</string>
+    <string name="settings_geely_evcc_description">從 EVCC 1.2 讀取已授權的車輛資料，並向已連線的 iPhone 傳送支援的電量、續航、車速和檔位資訊；修改將在下次連線時生效。</string>
+    <string name="settings_geely_evcc_vehicle_status">向 CarPlay 傳送電量和續航</string>
+    <string name="settings_geely_evcc_vehicle_status_description">EVCC 提供可信資料時，將動力電池電量、剩餘續航和充電狀態傳送給已連線的 iPhone；下次連線生效。</string>
+    <string name="settings_geely_evcc_vehicle_speed">向 CarPlay 定位傳送車速</string>
+    <string name="settings_geely_evcc_vehicle_speed_description">在 iPhone 要求的位置資料中加入 EVCC 輪速和檔位；還需要啟用位置共享；下次連線生效。</string>
+    <string name="settings_geely_evcc_low_charge_percent">低電量提醒門檻</string>
+    <string name="settings_geely_evcc_charging_connectors">充電介面</string>
+    <string name="settings_geely_evcc_confirm_title">啟用 EVCC 車輛資料？</string>
+    <string name="settings_geely_evcc_confirm_message">GeePlay 將從 EVCC 讀取所選車輛資料，並與已連線的 iPhone 分享；仍需在 EVCC 中授權。</string>
+    <string name="settings_geely_evcc_confirm_action">啟用</string>
+    <string name="settings_geely_evcc_open_settings">開啟 EVCC 授權</string>
+    <string name="settings_geely_evcc_unavailable">EVCC 車輛資料 Adapter 無法使用。</string>
 </resources>
