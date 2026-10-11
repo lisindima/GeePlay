@@ -194,6 +194,7 @@ class AndroidMediaSink(
     private val onAudioDiagnostic: (String) -> Unit = {},
     /** True while any music ("media") audio stream is running; called from media threads. */
     private val onMediaAudioChanged: (Boolean) -> Unit = {},
+    private val localMediaAudioPolicy: LocalMediaAudioPolicy = LocalMediaAudioPolicy.DIPLAY,
     /** Opt-in call echo cancellation, replacing a controllable platform canceller while available. */
     private val callEchoCancellation: Boolean = false,
     /** Cut the bass that head units add when they play a call as music. */
@@ -248,6 +249,7 @@ class AndroidMediaSink(
     internal var detachTimeoutNanos = 2_000_000_000L
     internal var detachGraceNanos = 500_000_000L
     private val mediaAudioTypes = mutableSetOf<AudioStreamId>()
+    private val suppressedAudioStreams = ConcurrentHashMap.newKeySet<AudioStreamId>()
     private val audioRenderers = ConcurrentHashMap<AudioStreamId, AudioRenderer>()
     private val microphoneUplinks = ConcurrentHashMap<AudioStreamId, MicrophoneUplink>()
     private val audioModeLock = Any()
@@ -491,15 +493,22 @@ class AndroidMediaSink(
     }
 
     override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {
+        if (!localMediaAudioPolicy.shouldRender(format)) {
+            suppressedAudioStreams += id
+            onAudioDiagnostic("Audio: local playback suppressed owner=${localMediaAudioPolicy.owner} channel=MEDIA")
+            return
+        }
         audioRenderer(id, format).start()
         if (format.audioType == "media") updateMediaAudio(id, true)
     }
 
     override fun onAudioRtp(id: AudioStreamId, format: AudioFormat, rtp: ByteArray, sample: Int) {
+        if (id in suppressedAudioStreams) return
         audioRenderer(id, format).submit(rtp, sample)
     }
 
     override fun onAudioStopped(id: AudioStreamId) {
+        suppressedAudioStreams.remove(id)
         synchronized(this) {
             audioRenderers.remove(id)?.close()
             callEchoReferences.remove(id)
@@ -610,6 +619,7 @@ class AndroidMediaSink(
         audioFocusCoordinator.close()
         audioRenderers.values.forEach(AudioRenderer::close)
         audioRenderers.clear()
+        suppressedAudioStreams.clear()
         callEchoReferences.clear()
         val hadMedia = synchronized(mediaAudioTypes) { mediaAudioTypes.isNotEmpty().also { mediaAudioTypes.clear() } }
         if (hadMedia) onMediaAudioChanged(false)

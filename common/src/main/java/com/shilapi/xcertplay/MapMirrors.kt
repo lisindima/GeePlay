@@ -33,6 +33,8 @@ internal object MapMirrors {
 
     private val main = Handler(Looper.getMainLooper())
     private val surfaces = LinkedHashMap<String, Surface>()
+    @Volatile private var diagnosticMirrorCount = 0
+    @Volatile private var diagnosticLauncherCount = 0
     private val aspectListeners = CopyOnWriteArraySet<() -> Unit>()
     private val streamListeners = CopyOnWriteArraySet<(Boolean) -> Unit>()
 
@@ -58,6 +60,8 @@ internal object MapMirrors {
         } else {
             surfaces[key] = surface
         }
+        diagnosticMirrorCount = surfaces.size
+        diagnosticLauncherCount = surfaces.keys.count { it != CARD }
         sink?.invoke(key, surface)
         onChanged?.invoke()
     }
@@ -66,6 +70,9 @@ internal object MapMirrors {
 
     /** Whether a launcher shows the map (see [MapEmbedService]), so the centre card is not needed. */
     val launcherShowsMap: Boolean get() = surfaces.keys.any { it != CARD }
+
+    fun diagnosticReport(): String =
+        "mapMirrors active=$diagnosticMirrorCount launcher=$diagnosticLauncherCount streamActive=$streamActive"
 
     fun setStreamActive(active: Boolean) {
         main.post {

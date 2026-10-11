@@ -1,0 +1,114 @@
+package com.lllhys.geeplay.vehicle.geely
+
+import android.content.Context
+import com.shilapi.xcertplay.iap2.wire.Iap2Frame
+import com.shilapi.xcertplay.navigation.runtime.RouteGuidanceCoordinator
+import com.shilapi.xcertplay.navigation.runtime.NavigationClear
+import com.shilapi.xcertplay.navigation.runtime.NavigationOutput
+import com.shilapi.xcertplay.navigation.runtime.NavigationPublication
+import com.shilapi.xcertplay.navigation.apple.AppleRouteGuidanceParser
+import com.shilapi.xcertplay.navigation.runtime.CarPlayNavigationOverlay
+import com.shilapi.xcertplay.navigation.runtime.RouteGuidanceSource
+import com.shilapi.xcertplay.vehicle.SourceCloseReason
+import com.shilapi.xcertplay.vehicle.VehicleSessionHooks
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+
+internal class GeelyTurnOverlayOutput(
+    private val semanticJunctionEnabled: Boolean,
+    private val delegate: NavigationOutput = CarPlayNavigationOverlay,
+) : NavigationOutput {
+    override fun publish(publication: NavigationPublication) {
+        val filtered = if (semanticJunctionEnabled) publication else publication.copy(
+            snapshot = publication.snapshot.copy(
+                maneuver = publication.snapshot.maneuver.copy(junction = null),
+            ),
+        )
+        delegate.publish(filtered)
+    }
+
+    override fun clear(clear: NavigationClear) = delegate.clear(clear)
+    override fun close() = delegate.close()
+}
+
+class GeelyVehicleSessionHooks(
+    context: Context,
+    config: GeelyNavigationConfig = GeelyNavigationSettings.load(context),
+    onStatus: (GeelyNavigationDriverStatus) -> Unit = {},
+    additionalOutputs: List<NavigationOutput> = emptyList(),
+) : VehicleSessionHooks {
+    private val output = GeelyNavigationOutput(context.applicationContext, config, onStatus)
+    private val turnOverlay = GeelyTurnOverlayOutput(config.semanticJunctionEnabled)
+    private val diagnosticsOutput = object : NavigationOutput {
+        override fun publish(publication: NavigationPublication) =
+            GeelyIntegrationDiagnostics.publication(publication)
+
+        override fun clear(clear: NavigationClear) = GeelyIntegrationDiagnostics.cleared(clear)
+    }
+    private val coordinator = RouteGuidanceCoordinator(
+        listOf(diagnosticsOutput, output, turnOverlay) + additionalOutputs,
+    )
+    private val input = GeelyInputRuntime(context.applicationContext, GeelyIntegrationDiagnostics::input)
+    private val closed = AtomicBoolean()
+    private var activeSession: Any? = null
+    private val timer = Executors.newSingleThreadScheduledExecutor { task ->
+        Thread(task, "geeplay-route-expiry").apply { isDaemon = true }
+    }
+
+    init {
+        timer.scheduleWithFixedDelay(coordinator::refresh, 1, 1, TimeUnit.SECONDS)
+    }
+
+    override fun sourceOpened(source: RouteGuidanceSource) {
+        if (!closed.get()) coordinator.sourceOpened(source)
+    }
+    override fun attachHostControls(controls: com.shilapi.xcertplay.vehicle.VehicleHostControls) {
+        if (!closed.get()) input.attachHostControls(controls)
+    }
+    override fun sourceReady(source: RouteGuidanceSource) {
+        if (closed.get()) return
+        GeelyIntegrationDiagnostics.sourceReady(source)
+        coordinator.sourceReady(source)
+    }
+    override fun onControlFrame(source: RouteGuidanceSource, frame: Iap2Frame) {
+        if (closed.get()) return
+        if (frame.messageId == AppleRouteGuidanceParser.ROUTE_GUIDANCE_UPDATE ||
+            frame.messageId == AppleRouteGuidanceParser.ROUTE_GUIDANCE_MANEUVER_UPDATE ||
+            frame.messageId == AppleRouteGuidanceParser.LANE_GUIDANCE_INFORMATION
+        ) {
+            GeelyIntegrationDiagnostics.frame(
+                frame.messageId,
+                AppleRouteGuidanceParser.isValidFrame(frame.messageId, frame.payload),
+            )
+        }
+        coordinator.onFrame(source, frame)
+    }
+    override fun sourceClosed(source: RouteGuidanceSource, reason: SourceCloseReason) {
+        if (closed.get()) return
+        GeelyIntegrationDiagnostics.sourceClosed(source)
+        coordinator.sourceClosed(source)
+    }
+    override fun carPlaySessionStarted(sessionToken: Any, stillActive: () -> Boolean) {
+        if (closed.get() || activeSession === sessionToken) return
+        activeSession = sessionToken
+        GeelyIntegrationDiagnostics.sessionStarted()
+        coordinator.sessionStarted(sessionToken)
+        input.sessionStarted(sessionToken)
+    }
+    override fun carPlaySessionEnded(sessionToken: Any, replacementExpected: Boolean) {
+        if (closed.get() || activeSession !== sessionToken) return
+        activeSession = null
+        GeelyIntegrationDiagnostics.sessionEnded()
+        input.sessionEnded(sessionToken)
+        coordinator.sessionEnded(sessionToken, replacementExpected)
+    }
+
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        activeSession = null
+        timer.shutdownNow()
+        input.close()
+        coordinator.close()
+    }
+}

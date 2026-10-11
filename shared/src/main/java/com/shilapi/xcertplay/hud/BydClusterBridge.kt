@@ -117,7 +117,12 @@ internal object BydClusterBridge {
             applyClusterModeLocked()
             if (!guidanceLogged) {
                 guidanceLogged = true
-                Log.i(TAG, "cluster guidance sent $frame")
+                Log.i(
+                    TAG,
+                    "cluster guidance sent icon=${frame.icon} distanceMeters=${frame.distanceMeters} " +
+                        "remainingMetersPresent=${frame.routeRemainingMeters >= 0} " +
+                        "remainingSecondsPresent=${frame.routeRemainingSeconds >= 0}",
+                )
             }
         }
     }

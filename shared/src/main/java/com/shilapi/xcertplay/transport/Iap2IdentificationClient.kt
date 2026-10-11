@@ -393,7 +393,9 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
                     // Without these limits the iPhone may omit road names from 0x5201/0x5202.
                     u16(2, 64) // MaxCurrentRoadNameLength
                     u16(4, 64) // MaxAfterManeuverRoadNameLength
-                    u16(6, 8)
+                    u16(6, 8) // MaxGuidanceManeuverStorageCapacity
+                    u16(7, 64) // MaxLaneGuidanceDescriptionLength
+                    u16(8, 8) // MaxLaneGuidanceStorageCapacity
                 }
             }
         }
@@ -431,6 +433,7 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
             0x5001, // NowPlayingUpdate
             0x5201, // RouteGuidanceUpdate
             0x5202, // RouteGuidanceManeuverUpdate
+            0x5204, // RouteGuidanceLaneGuidanceInformation
             0xae01, // PowerUpdate
             0x4158, // CommunicationsUpdate
             0x4155, // CallStateUpdate

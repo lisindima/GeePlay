@@ -68,6 +68,8 @@ class CarPlayRuntimeConfig(
     val wifiP2pPreferredChannel: Int = WifiP2pChannels.AUTO,
     val existingWifiSsid: String = "",
     val existingWifiPassphrase: String = "",
+    /** Keep wireless iAP2 over RFCOMM after the type-130 tunnel is ready. */
+    val retainWirelessBluetoothControl: Boolean = false,
 ) {
     init {
         require(iphoneDevices.all { it.vendorId == APPLE_VENDOR_ID }) {

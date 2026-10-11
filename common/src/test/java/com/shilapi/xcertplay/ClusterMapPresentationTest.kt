@@ -1,7 +1,12 @@
 package com.shilapi.xcertplay
 
 import android.hardware.display.DisplayManager
+import android.content.Context
+import android.content.ContextWrapper
 import android.view.Display
+import com.shilapi.xcertplay.vehicle.VehicleClusterDisplayPolicy
+import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
+import com.shilapi.xcertplay.vehicle.VehicleSessionHooks
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -158,6 +163,21 @@ class ClusterMapPresentationTest {
             assertNull(ClusterMapPresentation.findDisplay(context))
         } finally {
             ShadowDisplayManager.removeDisplay(other)
+        }
+    }
+
+    @Test fun productDisplayPolicyFailsClosedInsteadOfFallingBackToBydDisplays() {
+        val bydDisplay = display(DiLink4ClusterDisplay.NAME, "w1920dp-h720dp-mdpi")
+        val productContext = object : ContextWrapper(context), VehicleIntegrationProvider {
+            override fun getApplicationContext(): Context = this
+            override fun createVehicleSessionHooks(context: Context): VehicleSessionHooks = VehicleSessionHooks.NONE
+            override fun clusterDisplayPolicy(context: Context): VehicleClusterDisplayPolicy =
+                VehicleClusterDisplayPolicy { null }
+        }
+        try {
+            assertNull(ClusterMapPresentation.findDisplay(productContext))
+        } finally {
+            ShadowDisplayManager.removeDisplay(bydDisplay)
         }
     }
     @Test fun dilink4MeasuredProjectionIsSelected() {

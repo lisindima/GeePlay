@@ -80,6 +80,11 @@ import com.shilapi.xcertplay.update.UpdateChecksums
 import com.shilapi.xcertplay.update.UpdateClient
 import com.shilapi.xcertplay.update.UpdateRelease
 import com.shilapi.xcertplay.update.UpdateReleaseLookup
+import com.shilapi.xcertplay.vehicle.VehicleSettingEffect
+import com.shilapi.xcertplay.vehicle.VehicleSettingRow
+import com.shilapi.xcertplay.vehicle.VehicleSettingsCard
+import com.shilapi.xcertplay.vehicle.VehicleSettingsController
+import com.shilapi.xcertplay.vehicle.VehicleSettingsPlacement
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -110,6 +115,11 @@ internal enum class SettingsSection {
     LOCATION,
     CLUSTER_MAP,
     BYD_NAVIGATION,
+    VEHICLE_NAVIGATION,
+    VEHICLE_AUDIO,
+    VEHICLE_INPUT,
+    VEHICLE_DISPLAY,
+    VEHICLE_DIAGNOSTICS,
     PERMISSIONS_AND_HELP,
     LANGUAGE,
 }
@@ -127,20 +137,29 @@ internal object SettingsInformationArchitecture {
             SettingsSection.PERMISSIONS_AND_HELP,
         ),
         SettingsCategory.DISPLAY to setOf(SettingsSection.DISPLAY_AND_PERFORMANCE),
-        SettingsCategory.AUDIO to setOf(SettingsSection.AUDIO_ROUTING),
-        SettingsCategory.NAVIGATION to setOf(SettingsSection.LOCATION, SettingsSection.BYD_NAVIGATION),
+        SettingsCategory.AUDIO to setOf(SettingsSection.AUDIO_ROUTING, SettingsSection.VEHICLE_AUDIO),
+        SettingsCategory.NAVIGATION to setOf(
+            SettingsSection.LOCATION,
+            SettingsSection.BYD_NAVIGATION,
+            SettingsSection.VEHICLE_NAVIGATION,
+        ),
         SettingsCategory.VEHICLE to setOf(
             SettingsSection.CARPLAY_CONTROLS,
             SettingsSection.WHEEL_KEYS,
             SettingsSection.CAR_BUTTON,
+            SettingsSection.VEHICLE_INPUT,
         ),
-        SettingsCategory.DIAGNOSTICS to setOf(SettingsSection.DIAGNOSTICS),
+        SettingsCategory.DIAGNOSTICS to setOf(
+            SettingsSection.DIAGNOSTICS,
+            SettingsSection.VEHICLE_DIAGNOSTICS,
+        ),
         SettingsCategory.ADVANCED to setOf(
             SettingsSection.CLUSTER_MAP,
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.ADVANCED_MEDIA,
             SettingsSection.NAVIGATION_WHEEL,
             SettingsSection.AMBIENT_LIGHTING,
+            SettingsSection.VEHICLE_DISPLAY,
         ),
     )
 }
@@ -735,7 +754,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             setImageResource(R.drawable.ic_carplay)
             contentDescription = getString(R.string.carplay)
         }, LinearLayout.LayoutParams(logoSize, logoSize))
-        addView(label(getString(R.string.diplay), if (compact) 20 else 26, TEXT, true,
+        addView(label(productDisplayName(), if (compact) 20 else 26, TEXT, true,
             centreGlyphs = resources.configuration.locales[0].language != "zh").apply {
             setPadding(if (compact) dp(8) else dp(12), 0, 0, 0)
         }, LinearLayout.LayoutParams(0, if (compact) dp(44) else dp(52), 1f))
@@ -1825,10 +1844,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 AirPlayPersistence.saveMainBufferedAudio(this, it)
                 reconnectIfRunning()
             }
-            toggle(card, getString(R.string.settings_car_bluetooth_audio), getString(R.string.settings_car_bluetooth_audio_description),
-                AirPlayPersistence.loadCarBluetoothAudio(this)) {
-                AirPlayPersistence.saveCarBluetoothAudio(this, it)
-                reconnectIfRunning()
+            if (vehicleSettingsController() == null) {
+                toggle(card, getString(R.string.settings_car_bluetooth_audio), getString(R.string.settings_car_bluetooth_audio_description),
+                    AirPlayPersistence.loadCarBluetoothAudio(this)) {
+                    AirPlayPersistence.saveCarBluetoothAudio(this, it)
+                    reconnectIfRunning()
+                }
             }
         }
         filteredSection(content, SettingsSection.CAR_BUTTON,
@@ -1920,9 +1941,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                         AirPlayPersistence.saveCenterMapAutoHide(this, it)
                     }
                 }
-                toggle(card, getString(R.string.launcher_map_sharing), getString(R.string.launcher_map_sharing_description),
-                    AirPlayPersistence.loadLauncherMapSharing(this)) {
-                    AirPlayPersistence.saveLauncherMapSharing(this, it)
+                if ((application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+                        ?.externalMapEmbeddingAvailable(applicationContext) != false
+                ) {
+                    toggle(card, getString(R.string.launcher_map_sharing), getString(R.string.launcher_map_sharing_description),
+                        AirPlayPersistence.loadLauncherMapSharing(this)) {
+                        AirPlayPersistence.saveLauncherMapSharing(this, it)
+                    }
                 }
                 if (AirPlayPersistence.loadCenterMapOverlay(this)) {
                     val overlay = CenterMapOverlay.permitted(this)
@@ -2166,6 +2191,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }
             clusterSongSwitch(card)
         }
+        vehicleSettingsSections(content)
         filteredSection(content, SettingsSection.PERMISSIONS_AND_HELP,
             getString(R.string.permissions_and_connection_help), R.drawable.ic_dp_permissions) { card ->
             card.addView(label(getString(R.string.nearby_devices_connects_your_iphone_microphone_enables_sir), 16, MUTED))
@@ -2176,8 +2202,112 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         languageSettings(content)
     }
 
+    private fun vehicleSettingsController(): VehicleSettingsController? =
+        (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.vehicleSettings(applicationContext)
+
+    private fun vehicleSettingsSections(content: LinearLayout) {
+        val controller = vehicleSettingsController() ?: return
+        controller.cards(this).forEach { card ->
+            filteredSection(content, card.placement.settingsSection(), card.title, card.placement.icon()) { body ->
+                card.rows.forEach { row -> renderVehicleSettingRow(body, row) }
+            }
+        }
+    }
+
+    private fun renderVehicleSettingRow(parent: LinearLayout, row: VehicleSettingRow) {
+        when (row) {
+            is VehicleSettingRow.Information -> parent.addView(
+                label(row.text, 14, MUTED).apply { setPadding(0, 0, 0, dp(12)) },
+            )
+            is VehicleSettingRow.Toggle -> toggle(
+                parent,
+                row.title,
+                row.description,
+                row.checked,
+                row.enabled,
+            ) { selected ->
+                val save = {
+                    row.save(selected)
+                    applyVehicleSettingEffect(row.effect)
+                }
+                val confirmation = row.enableConfirmation
+                if (selected && confirmation != null) {
+                    appDialogBuilder()
+                        .setTitle(confirmation.title)
+                        .setMessage(confirmation.message)
+                        .setPositiveButton(confirmation.positiveLabel) { _, _ -> save() }
+                        .setNegativeButton(R.string.cancel) { _, _ -> render() }
+                        .setOnCancelListener { render() }
+                        .show()
+                } else {
+                    save()
+                }
+            }
+            is VehicleSettingRow.Choice -> choice(
+                parent,
+                row.title,
+                row.options,
+                row.selectedIndex.coerceIn(row.options.indices),
+                reconnects = false,
+                enabled = row.enabled,
+            ) { selected ->
+                val save = {
+                    row.save(selected)
+                    applyVehicleSettingEffect(row.effect)
+                }
+                val confirmation = row.confirmations[selected]
+                if (confirmation == null) {
+                    save()
+                } else {
+                    appDialogBuilder()
+                        .setTitle(confirmation.title)
+                        .setMessage(confirmation.message)
+                        .setPositiveButton(confirmation.positiveLabel) { _, _ -> save() }
+                        .setNegativeButton(R.string.cancel) { _, _ -> render() }
+                        .setOnCancelListener { render() }
+                        .show()
+                }
+            }
+            is VehicleSettingRow.Action -> parent.addView(
+                button(row.title, row.primary) {
+                    row.run()
+                    render()
+                },
+                matchButton(8, 56),
+            )
+        }
+    }
+
+    private fun applyVehicleSettingEffect(effect: VehicleSettingEffect) {
+        when (effect) {
+            VehicleSettingEffect.IMMEDIATE -> Unit
+            VehicleSettingEffect.REFRESH_SETTINGS -> render()
+            VehicleSettingEffect.NEXT_CONNECTION -> {
+                markReconnectNeeded()
+                render()
+            }
+        }
+    }
+
+    private fun VehicleSettingsPlacement.settingsSection(): SettingsSection = when (this) {
+        VehicleSettingsPlacement.AUDIO -> SettingsSection.VEHICLE_AUDIO
+        VehicleSettingsPlacement.NAVIGATION -> SettingsSection.VEHICLE_NAVIGATION
+        VehicleSettingsPlacement.VEHICLE -> SettingsSection.VEHICLE_INPUT
+        VehicleSettingsPlacement.DIAGNOSTICS -> SettingsSection.VEHICLE_DIAGNOSTICS
+        VehicleSettingsPlacement.ADVANCED -> SettingsSection.VEHICLE_DISPLAY
+    }
+
+    private fun VehicleSettingsPlacement.icon(): Int = when (this) {
+        VehicleSettingsPlacement.AUDIO -> R.drawable.ic_dp_audio
+        VehicleSettingsPlacement.NAVIGATION -> R.drawable.ic_dp_navigation
+        VehicleSettingsPlacement.VEHICLE -> R.drawable.ic_dp_controls
+        VehicleSettingsPlacement.DIAGNOSTICS -> R.drawable.ic_dp_diagnostics
+        VehicleSettingsPlacement.ADVANCED -> R.drawable.ic_dp_dashboard
+    }
+
     private fun about(content: LinearLayout) {
-        content.addView(label(getString(R.string.diplay), 40, TEXT, true))
+        content.addView(label(productDisplayName(), 40, TEXT, true))
         content.addView(label(getString(R.string.carplay_at_home_in_your_car), 20, MUTED).apply { setPadding(0, dp(8), 0, dp(24)) })
         section(content, getString(R.string.about_public_preview_prefix, version())) { card ->
             card.addView(label(getString(R.string.an_independent_carplay_receiver_for_android_head_units_wir), 17, TEXT))
@@ -2252,7 +2382,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun latestRelease(): UpdateRelease? {
-        return UpdateReleaseLookup.latest(version(), userAgent())
+        val productUrl = (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.updateReleasesUrl(applicationContext)
+        return UpdateReleaseLookup.latest(version(), userAgent(), productUrl ?: UpdateClient.RELEASES_URL)
     }
 
     private fun openAvailableUpdate(release: UpdateRelease) {
@@ -2354,7 +2486,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
     }
 
-    private fun userAgent() = "DiPlay/${version()}"
+    private fun productDisplayName(): String =
+        (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.productDisplayName(applicationContext)
+            ?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.diplay)
+
+    private fun userAgent() = "${productDisplayName()}/${version()}"
 
     // An opted-in connection prepares the hotspot in the controller instead of stopping at this reminder.
     private fun carHotspotOff(): Boolean =
@@ -4877,7 +5015,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }, "adb-cluster-authorize").start()
     }
 
-    private fun reportFileName() = "DiPlay-${SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.US).format(Date())}.txt"
+    private fun reportFileName() = productDisplayName().filter(Char::isLetterOrDigit).ifBlank { "DiPlay" } +
+        "-${SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.US).format(Date())}.txt"
 
     private fun saveReportToDownloads() {
         if (exportInProgress) return
@@ -4903,7 +5042,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         Thread({
             val result = runCatching {
                 val report = buildString {
-                    appendLine("DiPlay ${version()} · private beta diagnostic report")
+                    appendLine("${productDisplayName()} ${version()} · private beta diagnostic report")
                     appendLine("Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
                     appendLine("Head unit: ${Build.MANUFACTURER} ${Build.MODEL}")
                     appendLine("Connection: ${if (AirPlayPersistence.loadWirelessEnabled(appContext)) "wireless" else "USB"}")
@@ -4921,6 +5060,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     appendLine()
                     appendLine("--- Current cluster display diagnostics (even when disabled) ---")
                     appendLine(ClusterMapPresentation.diagnosticReport(appContext))
+                    appendLine(MapMirrors.diagnosticReport())
                     appendLine()
                     appendLine("--- ADB cluster activity routing ---")
                     appendLine("adbClusterActivityEnabled=${AirPlayPersistence.loadAdbClusterEnabled(appContext)}")
@@ -4965,6 +5105,16 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     appendLine("Startup settings: openAfterBoot=${AirPlayPersistence.loadAutoStartOnBoot(appContext)} " +
                         "connectWhenOpened=${DiPlayPreferences.autoConnect(appContext)}")
                     appendLine()
+                    (appContext as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+                        ?.diagnosticReport(appContext)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { vehicleReport ->
+                            appendLine("--- Vehicle integration ---")
+                            vehicleReport.lineSequence().forEach { line ->
+                                DiagnosticRedactor.redact(line)?.let { appendLine(it) }
+                            }
+                            appendLine()
+                        }
                     appendLine(UpdateAvailability.report(appContext, System.currentTimeMillis()))
                     appendLine()
                     appendLine("--- Recent own-app process exits (Android 11+) ---")

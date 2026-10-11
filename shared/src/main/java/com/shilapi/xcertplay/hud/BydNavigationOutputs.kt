@@ -129,6 +129,7 @@ object BydNavigationOutputs {
                 arrivalEpochSeconds = apple.arrivalEpochSeconds,
                 remainingSeconds = apple.remainingSeconds,
                 remainingMeters = apple.remainingMeters,
+                junction = apple.junction,
             )
         }
     }

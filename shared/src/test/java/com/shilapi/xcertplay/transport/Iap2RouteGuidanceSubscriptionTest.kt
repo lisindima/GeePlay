@@ -26,6 +26,8 @@ class Iap2RouteGuidanceSubscriptionTest {
         assertArrayEquals(byteArrayOf(0, 42), component.single { it.id == 0 }.payload)
         assertArrayEquals("RouteGuidance\u0000".encodeToByteArray(), component.single { it.id == 1 }.payload)
         assertArrayEquals(byteArrayOf(0, 8), component.single { it.id == 6 }.payload)
+        assertArrayEquals(byteArrayOf(0, 64), component.single { it.id == 7 }.payload)
+        assertArrayEquals(byteArrayOf(0, 8), component.single { it.id == 8 }.payload)
     }
 
     @Test
@@ -37,5 +39,27 @@ class Iap2RouteGuidanceSubscriptionTest {
             byteArrayOf(0, 6, 0, 0, 0, 42, 0, 4, 0, 1, 0, 4, 0, 2),
             frame.payload,
         )
+    }
+
+    @Test
+    fun identificationAcceptsLaneGuidanceUpdates() {
+        val config = Iap2IdentificationConfig(
+            name = "xcertplay",
+            modelIdentifier = "xcertplay",
+            manufacturer = "xcertplay",
+            serialNumber = "xcertplay",
+            firmwareVersion = "1.0.0",
+            hardwareVersion = "1.0",
+            carPlayUsbInterfaceNumber = 3,
+        )
+
+        val parameters = Iap2ParameterList.parse(
+            Iap2IdentificationClient.identificationInformation(config).payload,
+        ).asList()
+        val receivedMessages = parameters.single { it.id == 7 }.payload
+
+        assertEquals(true, receivedMessages.asList().windowed(2, 2).any {
+            (it[0].toInt() and 0xff) == 0x52 && (it[1].toInt() and 0xff) == 0x04
+        })
     }
 }

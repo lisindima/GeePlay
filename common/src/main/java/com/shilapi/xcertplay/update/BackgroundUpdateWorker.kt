@@ -14,6 +14,7 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.shilapi.xcertplay.CarPlayBackgroundSession
+import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
 import java.util.concurrent.TimeUnit
 
 internal object BackgroundUpdatePolicy {
@@ -45,7 +46,10 @@ internal class BackgroundUpdateWorker(context: Context, parameters: WorkerParame
         return try {
             val release = UpdateReleaseLookup.latest(
                 installedVersion = installedVersion,
-                userAgent = "DiPlay/$installedVersion",
+                userAgent = "${applicationContext.applicationInfo.loadLabel(applicationContext.packageManager)}/$installedVersion",
+                releasesUrl = (applicationContext as? VehicleIntegrationProvider)
+                    ?.updateReleasesUrl(applicationContext)
+                    ?: UpdateClient.RELEASES_URL,
                 openConnection = network::openConnection,
             )
             if (release == null) UpdateAvailability.clear(applicationContext)

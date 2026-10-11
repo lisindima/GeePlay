@@ -51,9 +51,7 @@ class WirelessHandoffWatchdogTest {
         controller = CarPlayController(object : ContextWrapper(RuntimeEnvironment.getApplication()) {
             override fun getApplicationContext(): Context = this
             override fun bindService(service: Intent, conn: ServiceConnection, flags: Int): Boolean = false
-        }, CarPlayRuntimeConfig(mfiTarget = MfiTarget.LOCAL, transport = CarPlayTransport.WIRELESS,
-            identification = Iap2IdentificationConfig(name = "test", modelIdentifier = "test", manufacturer = "test",
-                serialNumber = "test", firmwareVersion = "1", hardwareVersion = "1", carPlayUsbInterfaceNumber = 3)),
+        }, runtimeConfig(),
             config, identity, PairingStore(), listener, object : AirPlayMediaHandler {}, statuses::add)
         session = AirPlaySession(Socket(), config, identity, PairingStore(), null, listener, object : AirPlayMediaHandler {})
         val phase = controller.javaClass.getDeclaredField("phase").apply { isAccessible = true }
@@ -131,6 +129,17 @@ class WirelessHandoffWatchdogTest {
         verify(bootstrap, times(1)).close()
         assertFalse(flag("wirelessHandoffFellBack").get())
         assertEquals(0, hotspotCloses)
+    }
+
+    @Test fun OEMBluetoothPolicyRetainsBootstrapAfterTunnelPromotion() {
+        ReflectionHelpers.setField(controller, "config", runtimeConfig(retainBluetoothControl = true))
+
+        tunnelReady(0)
+        awaitHandoff()
+
+        verify(bootstrap, never()).close()
+        assertEquals(listOf(CarPlayStatus.WirelessActive), statuses)
+        assertTrue(diagnostics.any { it.contains("retaining Bluetooth bootstrap") })
     }
 
     @Test fun aQueuedTunnelCompletionCannotCloseTheNextGenerationsBootstrap() {
@@ -232,6 +241,20 @@ class WirelessHandoffWatchdogTest {
         }
         shadowOf(Looper.getMainLooper()).idle()
     }
+    private fun runtimeConfig(retainBluetoothControl: Boolean = false) = CarPlayRuntimeConfig(
+        mfiTarget = MfiTarget.LOCAL,
+        transport = CarPlayTransport.WIRELESS,
+        identification = Iap2IdentificationConfig(
+            name = "test",
+            modelIdentifier = "test",
+            manufacturer = "test",
+            serialNumber = "test",
+            firmwareVersion = "1",
+            hardwareVersion = "1",
+            carPlayUsbInterfaceNumber = 3,
+        ),
+        retainWirelessBluetoothControl = retainBluetoothControl,
+    )
     private fun proofCall(name: String, vararg args: Any) {
         proof.javaClass.declaredMethods.single { it.name == name }.apply { isAccessible = true }.invoke(proof, *args)
     }

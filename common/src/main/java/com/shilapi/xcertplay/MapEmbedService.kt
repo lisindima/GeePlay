@@ -36,18 +36,21 @@ class MapEmbedService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private val messenger = Messenger(Handler(Looper.getMainLooper()) { handle(it); true })
     private val embeds = HashMap<IBinder, Embed>()
+    private val deathRecipients = HashMap<IBinder, IBinder.DeathRecipient>()
     private var nextId = 0
     private var destroyed = false
     private var stopObservingSharing: (() -> Unit)? = null
 
     override fun onCreate() {
         super.onCreate()
-        stopObservingSharing = AirPlayPersistence.observeLauncherMapSharing(this) { enabled ->
+        stopObservingSharing = AirPlayPersistence.observeLauncherMapSharing(this, ::onSharingChanged)
+    }
+
+    private fun onSharingChanged(enabled: Boolean) {
             if (!enabled) {
                 if (Looper.myLooper() == main.looper) revokeSharing()
                 else main.post { revokeSharing() }
             }
-        }
     }
 
     override fun onBind(intent: Intent): IBinder = messenger.binder
@@ -56,15 +59,18 @@ class MapEmbedService : Service() {
         destroyed = true
         stopObservingSharing?.invoke()
         stopObservingSharing = null
-        embeds.values.toList().forEach { it.release() }
-        embeds.clear()
+        embeds.keys.toList().forEach(::releaseClient)
         super.onDestroy()
     }
 
     private fun revokeSharing() {
         if (destroyed) return
         val attached = embeds.values.toList()
+        val clients = embeds.keys.toList()
         embeds.clear()
+        clients.forEach { client ->
+            deathRecipients.remove(client)?.let { death -> runCatching { client.unlinkToDeath(death, 0) } }
+        }
         attached.forEach { it.sharingDisabled() }
     }
 
@@ -74,7 +80,7 @@ class MapEmbedService : Service() {
         when (message.what) {
             MSG_ATTACH -> attach(client, caller, message.data)
             MSG_RESIZE -> embeds[client.binder]?.resize(message.data.getInt(KEY_WIDTH), message.data.getInt(KEY_HEIGHT))
-            MSG_DETACH -> embeds.remove(client.binder)?.release()
+            MSG_DETACH -> releaseClient(client.binder)
         }
     }
 
@@ -84,7 +90,7 @@ class MapEmbedService : Service() {
             return
         }
         val error = when {
-            !AirPlayPersistence.loadLauncherMapSharing(this) -> ERROR_DISABLED
+            !sharingEnabled() -> ERROR_DISABLED
             data.getBinder(KEY_HOST_TOKEN) == null -> ERROR_BAD_REQUEST
             else -> null
         }
@@ -92,7 +98,7 @@ class MapEmbedService : Service() {
             refuse(client, caller, error)
             return
         }
-        embeds.remove(client.binder)?.release()
+        releaseClient(client.binder)
         val display = getSystemService(DisplayManager::class.java)?.getDisplay(data.getInt(KEY_DISPLAY_ID))
         if (display == null) {
             send(client, MSG_ERROR, Bundle().apply { putString(KEY_ERROR, ERROR_BAD_REQUEST) })
@@ -103,13 +109,21 @@ class MapEmbedService : Service() {
             data.getBinder(KEY_HOST_TOKEN)!!, display, data.getInt(KEY_WIDTH), data.getInt(KEY_HEIGHT),
         )
         embeds[client.binder] = embed
-        runCatching { client.binder.linkToDeath({ main.post { embeds.remove(client.binder)?.release() } }, 0) }
+        val death = IBinder.DeathRecipient { main.post { releaseClient(client.binder) } }
+        if (runCatching { client.binder.linkToDeath(death, 0) }.isFailure) {
+            embeds.remove(client.binder)?.release()
+            refuse(client, caller, ERROR_BAD_REQUEST)
+            return
+        }
+        deathRecipients[client.binder] = death
         Log.i(TAG, "$caller shows the map ${data.getInt(KEY_WIDTH)}x${data.getInt(KEY_HEIGHT)}")
         send(client, MSG_ATTACHED, Bundle().apply {
             putParcelable(KEY_SURFACE_PACKAGE, embed.surfacePackage)
             putBoolean(KEY_STREAM_ACTIVE, MapMirrors.streamActive)
         })
     }
+
+    private fun sharingEnabled(): Boolean = AirPlayPersistence.loadLauncherMapSharing(this)
 
     private fun refuse(client: Messenger, caller: String, error: String) {
         Log.w(TAG, "$caller asked for the map: $error")
@@ -120,8 +134,13 @@ class MapEmbedService : Service() {
         try {
             client.send(Message.obtain(null, what).apply { this.data = data })
         } catch (_: RemoteException) {
-            embeds.remove(client.binder)?.release()
+            releaseClient(client.binder)
         }
+    }
+
+    private fun releaseClient(client: IBinder) {
+        deathRecipients.remove(client)?.let { death -> runCatching { client.unlinkToDeath(death, 0) } }
+        embeds.remove(client)?.release()
     }
 
     /** One map in one launcher view. Main thread. */

@@ -96,4 +96,36 @@ class MapEmbedServiceTest {
             MapMirrors.streamAspect = MapMirrors.PHYSICAL_STREAM_ASPECT
         }
     }
+
+    @Test fun clientDeathReleasesTheEmbed() {
+        val controller = Robolectric.buildService(MapEmbedService::class.java).create()
+        val service = controller.get()
+        try {
+            AirPlayPersistence.saveLauncherMapSharing(service, true)
+            val client = Messenger(Handler(Looper.getMainLooper()) { true })
+            val endpoint = Messenger(service.onBind(Intent(MapEmbedService.ACTION)))
+            endpoint.send(Message.obtain(null, MapEmbedService.MSG_ATTACH).apply {
+                replyTo = client
+                data = Bundle().apply {
+                    putBinder(MapEmbedService.KEY_HOST_TOKEN, Binder())
+                    putInt(MapEmbedService.KEY_DISPLAY_ID, Display.DEFAULT_DISPLAY)
+                    putInt(MapEmbedService.KEY_WIDTH, 1200)
+                    putInt(MapEmbedService.KEY_HEIGHT, 450)
+                }
+            })
+            shadowOf(Looper.getMainLooper()).idle()
+            val deaths = service.javaClass.getDeclaredField("deathRecipients").apply { isAccessible = true }
+                .get(service) as Map<IBinder, IBinder.DeathRecipient>
+            assertEquals(1, deaths.size)
+
+            deaths.getValue(client.binder).binderDied()
+            shadowOf(Looper.getMainLooper()).idle()
+
+            val embeds = service.javaClass.getDeclaredField("embeds").apply { isAccessible = true }
+                .get(service) as Map<*, *>
+            assertTrue(embeds.isEmpty())
+        } finally {
+            controller.destroy()
+        }
+    }
 }

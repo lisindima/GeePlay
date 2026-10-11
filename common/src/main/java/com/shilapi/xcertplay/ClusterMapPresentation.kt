@@ -28,6 +28,8 @@ import android.widget.ProgressBar
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.hud.ClusterTurnGuidance
+import com.shilapi.xcertplay.vehicle.VehicleDisplayCandidate
+import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
 
 /**
  * Shows CarPlay's instrument-cluster stream on a BYD cluster projection display.
@@ -202,6 +204,16 @@ internal class ClusterMapPresentation(
         fun findDisplay(context: Context, theme: DiLink51ClusterLayout.Theme = DiLink51ClusterLayout.theme(context)): Display? {
             val displays = context.getSystemService(DisplayManager::class.java)
                 ?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION) ?: return null
+            val provider = context.applicationContext as? VehicleIntegrationProvider
+            val productPolicy = provider?.clusterDisplayPolicy(context.applicationContext)
+            if (productPolicy != null) {
+                val productTarget = productPolicy.select(displays.map { display ->
+                    val size = sizeOf(display)
+                    VehicleDisplayCandidate(display.displayId, display.name, size.x, size.y, display.flags)
+                }) ?: return null
+                return displays.firstOrNull { display -> display.displayId == productTarget.displayId }
+                    ?.takeIf { it.isValid && it.flags and Display.FLAG_PRESENTATION != 0 }
+            }
             val name = DiLink51ClusterLayout.displayName(
                 displays.map { it.name }, android.os.Build.FINGERPRINT, theme,
             )

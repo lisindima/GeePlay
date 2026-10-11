@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.Path
 import android.graphics.drawable.Drawable
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,6 +55,11 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
     }
     private val infoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(224, 235, 235, 240); typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    }
+    private val junctionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
     }
     private val rect = RectF()
     private var glyph: Drawable? = null
@@ -218,6 +224,7 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
 
     /** Draws the tinted Material Symbols glyph; the roundabout exit number gets a corner badge. */
     private fun drawGlyph(canvas: Canvas, next: ClusterTurnGuidance, left: Float, top: Float, side: Float, exit: Int?) {
+        if (drawJunction(canvas, next, left, top, side)) return
         if (next.icon == 0) return
         val resId = glyphRes(next.icon)
         if (resId != glyphTag) {
@@ -239,6 +246,52 @@ internal class ClusterTurnCardView(context: Context) : View(context) {
             val textY = cy - (badgeTextPaint.descent() + badgeTextPaint.ascent()) / 2f
             canvas.drawText(exit.toString(), cx, textY, badgeTextPaint)
         }
+    }
+
+    private fun drawJunction(
+        canvas: Canvas,
+        next: ClusterTurnGuidance,
+        left: Float,
+        top: Float,
+        side: Float,
+    ): Boolean {
+        val junction = next.junction ?: return false
+        if (junction.elementAngles.isEmpty()) return false
+        val originX = left + side / 2f
+        val originY = top + side * 0.88f
+        val branchStartY = top + side * 0.58f
+        val branchLength = side * 0.46f
+        val normal = if (night) Color.argb(180, 220, 224, 232) else Color.argb(190, 235, 238, 244)
+        val stroke = (side * 0.065f).coerceAtLeast(2f)
+        junctionPaint.color = normal
+        junctionPaint.strokeWidth = stroke
+        canvas.drawLine(originX, originY, originX, branchStartY, junctionPaint)
+        val selected = junction.exitAngle
+        junction.elementAngles.forEach { angle ->
+            val highlighted = selected != null && angle == selected
+            junctionPaint.color = if (highlighted) accent else normal
+            junctionPaint.strokeWidth = if (highlighted) stroke * 1.35f else stroke
+            val radians = Math.toRadians(angle.toDouble())
+            val endX = originX + kotlin.math.sin(radians).toFloat() * branchLength
+            val endY = branchStartY - kotlin.math.cos(radians).toFloat() * branchLength
+            canvas.drawLine(originX, branchStartY, endX, endY, junctionPaint)
+            if (highlighted) drawJunctionArrow(canvas, endX, endY, radians, side)
+        }
+        return true
+    }
+
+    private fun drawJunctionArrow(canvas: Canvas, x: Float, y: Float, radians: Double, side: Float) {
+        val head = side * 0.13f
+        val backX = x - kotlin.math.sin(radians).toFloat() * head
+        val backY = y + kotlin.math.cos(radians).toFloat() * head
+        val sideX = kotlin.math.cos(radians).toFloat() * head * 0.55f
+        val sideY = kotlin.math.sin(radians).toFloat() * head * 0.55f
+        val path = Path().apply {
+            moveTo(backX - sideX, backY - sideY)
+            lineTo(x, y)
+            lineTo(backX + sideX, backY + sideY)
+        }
+        canvas.drawPath(path, junctionPaint)
     }
 
     private fun glyphRes(icon: Int): Int = when (icon) {

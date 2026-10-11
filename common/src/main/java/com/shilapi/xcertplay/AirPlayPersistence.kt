@@ -526,11 +526,22 @@ object AirPlayPersistence {
             .apply()
     }
 
-    fun loadOemLabel(context: Context): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_OEM_LABEL, DEFAULT_OEM_LABEL)
+    fun loadOemLabel(context: Context): String {
+        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_OEM_LABEL, defaultOemLabel(context))
             // iOS hides the car icon without a label.
-            .orEmpty().ifBlank { DEFAULT_OEM_LABEL }
+            .orEmpty().ifBlank { defaultOemLabel(context) }
+        return (context.applicationContext as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.normalizeSavedOemLabel(context.applicationContext, saved, loadCustomAirPlayIconFile(context) != null)
+            ?.takeIf { it.isNotBlank() }
+            ?: saved
+    }
+
+    private fun defaultOemLabel(context: Context): String =
+        (context.applicationContext as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.defaultOemLabel(context.applicationContext)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_OEM_LABEL
 
     fun saveOemLabel(context: Context, oemLabel: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()

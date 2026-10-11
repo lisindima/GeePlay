@@ -1,0 +1,122 @@
+package com.lllhys.geeplay
+
+import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.os.Looper
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import com.lllhys.geeplay.vehicle.geely.R as GeelyR
+import com.shilapi.xcertplay.DiPlayActivity
+import java.nio.file.Files
+import java.nio.file.Paths
+import kotlin.math.roundToInt
+import org.junit.After
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class GeePlaySettingsScreenshotsTest {
+    private val originalConfiguration = Configuration(RuntimeEnvironment.getApplication().resources.configuration)
+
+    @After
+    fun restoreConfiguration() {
+        RuntimeEnvironment.setQualifiers("en")
+        RuntimeEnvironment.getApplication().resources.updateConfiguration(
+            originalConfiguration,
+            RuntimeEnvironment.getApplication().resources.displayMetrics,
+        )
+    }
+
+    @Test
+    fun writesCompactFullAndArabicNavigationSettingsScreenshots() {
+        listOf(
+            Triple("en", 600, 1.3f),
+            Triple("en", 1280, 1.5f),
+            Triple("ar", 600, 1.3f),
+        ).forEach { (locale, widthDp, fontScale) ->
+            val activity = openNavigationSettings(locale, widthDp, fontScale)
+            try {
+                val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+                layout(root, widthDp)
+                assertTrue(descendants(root).filterIsInstance<TextView>().any {
+                    it.text == activity.getString(GeelyR.string.settings_geely_navigation_title)
+                })
+                writeScreenshot(root, "$locale-${widthDp}dp-font-$fontScale.png")
+            } finally {
+                activity.finish()
+                shadowOf(Looper.getMainLooper()).idle()
+            }
+        }
+    }
+
+    private fun openNavigationSettings(locale: String, widthDp: Int, fontScale: Float): DiPlayActivity {
+        RuntimeEnvironment.setQualifiers("$locale-w${widthDp}dp-h960dp-mdpi")
+        val app = RuntimeEnvironment.getApplication()
+        app.resources.updateConfiguration(
+            Configuration(app.resources.configuration).apply {
+                this.fontScale = fontScale
+                screenWidthDp = widthDp
+                screenHeightDp = 960
+            },
+            app.resources.displayMetrics,
+        )
+        val activity = Robolectric.buildActivity(
+            DiPlayActivity::class.java,
+            Intent(app, DiPlayActivity::class.java).putExtra("page", "settings"),
+        ).setup().get()
+        val categoryClass = Class.forName("com.shilapi.xcertplay.SettingsCategory") as Class<out Enum<*>>
+        val navigation = categoryClass.enumConstants.single { it.name == "NAVIGATION" }
+        DiPlayActivity::class.java.getDeclaredField("settingsCategory").apply {
+            isAccessible = true
+            set(activity, navigation)
+        }
+        DiPlayActivity::class.java.getDeclaredMethod("render").apply { isAccessible = true }.invoke(activity)
+        shadowOf(Looper.getMainLooper()).idle()
+        return activity
+    }
+
+    private fun layout(root: View, widthDp: Int) {
+        val density = root.resources.displayMetrics.density
+        val width = (widthDp * density).roundToInt()
+        val height = (960 * density).roundToInt()
+        root.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+        )
+        root.layout(0, 0, width, height)
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    private fun writeScreenshot(root: View, name: String) {
+        val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+        try {
+            root.draw(Canvas(bitmap))
+            val directory = Paths.get(System.getProperty("user.dir"), "build", "reports", "geely-settings")
+            Files.createDirectories(directory)
+            Files.newOutputStream(directory.resolve(name)).use { output ->
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+            }
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private fun descendants(view: View): Sequence<View> = sequence {
+        yield(view)
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) yieldAll(descendants(view.getChildAt(index)))
+        }
+    }
+}

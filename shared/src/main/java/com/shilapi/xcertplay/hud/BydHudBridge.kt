@@ -86,7 +86,10 @@ internal object BydHudBridge {
         if (frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_UPDATE ||
             frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE
         ) {
-            Log.d(TAG, "route frame=0x${frame.messageId.toString(16)} change=$change guidance=${route.current()}")
+            Log.d(
+                TAG,
+                "route frame=0x${frame.messageId.toString(16)} change=$change active=${route.current() != null}",
+            )
         }
         when (change) {
             BydHudRouteChange.GUIDANCE -> sendCurrentLocked()
@@ -185,7 +188,12 @@ internal object BydHudBridge {
     }
 
     private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, service: IBinder) = onGatewayCallback {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) = onGatewayCallback {
+            if (service == null) {
+                binding = false
+                Log.w(TAG, "SOME/IP service connected without a binder")
+                return@onGatewayCallback
+            }
             binder = service
             binding = true
             val registered = transactLocked(TX_REGISTER_CALLBACK, returnsValue = false) { it.writeStrongBinder(callback) }
@@ -198,7 +206,7 @@ internal object BydHudBridge {
         }
 
         // BIND_AUTO_CREATE reconnects after a gateway restart without a second binding.
-        override fun onServiceDisconnected(name: ComponentName) = onGatewayCallback {
+        override fun onServiceDisconnected(name: ComponentName?) = onGatewayCallback {
             binder = null
             started = false
         }

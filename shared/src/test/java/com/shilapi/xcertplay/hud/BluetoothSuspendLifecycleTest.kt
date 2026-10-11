@@ -288,6 +288,7 @@ class BluetoothSuspendLifecycleTest {
                 serialNumber = "test", firmwareVersion = "1", hardwareVersion = "1", carPlayUsbInterfaceNumber = 3),
         ), AirPlayConfig("test", "test", "", "1", AirPlayDisplayConfig(800, 480)),
             AirPlayIdentity(ByteArray(32), ByteArray(32), "test"), PairingStore(),
-            object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, {}).also(controllers::add)
+            object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, {},
+            vehicleHooks = BydVehicleSessionHooks(context)).also(controllers::add)
     }
 }

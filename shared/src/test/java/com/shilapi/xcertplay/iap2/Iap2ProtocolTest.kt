@@ -30,6 +30,23 @@ class Iap2ProtocolTest {
     }
 
     @Test
+    fun routeGuidanceCatalogDescribesLaneLifecycleFields() {
+        assertEquals(
+            listOf(0x0010, 0x0011, 0x0012),
+            Iap2Endpoints.ROUTE_GUIDANCE_UPDATE.fields.map { it.id }
+                .filter { it in 0x0010..0x0012 },
+        )
+        assertEquals(
+            "LinkedLaneGuidance",
+            Iap2Endpoints.ROUTE_GUIDANCE_MANEUVER_UPDATE.fields.single { it.id == 0x000c }.name,
+        )
+        val laneInformation = Iap2Endpoints.ROUTE_GUIDANCE_LANE_INFORMATION.fields
+            .single { it.id == 0x0002 }
+        assertTrue(laneInformation.repeatable)
+        assertEquals(listOf(0, 1, 2, 3), laneInformation.children.map { it.id })
+    }
+
+    @Test
     fun framerAcceptsFragmentedAndConcatenatedFrames() {
         val first = Iap2Frame(0x4300, byteArrayOf(0, 4, 0, 0))
         val second = Iap2Frame(0x4301, byteArrayOf(0, 5, 0, 0, 1))

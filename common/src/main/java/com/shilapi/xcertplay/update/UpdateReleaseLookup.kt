@@ -7,10 +7,11 @@ internal object UpdateReleaseLookup {
     fun latest(
         installedVersion: String,
         userAgent: String,
+        releasesUrl: String = UpdateClient.RELEASES_URL,
         openConnection: (URL) -> URLConnection = { it.openConnection() },
     ): UpdateRelease? {
         val json = UpdateClient.fetchText(
-            UpdateClient.RELEASES_URL,
+            releasesUrl,
             "application/vnd.github+json",
             userAgent,
             openConnection,

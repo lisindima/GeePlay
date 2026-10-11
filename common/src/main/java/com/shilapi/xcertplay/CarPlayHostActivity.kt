@@ -90,6 +90,7 @@ import com.shilapi.xcertplay.location.AndroidCarPlayLocationProvider
 import com.shilapi.xcertplay.media.AndroidMediaSink
 import com.shilapi.xcertplay.media.CarPlayTouchMapper
 import com.shilapi.xcertplay.media.CarPlayVideoLayout
+import com.shilapi.xcertplay.media.LocalMediaAudioPolicy
 import com.shilapi.xcertplay.network.CarPlayVpnService
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
@@ -111,6 +112,7 @@ import com.shilapi.xcertplay.transport.Iap2LocationProvider
 import com.shilapi.xcertplay.transport.IphoneUsbMatcher
 import com.shilapi.xcertplay.transport.UsbDeviceId
 import com.shilapi.xcertplay.transport.VehicleSpeedLocationProvider
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
@@ -169,10 +171,11 @@ class CarPlayHostActivity : ComponentActivity() {
         remoteMfiServer = remoteMfiServer.trim().takeIf { it.isNotEmpty() },
         remoteMfiToken = remoteMfiToken.takeIf { it.isNotEmpty() },
         identification = Iap2IdentificationConfig(
-            name = "DiPlay",
+            name = productDisplayName(),
             modelIdentifier = normalizedModel(),
             manufacturer = normalizedManufacturer(),
-            serialNumber = "DIPLAY-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", ""),
+            serialNumber = productIdentifierPrefix().uppercase(Locale.ROOT) + "-" +
+                DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", ""),
             firmwareVersion = "0.1.0",
             hardwareVersion = "1.0",
             carPlayUsbInterfaceNumber = 3,
@@ -181,8 +184,9 @@ class CarPlayHostActivity : ComponentActivity() {
             chargingConnectors = com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
             vehicleSpeedEnabled = locationReportingEnabled && com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this),
         ),
-        label = "DiPlay",
-        hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),
+        label = productDisplayName(),
+        hostName = productIdentifierPrefix().lowercase(Locale.ROOT) + "-" +
+            DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(Locale.ROOT),
         hostMac = DiPlayBootstrap.deviceId(airPlayIdentity).split(":").map { it.toInt(16).toByte() }.toByteArray(),
         wirelessBluetoothDeviceAddress = DiPlayPreferences.phoneAddress(this),
         transport = if (wirelessEnabled) CarPlayTransport.WIRELESS else CarPlayTransport.WIRED,
@@ -197,7 +201,28 @@ class CarPlayHostActivity : ComponentActivity() {
         existingWifiPassphrase = existingWifiPassphrase,
         locationReportingEnabled = locationReportingEnabled,
         availableCurrentMilliAmps = AirPlayPersistence.loadUsbChargingCurrent(this).milliAmps,
+        retainWirelessBluetoothControl = mediaAudioPolicy().retainWirelessBootstrap,
     )
+
+    private fun mediaAudioPolicy(): LocalMediaAudioPolicy =
+        (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.mediaAudioPolicy(applicationContext)
+            ?: if (AirPlayPersistence.loadCarBluetoothAudio(this)) {
+                LocalMediaAudioPolicy.PHONE_OR_EXTERNAL
+            } else {
+                LocalMediaAudioPolicy.DIPLAY
+            }
+
+    private fun productDisplayName(): String =
+        (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.productDisplayName(applicationContext)
+            ?.takeIf { it.isNotBlank() }
+            ?: "DiPlay"
+
+    private fun productIdentifierPrefix(): String = productDisplayName()
+        .filter(Char::isLetterOrDigit)
+        .take(16)
+        .ifBlank { "DIPLAY" }
 
     private val vpnConsent =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -971,7 +996,13 @@ class CarPlayHostActivity : ComponentActivity() {
         settingsGestureHint?.text = settingsGestureHintText()
         ensureClusterPresentation()
         AirPlayPersistence.overlaySettingsListener = { runOnUiThread { applyClusterTurnOverlay() } }
-        com.shilapi.xcertplay.hud.BydNavigationOutputs.setTurnOverlayListener(clusterTurnOverlayListener)
+        if (application is com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider) {
+            com.shilapi.xcertplay.hud.BydNavigationOutputs.setTurnOverlayListener(null)
+            com.shilapi.xcertplay.navigation.runtime.CarPlayNavigationOverlay.setListener(clusterTurnOverlayListener)
+        } else {
+            com.shilapi.xcertplay.navigation.runtime.CarPlayNavigationOverlay.setListener(null)
+            com.shilapi.xcertplay.hud.BydNavigationOutputs.setTurnOverlayListener(clusterTurnOverlayListener)
+        }
         mainHandler.removeCallbacks(refreshTurnOverlay)
         mainHandler.post(refreshTurnOverlay)
         var systemBarsChanged = false
@@ -1223,7 +1254,9 @@ class CarPlayHostActivity : ComponentActivity() {
         adbClusterConfigured = false
         clusterStreamOnDisplay = false
         requestedSmallWindowForStream = null
-        if (!AirPlayPersistence.loadClusterMapEnabled(this)) return null
+        val productNeedsClusterStream = (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.requiresClusterStream(applicationContext) == true
+        if (!AirPlayPersistence.loadClusterMapEnabled(this) && !productNeedsClusterStream) return null
         if (AdbClusterRouter.enabled(this) && ClusterActivityOutput.hasConfirmedRoute()) {
             adbClusterConfigured = true
             clusterStreamOnDisplay = true
@@ -1498,6 +1531,7 @@ class CarPlayHostActivity : ComponentActivity() {
         mainHandler.removeCallbacks(refreshTurnOverlay)
         AirPlayPersistence.overlaySettingsListener = null
         com.shilapi.xcertplay.hud.BydNavigationOutputs.setTurnOverlayListener(null)
+        com.shilapi.xcertplay.navigation.runtime.CarPlayNavigationOverlay.setListener(null)
         com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterNaviModeListener(null)
         clusterMonitor?.stop()
         getSystemService(android.hardware.display.DisplayManager::class.java)
@@ -4377,10 +4411,12 @@ class CarPlayHostActivity : ComponentActivity() {
         appendLog(requestSummary)
         appendLog(support.details)
         appendLog(effectiveSummary)
-        val carBluetoothAudio = AirPlayPersistence.loadCarBluetoothAudio(this)
-        if (carBluetoothAudio) logCarBluetoothAudio()
+        val mediaPolicy = mediaAudioPolicy()
+        if (mediaPolicy.owner != com.shilapi.xcertplay.media.MediaOutputOwner.DIPLAY) {
+            logCarBluetoothAudio(mediaPolicy)
+        }
         return AirPlayConfig(
-            deviceName = "DiPlay",
+            deviceName = productDisplayName(),
             deviceId = DiPlayBootstrap.deviceId(airPlayIdentity),
             btMac = DiPlayBluetooth.localAddress(this) ?: DiPlayBootstrap.deviceId(airPlayIdentity),
             sourceVersion = "950.7.1",
@@ -4396,13 +4432,19 @@ class CarPlayHostActivity : ComponentActivity() {
             icons = listOf(loadAirPlayIcon()),
             videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
             mainBufferedAudio = AirPlayPersistence.loadMainBufferedAudio(this),
-            disableAudioOutput = carBluetoothAudio,
+            disableAudioOutput = !mediaPolicy.advertiseAudio,
         )
     }
 
     /** Car Bluetooth audio: shows whether the iPhone keeps A2DP/HFP with the car now and once CarPlay runs. */
-    private fun logCarBluetoothAudio() {
-        appendLog("Car Bluetooth audio: on; CarPlay audio not offered")
+    private fun logCarBluetoothAudio(policy: LocalMediaAudioPolicy) {
+        appendLog(
+            if (policy.advertiseAudio) {
+                "Car Bluetooth audio: music local playback suppressed; guidance, Siri and calls remain local"
+            } else {
+                "Car Bluetooth audio: on; CarPlay audio not offered"
+            },
+        )
         val adapter = runCatching { getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter }.getOrNull()
             ?: return appendLog("Car Bluetooth audio: no Bluetooth adapter")
         fun probe(moment: String) {
@@ -4451,8 +4493,24 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun defaultAirPlayIconBytes(): ByteArray =
-        // Shown in CarPlay's app list as the "back to the car" button.
-        resources.openRawResource(R.raw.ic_car_home).use { it.readBytes() }
+        (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.defaultCarIconResource(applicationContext)
+            ?.let { resource ->
+                ContextCompat.getDrawable(this, resource)?.let { drawable ->
+                    val bitmap = Bitmap.createBitmap(192, 192, Bitmap.Config.ARGB_8888)
+                    drawable.setBounds(0, 0, bitmap.width, bitmap.height)
+                    drawable.draw(android.graphics.Canvas(bitmap))
+                    ByteArrayOutputStream().use { output ->
+                        check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                            "Could not encode the product car icon"
+                        }
+                        bitmap.recycle()
+                        output.toByteArray()
+                    }
+                }
+            }
+            // Shown in CarPlay's app list as the "back to the car" button.
+            ?: resources.openRawResource(R.raw.ic_car_home).use { it.readBytes() }
 
     private fun updateAirPlayIconPreview() {
         val preview = iconPreviewView ?: return
@@ -4589,6 +4647,7 @@ class CarPlayHostActivity : ComponentActivity() {
     ): AndroidMediaSink {
         // Capture this session's log: late decoder shutdown must not write into a new session.
         val diagnosticLog = sessionLog
+        val mediaPolicy = mediaAudioPolicy()
         return AndroidMediaSink(
             surface = null,
             videoWidth = videoWidth,
@@ -4613,6 +4672,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 }
             },
             onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
+            localMediaAudioPolicy = mediaPolicy,
             callEchoCancellation = AirPlayPersistence.loadCallEchoCancellation(this),
             callVoiceFilter = AirPlayPersistence.loadCallVoiceFilter(this),
             // Only a SurfaceView honours release timestamps; smooth video always selects one.
@@ -4925,11 +4985,14 @@ class CarPlayHostActivity : ComponentActivity() {
             } else {
                 null
             },
+            vehicleHooks = (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+                ?.createVehicleSessionHooks(applicationContext)
+                ?: com.shilapi.xcertplay.hud.BydVehicleSessionHooks(applicationContext),
         )
         controller = next
         resetSidePanel() // a new session starts without the side panel
         updateClusterMapShown()
-        CarPlayMediaKeys.attach(this, next)
+        if (mediaAudioPolicy().ownMediaSession) CarPlayMediaKeys.attach(this, next)
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
         val display = CarPlaySessionDisplay(
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
