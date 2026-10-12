@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for coding agents that work on DiPlay.
+Instructions for coding agents that work on the DiPlay upstream code and the GeePlay downstream product.
 
 ## Checks
 
@@ -13,6 +13,70 @@ Run the CI command from `.github/workflows/android.yml` before you report a chan
 ```
 
 Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
+
+GeePlay changes MUST also run:
+
+```sh
+./gradlew :vehicle-geely:testDebugUnitTest :vehicle-geely:lintDebug \
+  :geely:testDebugUnitTest :geely:lintDebug :geely:assembleDebug
+```
+
+## Upstream merge review for GeePlay
+
+Every merge, rebase or cherry-pick from the DiPlay upstream into a GeePlay branch MUST include a new,
+standalone checklist copied from `docs/upstream-merge-checklists/TEMPLATE.md`.
+
+Name it `docs/upstream-merge-checklists/YYYY-MM-DD-<upstream-short-sha>.md`. Do not reuse or overwrite an
+older checklist. Create one even when the conclusion is that no GeePlay migration is needed.
+
+### Before changing merge results
+
+1. Record the GeePlay branch, pre-merge `HEAD`, upstream ref/SHA and merge base in the checklist.
+2. Record the dirty worktree and preserve unrelated user changes.
+3. Inventory upstream changed files and settings before accepting `ours` or `theirs` resolutions.
+4. Search the upstream diff for `BYD`, `DiLink`, settings sections, permissions, services, iAP2 messages,
+   CarPlay display/audio changes and newly added resources.
+
+### Classify every product-relevant upstream change
+
+Use exactly one primary disposition for every reviewed item:
+
+| Disposition | Meaning |
+| --- | --- |
+| `INHERIT` | Product-neutral behavior GeePlay should receive unchanged |
+| `MIGRATE_SHARED` | Useful capability that first needs a brand-neutral interface/model in `:shared` or `:common` |
+| `ADAPT_GEELY` | Behavior that needs a separate Geely/ECARX implementation, permission, profile or lifecycle |
+| `EXCLUDE_GEEPLAY` | BYD/DiLink-only behavior that must stay hidden or absent in GeePlay |
+| `EVIDENCE_PENDING` | Potential GeePlay capability that remains disabled until protocol or real-car evidence exists |
+
+For `MIGRATE_SHARED` and `ADAPT_GEELY`, list the target files, tests and cleanup/rollback behavior. For
+`EXCLUDE_GEEPLAY`, identify the product gate or manifest removal that enforces the exclusion. A file may
+contain multiple reviewed items with different dispositions; list them separately.
+
+### Required merge hotspots
+
+Review at least these areas on every upstream merge, marking each as changed or not changed:
+
+- `SettingsCategory`, `SettingsSection`, `SettingsInformationArchitecture` and Settings search indexing;
+- `LegacyBydSettingsPolicy` and the GeePlay `GeelyProductSettings` BYD-menu switch;
+- application/library manifests, exported components, queries and permissions;
+- `CarPlayController`, `CarPlayHostActivity`, transport/source ownership and teardown;
+- `shared/.../hud/Byd*`, vehicle hooks and any new vendor singleton;
+- iAP2 identification, endpoint catalogs, RouteGuidance/lane messages and AirPlay display properties;
+- media ownership, audio focus, Bluetooth bootstrap and MediaSession behavior;
+- strings/locales, settings screenshots, credentials, release/update identity and build configuration;
+- tests added or changed upstream, including tests that imply a new product decision.
+
+When upstream adds a BYD/DiLink-only setting, add its section to the centralized BYD boundary or gate the
+mixed control with `legacyBydSettingsAvailable()`. Do not delete the upstream implementation merely to hide
+it from GeePlay, and do not expose it in GeePlay until the checklist explicitly classifies it.
+
+### Merge completion
+
+The merge is not done until the standalone checklist has no unclassified item, all required tests/evidence
+are linked, the GeePlay exclusion gates are rechecked, and both the base CI command and the GeePlay command
+above pass. `EVIDENCE_PENDING` items may remain open only when the runtime setting stays disabled and the
+checklist states the missing evidence and next validation action.
 
 ## Adding or moving a setting
 

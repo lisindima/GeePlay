@@ -25,6 +25,7 @@ class GeelyVehicleSettingsControllerTest {
         )
         GeelyMediaSettings.saveOwner(context, MediaOutputOwner.OEM_BLUETOOTH)
         GeelyInputSettings.saveProfile(context, GeelyInputProfile.DISABLED)
+        GeelyProductSettings.saveBlockLegacyBydMenus(context, true)
     }
 
     @Test
@@ -93,7 +94,7 @@ class GeelyVehicleSettingsControllerTest {
     @Test
     fun `unvalidated physical display and junction rendering remain disabled`() {
         val cards = GeelyVehicleSettingsController().cards(context)
-        val display = cards.single { it.placement == VehicleSettingsPlacement.ADVANCED }
+        val display = cards.single { it.id == "geely_cluster_display" }
             .rows.filterIsInstance<VehicleSettingRow.Toggle>()
             .single { it.id == "geely_cluster_display_enabled" }
         val junction = cards.single { it.placement == VehicleSettingsPlacement.NAVIGATION }
@@ -103,6 +104,21 @@ class GeelyVehicleSettingsControllerTest {
         assertFalse(display.enabled)
         assertFalse(display.checked)
         assertFalse(junction.checked)
+    }
+
+    @Test
+    fun `GeePlay blocks legacy BYD menus by default and refreshes settings when changed`() {
+        val row = GeelyVehicleSettingsController().cards(context)
+            .single { it.id == "geeplay_upstream_compatibility" }
+            .rows.filterIsInstance<VehicleSettingRow.Toggle>()
+            .single { it.id == "geeplay_block_legacy_byd_menus" }
+
+        assertTrue(row.checked)
+        assertEquals(com.shilapi.xcertplay.vehicle.VehicleSettingEffect.REFRESH_SETTINGS, row.effect)
+
+        row.save(false)
+
+        assertFalse(GeelyProductSettings.blockLegacyBydMenus(context))
     }
 
     @Test

@@ -362,6 +362,7 @@ merged manifest 门禁必须证明不存在：
 | 原车蓝牙音乐 | Audio |
 | 吉利方向盘/语音入口 | Vehicle |
 | 吉利物理仪表地图 | Advanced |
+| 上游兼容性 / 屏蔽 BYD 专属设置 | Advanced |
 | 吉利接口、权限和恢复状态 | Diagnostics |
 
 规则：
@@ -373,6 +374,8 @@ merged manifest 门禁必须证明不存在：
 - 下一次连接生效的设置调用 `markReconnectNeeded()`；只有“应用并重新连接”按钮可立即 reconnect。
 - 物理仪表 profile 未验证时控件 disabled，不能只显示 warning 后仍允许打开。
 - 不显示 AutoDisplay 或 launcher map sharing 设置。
+- GeePlay 默认屏蔽上游 BYD/DiLink 专属菜单；用户可在 Advanced 临时关闭屏蔽，用于兼容性排查，但这不构成 GeePlay 支持证据。
+- BYD-only section 必须集中登记在 `LegacyBydSettingsPolicy`；混合卡片只 gate 其中的 BYD 控件，不能误隐藏通用功能。
 - 布局变更提供 compact/full 大字体截图；行对齐变化提供 Arabic RTL 截图。
 
 ## 13. 诊断、隐私与恢复

@@ -301,3 +301,22 @@ BUILD SUCCESSFUL in 3m 41s
 ```
 
 测试合计 2440 项（0 failures、0 errors、1 skipped），五个 lint 目标均为 0 errors。APK SHA-256 为 `b1d2bc90c4290a459af281e904c1d3200e971c247b68b59a0fad12f9eb3a42f8`；等待 G636 ADB 恢复后覆盖安装并采集同一 CarPlay 日间画面的对比截图。
+
+### 2026-10-11：BYD 设置边界与上游合并治理
+
+- 新增 `GeelyProductSettings.blockLegacyBydMenus`，GeePlay 默认开启屏蔽；Advanced 的“上游兼容性”卡片可立即切换。
+- `LegacyBydSettingsPolicy` 集中登记整段 BYD/DiLink-only section：`BYD_ADB`、`BYD_NAVIGATION`、`CLUSTER_MAP`、`NAVIGATION_WHEEL`、`AMBIENT_LIGHTING`。
+- 混合页面只屏蔽 BYD 控件：call popup、joystick/map zoom、Advanced vehicle data；Siri 键、外部控制器、通用 CarPlay 设置保留。
+- Settings Search 使用同一渲染 gate；默认状态下不会索引或搜索到被屏蔽的 BYD 菜单。
+- 七个 locale 已补齐新设置文案，设置 controller、provider、IA policy、导航/Advanced UI 和 Search 均有回归覆盖。
+- `AGENTS.md` 新增强制 upstream merge review：每个 merge/rebase/cherry-pick 必须重新分类为 `INHERIT`、`MIGRATE_SHARED`、`ADAPT_GEELY`、`EXCLUDE_GEEPLAY` 或 `EVIDENCE_PENDING`。
+- 新增独立模板 `docs/upstream-merge-checklists/TEMPLATE.md`；每次上游合并必须复制为带日期和 upstream SHA 的新文件，不能覆盖历史 checklist。
+
+完整门禁：
+
+```text
+BUILD SUCCESSFUL in 3m 3s
+358 actionable tasks: 64 executed, 294 up-to-date
+```
+
+测试合计 2444 项（shared 1303、common 1084、home 4、vehicle-geely 45、geely 8），0 failures、0 errors、1 skipped；五个 lint 目标均为 0 errors。

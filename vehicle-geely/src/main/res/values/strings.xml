@@ -44,4 +44,7 @@
     <string name="settings_geely_diagnostics_status">Navigation SDK: %1$s\nDriver: %2$s\nLast failure: %3$s</string>
     <string name="settings_geely_available">available</string>
     <string name="settings_geely_unavailable">not detected</string>
+    <string name="settings_geely_upstream_compatibility_title">Upstream compatibility</string>
+    <string name="settings_geely_block_byd_menus">Hide BYD-only settings</string>
+    <string name="settings_geely_block_byd_menus_description">Hides upstream DiPlay controls that apply only to BYD or DiLink. Keep this enabled for GeePlay. Changes apply immediately and do not disable shared CarPlay features.</string>
 </resources>

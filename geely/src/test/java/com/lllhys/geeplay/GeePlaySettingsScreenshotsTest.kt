@@ -8,8 +8,10 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import com.lllhys.geeplay.vehicle.geely.GeelyProductSettings
 import com.lllhys.geeplay.vehicle.geely.R as GeelyR
 import com.shilapi.xcertplay.DiPlayActivity
+import com.shilapi.xcertplay.host.R as HostR
 import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.math.roundToInt
@@ -33,11 +35,46 @@ class GeePlaySettingsScreenshotsTest {
 
     @After
     fun restoreConfiguration() {
+        GeelyProductSettings.saveBlockLegacyBydMenus(RuntimeEnvironment.getApplication(), true)
         RuntimeEnvironment.setQualifiers("en")
         RuntimeEnvironment.getApplication().resources.updateConfiguration(
             originalConfiguration,
             RuntimeEnvironment.getApplication().resources.displayMetrics,
         )
+    }
+
+    @Test
+    fun defaultBYDMenuBlockAppliesToAdvancedSettingsAndSearch() {
+        val activity = openSettings("en", 1280, 1f, "ADVANCED")
+        try {
+            val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+            layout(root, 1280)
+            val visible = descendants(root).filterIsInstance<TextView>().map { it.text.toString() }.toSet()
+            assertTrue(activity.getString(GeelyR.string.settings_geely_block_byd_menus) in visible)
+            assertFalse(activity.getString(HostR.string.carplay_map_on_instrument_cluster_experimental) in visible)
+            assertFalse(activity.getString(HostR.string.settings_navigation_wheel_volume) in visible)
+            assertFalse(activity.getString(HostR.string.settings_ambient_title) in visible)
+            assertFalse(activity.getString(HostR.string.advanced_vehicle_data) in visible)
+
+            @Suppress("UNCHECKED_CAST")
+            val results = DiPlayActivity::class.java.getDeclaredMethod("buildSettingsSearchIndex")
+                .apply { isAccessible = true }
+                .invoke(activity) as List<Any>
+            val titles = results.map { result ->
+                result.javaClass.getDeclaredMethod("getTitle").invoke(result) as String
+            }.toSet()
+            assertTrue(activity.getString(GeelyR.string.settings_geely_block_byd_menus) in titles)
+            listOf(
+                HostR.string.carplay_map_on_instrument_cluster_experimental,
+                HostR.string.settings_navigation_wheel_volume,
+                HostR.string.settings_ambient_title,
+                HostR.string.advanced_vehicle_data,
+                HostR.string.byd_adb_features,
+            ).forEach { blocked -> assertFalse(activity.getString(blocked) in titles) }
+        } finally {
+            activity.finish()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
     }
 
     @Test
@@ -47,7 +84,7 @@ class GeePlaySettingsScreenshotsTest {
             Triple("en", 1280, 1.5f),
             Triple("ar", 600, 1.3f),
         ).forEach { (locale, widthDp, fontScale) ->
-            val activity = openNavigationSettings(locale, widthDp, fontScale)
+            val activity = openSettings(locale, widthDp, fontScale, "NAVIGATION")
             try {
                 val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
                 layout(root, widthDp)
@@ -67,7 +104,12 @@ class GeePlaySettingsScreenshotsTest {
         }
     }
 
-    private fun openNavigationSettings(locale: String, widthDp: Int, fontScale: Float): DiPlayActivity {
+    private fun openSettings(
+        locale: String,
+        widthDp: Int,
+        fontScale: Float,
+        categoryName: String,
+    ): DiPlayActivity {
         RuntimeEnvironment.setQualifiers("$locale-w${widthDp}dp-h960dp-mdpi")
         val app = RuntimeEnvironment.getApplication()
         app.resources.updateConfiguration(
@@ -83,10 +125,10 @@ class GeePlaySettingsScreenshotsTest {
             Intent(app, DiPlayActivity::class.java).putExtra("page", "settings"),
         ).setup().get()
         val categoryClass = Class.forName("com.shilapi.xcertplay.SettingsCategory") as Class<out Enum<*>>
-        val navigation = categoryClass.enumConstants.single { it.name == "NAVIGATION" }
+        val category = categoryClass.enumConstants.single { it.name == categoryName }
         DiPlayActivity::class.java.getDeclaredField("settingsCategory").apply {
             isAccessible = true
-            set(activity, navigation)
+            set(activity, category)
         }
         DiPlayActivity::class.java.getDeclaredMethod("render").apply { isAccessible = true }.invoke(activity)
         shadowOf(Looper.getMainLooper()).idle()

@@ -344,7 +344,7 @@ ADB 恢复后补充结果：
 
 实车截图位于 `docs/images/geely-validation/`。这些证据证明 UI、默认门禁、SDK/permission probe 和进程稳定性，不证明导航已发布到仪表。
 
-### 9.2 一期修复包（待覆盖安装）
+### 9.2 一期修复包（已覆盖安装）
 
 ```text
 Version: 0.2.17-geely.2-debug / versionCode 2
@@ -358,7 +358,7 @@ Install state: geely.2 installed with pm install -r -t; firstInstallTime and pre
 Authentication: ready on the real head unit; no missing-identity warning
 Interface size: 150 percent app-only override; system remains 160 dpi
 Final branding-resource APK SHA-256: c38bf62853058e5fc94272f8aff6aeb2a97d6036a78a77cba22254011fb6f347
-Final branding-resource install: pending the next G636 ADB recovery
+Final branding-resource install: superseded by the installed geely.3 build
 ```
 
 该包还修复 GeePlay 品牌文案、隐藏遗留 BYD unavailable 提示，并把诊断报告目录切换为 `Downloads/GeePlay`。
@@ -395,5 +395,28 @@ Full CI: BUILD SUCCESSFUL in 3m 41s
 Tasks: 358 actionable, 344 executed, 14 up-to-date
 Tests: 2440 / failures 0 / errors 0 / skipped 1
 Credential entries: exactly identity.pk8 + certificate.p7b; selected bytes matched
-Install: pending G636 ADB recovery
+Install: pm install -r -t succeeded on G636; app data preserved
+```
+
+G636 后续已覆盖安装该 geely.3 包；firstInstallTime、150% interface-size 偏好和应用数据均保留。其后的 host-root 背景同步与 BYD 菜单屏蔽源码改动已通过软件门禁，但尚未生成新的含认证实车包。
+
+### 9.5 BYD 设置屏蔽与 upstream checklist
+
+| 验证项 | 结果 |
+| --- | --- |
+| 默认产品策略 | `blockLegacyBydMenus=true`，GeePlay provider 不暴露 legacy BYD settings |
+| 整段 section | BYD ADB/navigation、cluster map、navigation wheel、ambient lighting 统一屏蔽 |
+| 混合 section | 只隐藏 BYD call popup、joystick/map zoom、Advanced vehicle data |
+| 通用设置 | Siri key、external controller、CarPlay display/audio/connection 保留 |
+| Search | 被屏蔽标题不进入索引；GeePlay compatibility toggle 可搜索 |
+| Escape hatch | Advanced 可关闭屏蔽，立即刷新；不视为车辆支持证据 |
+| Locale | values/ar/es/ru/uk/zh-CN/zh-TW 名称集合一致 |
+| Merge governance | `AGENTS.md` 强制每次 upstream 操作生成独立 checklist |
+| Checklist template | `docs/upstream-merge-checklists/TEMPLATE.md` |
+
+```text
+Full CI: BUILD SUCCESSFUL in 3m 3s
+Tasks: 358 actionable, 64 executed, 294 up-to-date
+Tests: 2444 / failures 0 / errors 0 / skipped 1
+Lint: mobile/home/maphost/vehicle-geely/geely all 0 errors
 ```

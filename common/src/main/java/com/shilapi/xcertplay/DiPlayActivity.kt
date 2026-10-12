@@ -164,6 +164,17 @@ internal object SettingsInformationArchitecture {
     )
 }
 
+/** Upstream BYD/DiLink-only sections that downstream products may hide without deleting source. */
+internal object LegacyBydSettingsPolicy {
+    val sections: Set<SettingsSection> = setOf(
+        SettingsSection.BYD_ADB,
+        SettingsSection.BYD_NAVIGATION,
+        SettingsSection.CLUSTER_MAP,
+        SettingsSection.NAVIGATION_WHEEL,
+        SettingsSection.AMBIENT_LIGHTING,
+    )
+}
+
 /** DiAuto's visual language, with a connection flow for an independent CarPlay receiver. */
 class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private val handler = Handler(Looper.getMainLooper())
@@ -1537,6 +1548,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun advancedVehicleDataSettings(content: LinearLayout) {
+        if (!legacyBydSettingsAvailable()) return
         section(content, getString(R.string.settings_vehicle), R.drawable.ic_dp_dashboard) { card ->
             card.addView(button(getString(if (bydVehicleAdvancedExpanded)
                 R.string.hide_advanced_vehicle_data else R.string.advanced_vehicle_data), false) {
@@ -1670,7 +1682,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }
             card.addView(label(getString(R.string.settings_usb_charging_description), 14, MUTED))
         }
-        if (settingsSectionFilter?.contains(SettingsSection.BYD_ADB) != false) bydAdbSettings(content)
+        if (legacyBydSettingsAvailable() &&
+            settingsSectionFilter?.contains(SettingsSection.BYD_ADB) != false
+        ) bydAdbSettings(content)
         filteredSection(content, SettingsSection.DISPLAY_AND_PERFORMANCE,
             getString(R.string.display_and_performance), R.drawable.ic_dp_display) { card ->
             val appearances = AppAppearance.entries
@@ -1795,7 +1809,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         // Opt-in controls that can cost sound or video on some head units.
         filteredSection(content, SettingsSection.ADVANCED_MEDIA,
             getString(R.string.settings_advanced_media), R.drawable.ic_dp_advanced) { card ->
-            if (Build.VERSION.SDK_INT == 32) {
+            if (legacyBydSettingsAvailable() && Build.VERSION.SDK_INT == 32) {
                 toggle(card, getString(R.string.settings_hide_byd_call_popup),
                     getString(R.string.settings_hide_byd_call_popup_description),
                     AirPlayPersistence.loadHideBydCallPopup(this)) {
@@ -3478,17 +3492,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     // One place for the key service setup, above every feature that needs it.
     private fun wheelKeysSettings(card: LinearLayout) {
         // The joystick and map zoom use BYD's media and custom keys.
-        val byd = CarHotspotSetup.isBydHeadUnit(this)
-        val zoomAvailable = wheelMapZoomAvailable()
-        val vehicleKeysOn = WheelZoomSettings.joystick(this) ||
-            (zoomAvailable && WheelZoomSettings.enabled(this))
+        val legacyByd = legacyBydSettingsAvailable()
+        val byd = legacyByd && CarHotspotSetup.isBydHeadUnit(this)
+        val zoomAvailable = legacyByd && wheelMapZoomAvailable()
+        val vehicleKeysOn = legacyByd && (WheelZoomSettings.joystick(this) ||
+            (zoomAvailable && WheelZoomSettings.enabled(this)))
         if (WheelZoomSettings.siriKey(this) || vehicleKeysOn) wheelKeyServiceControls(card)
         siriKeyControls(card)
         // Any head unit: a paired keyboard, remote or rotary controller works alongside touch.
         toggle(card, getString(R.string.settings_external_controller), getString(R.string.settings_external_controller_description),
             AirPlayPersistence.loadExternalController(this)) { AirPlayPersistence.saveExternalController(this, it) }
         // Keep previously configured controls reachable even if package detection misses the car.
-        if (byd || zoomAvailable || WheelZoomSettings.joystick(this)) wheelKeyControls(card)
+        if (legacyByd && (byd || zoomAvailable || WheelZoomSettings.joystick(this))) wheelKeyControls(card)
     }
 
     // Map zoom only works where the dashboard map card used to show these controls.
@@ -5328,6 +5343,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         build: (LinearLayout) -> Unit,
     ) {
         if (settingsSectionFilter?.contains(key) == false) return
+        if (!legacyBydSettingsAvailable() && key in LegacyBydSettingsPolicy.sections) return
         section(parent, title, icon, build)
     }
     // Routing changes affect the live cluster surface as soon as the host resumes.

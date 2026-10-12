@@ -44,4 +44,7 @@
     <string name="settings_geely_diagnostics_status">导航 SDK：%1$s\nDriver：%2$s\n最近失败：%3$s</string>
     <string name="settings_geely_available">可用</string>
     <string name="settings_geely_unavailable">未检测到</string>
+    <string name="settings_geely_upstream_compatibility_title">上游兼容性</string>
+    <string name="settings_geely_block_byd_menus">屏蔽 BYD 专属设置</string>
+    <string name="settings_geely_block_byd_menus_description">隐藏上游 DiPlay 中仅适用于 BYD 或 DiLink 的设置。GeePlay 建议保持开启；修改立即生效，不会关闭通用 CarPlay 功能。</string>
 </resources>

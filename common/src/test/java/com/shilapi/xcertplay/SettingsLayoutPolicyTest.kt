@@ -52,4 +52,17 @@ class SettingsLayoutPolicyTest {
         assertEquals(SettingsSection.entries.toSet(), assignments.toSet())
         assertEquals(assignments.toSet().size, assignments.size)
     }
+
+    @Test fun legacyBydMenuBoundaryIsExplicitAndReviewable() {
+        assertEquals(
+            setOf(
+                SettingsSection.BYD_ADB,
+                SettingsSection.BYD_NAVIGATION,
+                SettingsSection.CLUSTER_MAP,
+                SettingsSection.NAVIGATION_WHEEL,
+                SettingsSection.AMBIENT_LIGHTING,
+            ),
+            LegacyBydSettingsPolicy.sections,
+        )
+    }
 }

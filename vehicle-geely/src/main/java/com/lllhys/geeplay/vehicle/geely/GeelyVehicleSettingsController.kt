@@ -20,6 +20,7 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
         val clusterPolicy = GeelyClusterDisplayPolicy()
         val clusterAvailable = clusterPolicy.hasValidatedFirmware()
         val clusterEnabled = GeelyClusterDisplaySettings.enabled(context)
+        val blockLegacyBydMenus = GeelyProductSettings.blockLegacyBydMenus(context)
         val status = GeelyNavigationStatusStore.snapshot()
         return listOf(
             VehicleSettingsCard(
@@ -174,6 +175,24 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                             ),
                         ),
                         save = { index -> GeelyInputSettings.saveProfile(context, GeelyInputProfile.entries[index]) },
+                    ),
+                ),
+            ),
+            VehicleSettingsCard(
+                id = "geeplay_upstream_compatibility",
+                placement = VehicleSettingsPlacement.ADVANCED,
+                title = context.getString(R.string.settings_geely_upstream_compatibility_title),
+                rows = listOf(
+                    VehicleSettingRow.Information(
+                        context.getString(R.string.settings_geely_block_byd_menus_description),
+                    ),
+                    VehicleSettingRow.Toggle(
+                        id = "geeplay_block_legacy_byd_menus",
+                        title = context.getString(R.string.settings_geely_block_byd_menus),
+                        description = context.getString(R.string.settings_geely_block_byd_menus_description),
+                        checked = blockLegacyBydMenus,
+                        effect = VehicleSettingEffect.REFRESH_SETTINGS,
+                        save = { block -> GeelyProductSettings.saveBlockLegacyBydMenus(context, block) },
                     ),
                 ),
             ),

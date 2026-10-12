@@ -44,4 +44,7 @@
     <string name="settings_geely_diagnostics_status">SDK الملاحة: %1$s\nبرنامج التشغيل: %2$s\nآخر فشل: %3$s</string>
     <string name="settings_geely_available">متاح</string>
     <string name="settings_geely_unavailable">غير مكتشف</string>
+    <string name="settings_geely_upstream_compatibility_title">التوافق مع المنبع</string>
+    <string name="settings_geely_block_byd_menus">إخفاء إعدادات BYD فقط</string>
+    <string name="settings_geely_block_byd_menus_description">يخفي عناصر DiPlay القادمة من المنبع والمخصصة فقط لـ BYD أو DiLink. اتركه مفعّلًا في GeePlay. يُطبّق فورًا ولا يعطّل ميزات CarPlay المشتركة.</string>
 </resources>

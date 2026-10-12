@@ -16,6 +16,7 @@ import com.lllhys.geeplay.vehicle.geely.GeelyClusterDisplayPolicy
 import com.lllhys.geeplay.vehicle.geely.GeelyClusterDisplaySettings
 import com.lllhys.geeplay.vehicle.geely.GeelyIntegrationDiagnostics
 import com.lllhys.geeplay.vehicle.geely.GeelyNavigationRecovery
+import com.lllhys.geeplay.vehicle.geely.GeelyProductSettings
 
 class GeePlayApplication : Application(), VehicleIntegrationProvider {
     override fun onCreate() {
@@ -48,7 +49,8 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
     override fun vehicleSettings(context: Context): VehicleSettingsController =
         GeelyVehicleSettingsController()
 
-    override fun legacyBydSettingsAvailable(context: Context): Boolean = false
+    override fun legacyBydSettingsAvailable(context: Context): Boolean =
+        !GeelyProductSettings.blockLegacyBydMenus(context)
 
     override fun externalMapEmbeddingAvailable(context: Context): Boolean = false
 

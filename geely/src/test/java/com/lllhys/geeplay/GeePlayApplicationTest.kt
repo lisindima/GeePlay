@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.LocaleList
 import com.lllhys.geeplay.vehicle.geely.GeelyClusterDisplaySettings
+import com.lllhys.geeplay.vehicle.geely.GeelyProductSettings
 import com.shilapi.xcertplay.MapEmbedService
 import com.shilapi.xcertplay.host.R as HostR
 import com.shilapi.xcertplay.media.MediaOutputOwner
@@ -91,6 +92,19 @@ class GeePlayApplicationTest {
         com.shilapi.xcertplay.AirPlayPersistence.saveOemLabel(application, "My Car")
         assertEquals("My Car", com.shilapi.xcertplay.AirPlayPersistence.loadOemLabel(application))
         com.shilapi.xcertplay.AirPlayPersistence.saveOemLabel(application, "BYD")
+    }
+
+    @Test
+    fun `legacy BYD settings availability follows the GeePlay product switch`() {
+        val application = RuntimeEnvironment.getApplication() as GeePlayApplication
+        GeelyProductSettings.saveBlockLegacyBydMenus(application, true)
+        try {
+            assertFalse(application.legacyBydSettingsAvailable(application))
+            GeelyProductSettings.saveBlockLegacyBydMenus(application, false)
+            assertTrue(application.legacyBydSettingsAvailable(application))
+        } finally {
+            GeelyProductSettings.saveBlockLegacyBydMenus(application, true)
+        }
     }
 
     @Test

@@ -44,4 +44,7 @@
     <string name="settings_geely_diagnostics_status">SDK навигации: %1$s\nДрайвер: %2$s\nПоследняя ошибка: %3$s</string>
     <string name="settings_geely_available">доступен</string>
     <string name="settings_geely_unavailable">не обнаружен</string>
+    <string name="settings_geely_upstream_compatibility_title">Совместимость с upstream</string>
+    <string name="settings_geely_block_byd_menus">Скрыть настройки только для BYD</string>
+    <string name="settings_geely_block_byd_menus_description">Скрывает элементы upstream DiPlay, предназначенные только для BYD или DiLink. Для GeePlay оставьте включённым. Применяется сразу и не отключает общие функции CarPlay.</string>
 </resources>
