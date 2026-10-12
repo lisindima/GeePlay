@@ -305,9 +305,10 @@ GeePlay 已经能将 Geely OneOS/Flyme 输入转给 CarPlay：
 | 综合续航 | `ADAPT_API:1050624 / SENSOR_TYPE_ENDURANCE_MILEAGE` | `173 km` |
 | 汽油续航 | `ADAPT_API:1054720 / SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL` | `89 km` |
 | EV 续航 | `ADAPT_API:1054976 / SENSOR_TYPE_ENDURANCE_MILEAGE_EV` | `84 → 78 km` |
-| 车速 | `ADAPT_API:1048832 / SENSOR_TYPE_CAR_SPEED` | 静止时 `0.0` |
-| 车速备选 | `ADAPT_API:1055232 / SENSOR_TYPE_CAR_SPEED_FROM_IPK` | 静止时 `0.0` |
-| 挡位 | `CAPI:289408000 / GEAR_SELECTION` | `4=PARK` |
+| 车速 | `ADAPT_API:1048832 / SENSOR_TYPE_CAR_SPEED` | G636 行驶实测为 m/s；峰值 `0.968` 对应约 `3.48 km/h` |
+| 车速备选 | `ADAPT_API:1055232 / SENSOR_TYPE_CAR_SPEED_FROM_IPK` | 行驶实测为 m/s，按整 km/h 档位变化 |
+| 挡位 | `CAPI:557849089 / CLUSTER_GEAR_GEARLVRINDCN` | 动态实测 `0=P, 1=N, 2=R, 3=D` |
+| 挡位备选 | `ADAPT_API:2097664 / SENSOR_TYPE_GEAR` | 动态实测 `0x200230=P, 0x200240=N, 0x200210=R, 0x200220=D` |
 | 充电状态 | `ADAPT_API:605225728 / CHARGE_FUNC_CHARGING_STATE` | 未充电时 `0` |
 
 真机同时证明：
@@ -320,8 +321,8 @@ GeePlay 已经能将 Geely OneOS/Flyme 输入转给 CarPlay：
 - `VEHICLE_AIDL:557874322` 返回的续航估算与标准 EV 续航不同，不能作为无条件 fallback；
 - 充电口连接只表示插枪，不得替代 `isCharging`。
 
-生产代码仍保持 EvccApi 1.2 门禁；以上 1.1 结果用于修正车型 Profile，安装新版 EVCC 后
-必须再次验证 selector、车速单位和充电态正值。
+生产代码仍保持 EvccApi 1.2 门禁。新版 EVCC 3.3.0 / API 1.2 已确认两路车速 selector
+均使用 m/s，并确认动态挡位枚举；充电态正值仍需单独验证。
 
 ## 7. CarPlay 不能直接承载的 EVCC 写能力
 

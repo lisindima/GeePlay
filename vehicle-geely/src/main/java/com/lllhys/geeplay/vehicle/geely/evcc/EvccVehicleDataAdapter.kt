@@ -263,7 +263,6 @@ class EvccVehicleDataAdapter internal constructor(
             EvccVehicleSpeedSource(
                 telemetry,
                 requestRefresh = ::requestMotionRefresh,
-                onDiagnostic = { message -> Log.i(TAG, message) },
             )
         } else {
             null

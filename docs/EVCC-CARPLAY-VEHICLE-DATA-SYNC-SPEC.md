@@ -425,9 +425,10 @@ replaceSubscriptions` 验证了以下 Profile。该车当时安装 EVCC 3.2.14 /
 | `RANGE_TOTAL_KM` | `SENSOR_TYPE_ENDURANCE_MILEAGE` | `1050624` | `ADAPT_API` | 增程车综合续航 `173 km` |
 | `RANGE_GASOLINE_KM` | `SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL` | `1054720` | `ADAPT_API` | 增程车汽油续航 `89 km` |
 | `RANGE_EV_KM` | `SENSOR_TYPE_ENDURANCE_MILEAGE_EV` | `1054976` | `ADAPT_API` | `84 → 78 km` |
-| `VEHICLE_SPEED` | `SENSOR_TYPE_CAR_SPEED` | `1048832` | `ADAPT_API` | 静止时 `0.0`，单位仍需行驶验证 |
-| `VEHICLE_SPEED` fallback | `SENSOR_TYPE_CAR_SPEED_FROM_IPK` | `1055232` | `ADAPT_API` | 静止时 `0.0` |
-| `GEAR` | `GEAR_SELECTION` | `289408000` | `CAPI` | `4=PARK`，使用 Android VehicleGear 常量 |
+| `VEHICLE_SPEED` | `SENSOR_TYPE_CAR_SPEED` | `1048832` | `ADAPT_API` | G636 行驶实测为 m/s，直接写入 `$PASCD` |
+| `VEHICLE_SPEED` fallback | `SENSOR_TYPE_CAR_SPEED_FROM_IPK` | `1055232` | `ADAPT_API` | 与 EVCC 速度属性统一按 m/s 处理 |
+| `GEAR` | `CLUSTER_GEAR_GEARLVRINDCN` | `557849089` (`0x21401A01`) | `CAPI` | G636 动态实测 `0=P, 1=N, 2=R, 3=D` |
+| `GEAR` fallback | `SENSOR_TYPE_GEAR` | `2097664` (`0x200200`) | `ADAPT_API` | G636 动态实测 `0x200230=P, 0x200240=N, 0x200210=R, 0x200220=D` |
 | `CHARGING` | `CHARGE_FUNC_CHARGING_STATE` | `605225728` | `ADAPT_API` | 未充电时 `0`；充电时 `1` 尚待验证 |
 
 旧目录候选 `4195840` 和 `1049088` 在该车的 `ADAPT_API` 中分别解析为
@@ -814,7 +815,7 @@ EVCC source 和属性 selector
 以下问题必须在编码前或实车阶段关闭：
 
 1. 新版 EVCC 1.2 APK 是否保留本次在 1.1 上验证的 `ADAPT_API`/`CAPI` selector？
-2. `SENSOR_TYPE_CAR_SPEED` 的 km/h 单位假设能否通过短距离行驶与仪表车速对照确认？
+2. `SENSOR_TYPE_CAR_SPEED_FROM_IPK` fallback 是否与已验证主车速一样使用 m/s？
 3. `CHARGE_FUNC_CHARGING_STATE` 在实际充电过程中是否从 `0` 切换为 `1`？
 4. EVCC 车速事件在匀速和静止时是否持续更新，还是只在数值变化时发送？
 5. EVCC 启动到核心初始快照 ready 的时间是否足以赶上 iAP2 Identification？

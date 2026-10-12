@@ -103,23 +103,6 @@ class Iap2LocationReporterTest {
         assertTrue(sent.isEmpty())
     }
 
-    @Test
-    fun progressConfirmsThatLocationFramesActuallyContainVehicleSpeed() {
-        provider.nmea = "\$GPGGA\r\n\$PASCD,1.000,C,D,0,1,0.00,3.500*00\r\n"
-        val link = link()
-
-        link.handle(start) { sent += it }
-        repeat(9) {
-            nowMillis += 1_000
-            link.tick { frame -> sent += frame }
-        }
-
-        assertTrue(progress.any { "vehicle-speed packets=1" in it })
-        assertTrue(progress.any { "vehicle-speed packets=10" in it })
-        assertEquals(2, progress.count { "vehicle-speed packets=" in it })
-        assertTrue(progress.filter { "vehicle-speed packets=" in it }.all { it.startsWith("[DEBUG-a4f2]") })
-    }
-
     private class FakeProvider : Iap2LocationProvider {
         var started = false
         var requested: Set<Int>? = null

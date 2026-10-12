@@ -62,36 +62,6 @@ class VehicleSpeedNmeaTest {
     }
 
     @Test
-    fun diagnosticsDistinguishUnrequestedEmptyAndProducedSpeed() {
-        val diagnostics = mutableListOf<String>()
-        val speed = FakeSpeed().apply { reading = null }
-        val provider = VehicleSpeedLocationProvider(
-            FakePosition("\$GPGGA\r\n"),
-            speed,
-            onDiagnostic = diagnostics::add,
-        )
-
-        provider.onRequested(setOf(1, 2))
-        provider.start()
-        provider.onRequested(setOf(1, 2, Iap2LocationMessages.VEHICLE_SPEED_DATA))
-        provider.start()
-        provider.latestNmea()
-        speed.reading = VehicleSpeedReading(
-            VehicleGear.DRIVE,
-            listOf(VehicleSpeedSample(5_000, 3.5)),
-        )
-        provider.latestNmea()
-        provider.stop()
-
-        assertTrue(diagnostics.any { "requested=false" in it && "components=[1, 2]" in it })
-        assertTrue(diagnostics.any { "requested=true" in it && "components=[1, 2, 4]" in it })
-        assertTrue(diagnostics.any { "drain=empty" in it })
-        assertTrue(diagnostics.any { "drain=reading" in it && "samples=1" in it && "speedMps=3.500" in it })
-        assertTrue(diagnostics.any { "packets=1" in it && "emptyDrains=1" in it })
-        assertTrue(diagnostics.all { it.startsWith("[DEBUG-a4f2]") })
-    }
-
-    @Test
     fun readsTheRequestedSentenceTypes() {
         val request = Iap2Messages.buildRaw(Iap2LocationMessages.START_LOCATION_INFORMATION) {
             void(1)
@@ -139,12 +109,8 @@ class VehicleSpeedNmeaTest {
 
     private class FakeSpeed : VehicleSpeedSource {
         var started = false
-        var reading: VehicleSpeedReading? = VehicleSpeedReading(
-            VehicleGear.DRIVE,
-            listOf(VehicleSpeedSample(5_000, 13.9)),
-        )
         override fun start() { started = true }
         override fun stop() { started = false }
-        override fun drain() = reading
+        override fun drain() = VehicleSpeedReading(VehicleGear.DRIVE, listOf(VehicleSpeedSample(5_000, 13.9)))
     }
 }

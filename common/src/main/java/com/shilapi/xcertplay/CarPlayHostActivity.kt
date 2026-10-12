@@ -5049,10 +5049,6 @@ class CarPlayHostActivity : ComponentActivity() {
                 config.identification.vehicleSpeedEnabled -> VehicleSpeedLocationProvider(
                     AndroidCarPlayLocationProvider(this),
                     vehicleData.speedSource!!,
-                    onDiagnostic = { message ->
-                        Log.i(TAG, message)
-                        appendLog(message)
-                    },
                 )
                 else -> AndroidCarPlayLocationProvider(this)
             }

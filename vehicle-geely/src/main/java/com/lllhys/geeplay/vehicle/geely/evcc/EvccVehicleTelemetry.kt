@@ -83,13 +83,18 @@ internal data class EvccResolvedProperty(
 }
 
 internal object EvccGeelyPropertyProfile {
-    private val androidGearValues = buildMap {
-        put(1L, VehicleGear.NEUTRAL)
-        put(2L, VehicleGear.REVERSE)
-        put(4L, VehicleGear.PARK)
-        listOf(8L, 16L, 32L, 64L, 128L, 256L, 512L, 1_024L, 2_048L, 4_096L, 8_192L, 16_384L)
-            .forEach { put(it, VehicleGear.DRIVE) }
-    }
+    private val geelyGearLeverValues = mapOf(
+        0L to VehicleGear.PARK,
+        1L to VehicleGear.NEUTRAL,
+        2L to VehicleGear.REVERSE,
+        3L to VehicleGear.DRIVE,
+    )
+    private val adaptGearValues = mapOf(
+        0x200230L to VehicleGear.PARK,
+        0x200240L to VehicleGear.NEUTRAL,
+        0x200210L to VehicleGear.REVERSE,
+        0x200220L to VehicleGear.DRIVE,
+    )
 
     val bindings = listOf(
         EvccPropertyBinding(
@@ -143,23 +148,26 @@ internal object EvccGeelyPropertyProfile {
                 EvccPropertyCandidate(
                     id = 1_048_832L,
                     source = EvccApiContract.Source.ADAPT_API,
-                    scale = 1.0 / 3.6,
-                ), // SENSOR_TYPE_CAR_SPEED; unit conversion still requires a moving-vehicle test
+                ), // SENSOR_TYPE_CAR_SPEED; G636 moving trace confirmed meters per second
                 EvccPropertyCandidate(
                     id = 1_055_232L,
                     source = EvccApiContract.Source.ADAPT_API,
-                    scale = 1.0 / 3.6,
-                ), // SENSOR_TYPE_CAR_SPEED_FROM_IPK
+                ), // SENSOR_TYPE_CAR_SPEED_FROM_IPK; same EVCC speed unit contract
             ),
         ),
         EvccPropertyBinding(
             EvccLogicalSignal.GEAR,
             listOf(
                 EvccPropertyCandidate(
-                    id = 289_408_000L,
+                    id = 0x21401A01L,
                     source = EvccApiContract.Source.CAPI,
-                    gearValues = androidGearValues,
-                ), // Android VehiclePropertyIds.GEAR_SELECTION; G636 returned 4=PARK
+                    gearValues = geelyGearLeverValues,
+                ), // CLUSTER_GEAR_GEARLVRINDCN; G636 trace: 0=P, 1=N, 2=R, 3=D
+                EvccPropertyCandidate(
+                    id = 0x200200L,
+                    source = EvccApiContract.Source.ADAPT_API,
+                    gearValues = adaptGearValues,
+                ), // SENSOR_TYPE_GEAR; G636 trace mirrors the CAPI lever state
             ),
         ),
     )
@@ -601,7 +609,6 @@ internal class EvccVehicleSpeedSource(
     private val telemetry: EvccVehicleTelemetryStore,
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val requestRefresh: () -> Unit = {},
-    private val onDiagnostic: (String) -> Unit = {},
 ) : VehicleSpeedSource {
     private val lock = Any()
     private val samples = ArrayList<VehicleSpeedSample>()
@@ -617,91 +624,60 @@ internal class EvccVehicleSpeedSource(
     private var speedChanges = 0L
     private var lastSpeed: Double? = null
     private var lastGear: VehicleGear? = null
-    private var lastMoving: Boolean? = null
-    private var lastMotionAvailable: Boolean? = null
-    private var lastDrainHadSamples: Boolean? = null
     private var lastSampleAt: Long? = null
 
-    override fun start() {
-        val started = synchronized(lock) {
-            if (executor != null) return@synchronized false
-            samples.clear()
-            gear = null
-            sampleCount = 0
-            refreshRequests = 0
-            validSamples = 0
-            missingSamples = 0
-            drains = 0
-            emptyDrains = 0
-            speedChanges = 0
-            lastSpeed = null
-            lastGear = null
-            lastMoving = null
-            lastMotionAvailable = null
-            lastDrainHadSamples = null
-            lastSampleAt = null
-            val currentGeneration = ++generation
-            executor = Executors.newSingleThreadScheduledExecutor { task ->
-                Thread(task, "geeplay-evcc-speed").apply { isDaemon = true }
-            }.also {
-                it.scheduleWithFixedDelay(
-                    { sample(currentGeneration) },
-                    0,
-                    SAMPLE_MILLIS,
-                    TimeUnit.MILLISECONDS,
-                )
-            }
-            true
+    override fun start() = synchronized(lock) {
+        if (executor != null) return@synchronized
+        samples.clear()
+        gear = null
+        sampleCount = 0
+        refreshRequests = 0
+        validSamples = 0
+        missingSamples = 0
+        drains = 0
+        emptyDrains = 0
+        speedChanges = 0
+        lastSpeed = null
+        lastGear = null
+        lastSampleAt = null
+        val currentGeneration = ++generation
+        executor = Executors.newSingleThreadScheduledExecutor { task ->
+            Thread(task, "geeplay-evcc-speed").apply { isDaemon = true }
+        }.also {
+            it.scheduleWithFixedDelay(
+                { sample(currentGeneration) },
+                0,
+                SAMPLE_MILLIS,
+                TimeUnit.MILLISECONDS,
+            )
         }
-        if (started) diagnose("speed-source start")
     }
 
     override fun stop() {
-        val stopped = synchronized(lock) {
-            val running = executor ?: return@synchronized null
-            val summary = diagnosticsLocked(elapsedRealtime())
-            executor = null
-            generation += 1
-            samples.clear()
-            gear = null
-            running to summary
-        }
-        stopped?.first?.shutdownNow()
-        stopped?.let { diagnose("speed-source stop ${it.second}") }
-    }
-
-    override fun drain(): VehicleSpeedReading? {
-        var diagnostic: String? = null
-        val reading = synchronized(lock) {
-            val currentGear = gear
-            if (currentGear == null || samples.isEmpty()) {
-                emptyDrains += 1
-                if (lastDrainHadSamples != false) {
-                    diagnostic = "speed-source drain=empty ${diagnosticsLocked(elapsedRealtime())}"
-                }
-                lastDrainHadSamples = false
-                null
-            } else {
-                drains += 1
-                val result = VehicleSpeedReading(currentGear, samples.toList())
+        val running = synchronized(lock) {
+            executor.also {
+                executor = null
+                generation += 1
                 samples.clear()
-                if (lastDrainHadSamples != true || drains == 1L || drains % DIAGNOSTIC_DRAIN_INTERVAL == 0L) {
-                    diagnostic = "speed-source drain=reading count=$drains samples=${result.samples.size} " +
-                        diagnosticsLocked(elapsedRealtime())
-                }
-                lastDrainHadSamples = true
-                result
+                gear = null
             }
         }
-        diagnostic?.let(::diagnose)
-        return reading
+        running?.shutdownNow()
+    }
+
+    override fun drain(): VehicleSpeedReading? = synchronized(lock) {
+        val currentGear = gear
+        if (currentGear == null || samples.isEmpty()) {
+            emptyDrains += 1
+            return@synchronized null
+        }
+        drains += 1
+        VehicleSpeedReading(currentGear, samples.toList()).also { samples.clear() }
     }
 
     fun invalidate() = synchronized(lock) {
         samples.clear()
         gear = null
-        lastMotionAvailable = false
-        lastDrainHadSamples = null
     }
 
     fun diagnostics(): String = synchronized(lock) { diagnosticsLocked(elapsedRealtime()) }
@@ -716,22 +692,17 @@ internal class EvccVehicleSpeedSource(
         if (refresh) requestRefresh()
         val current = telemetry.motion()
         if (current == null) {
-            val diagnostic = synchronized(lock) {
+            synchronized(lock) {
                 if (executor == null || generation != expectedGeneration) return
                 missingSamples += 1
-                val shouldReport = lastMotionAvailable != false || missingSamples % DIAGNOSTIC_SAMPLE_INTERVAL == 0L
-                lastMotionAvailable = false
-                if (shouldReport) "speed-source sample=missing ${diagnosticsLocked(elapsedRealtime())}" else null
             }
-            diagnostic?.let(::diagnose)
             return
         }
         val timestamp = elapsedRealtime()
-        val diagnostic = synchronized(lock) {
+        synchronized(lock) {
             if (executor == null || generation != expectedGeneration) return
             val previousGear = gear
             val previousSpeed = lastSpeed
-            val previousMoving = lastMoving
             if (previousGear != null && previousGear != current.gear) samples.clear()
             gear = current.gear
             if (samples.size == MAX_SAMPLES) samples.removeAt(0)
@@ -740,18 +711,10 @@ internal class EvccVehicleSpeedSource(
             if (previousSpeed != null && abs(previousSpeed - current.speedMetersPerSecond) >= SPEED_CHANGE_EPSILON_MPS) {
                 speedChanges += 1
             }
-            val moving = current.speedMetersPerSecond >= MOVING_THRESHOLD_MPS
-            val shouldReport = lastMotionAvailable != true || previousGear != current.gear ||
-                previousMoving != null && previousMoving != moving ||
-                validSamples % DIAGNOSTIC_SAMPLE_INTERVAL == 0L
-            lastMotionAvailable = true
             lastSpeed = current.speedMetersPerSecond
             lastGear = current.gear
-            lastMoving = moving
             lastSampleAt = timestamp
-            if (shouldReport) "speed-source sample=ready ${diagnosticsLocked(timestamp)}" else null
         }
-        diagnostic?.let(::diagnose)
     }
 
     private fun diagnosticsLocked(now: Long): String {
@@ -762,16 +725,10 @@ internal class EvccVehicleSpeedSource(
             "changes=$speedChanges lastSpeedMps=$speedText gear=${lastGear?.letter ?: '-'} sampleAgeMs=$age"
     }
 
-    private fun diagnose(message: String) = onDiagnostic("$DEBUG_PREFIX $message")
-
     private companion object {
         const val SAMPLE_MILLIS = 250L
         const val MAX_SAMPLES = 40
         const val REFRESH_EVERY_SAMPLES = 4
-        const val DIAGNOSTIC_SAMPLE_INTERVAL = 20L
-        const val DIAGNOSTIC_DRAIN_INTERVAL = 10L
         const val SPEED_CHANGE_EPSILON_MPS = 0.05
-        const val MOVING_THRESHOLD_MPS = 0.1
-        const val DEBUG_PREFIX = "[DEBUG-a4f2]"
     }
 }
