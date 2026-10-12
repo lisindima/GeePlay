@@ -21,6 +21,24 @@ GeePlay changes MUST also run:
   :geely:testDebugUnitTest :geely:lintDebug :geely:assembleDebug
 ```
 
+## Capability alignment tracking
+
+`CAPABILITY-ALIGNMENT.md` in the repository root is the single source of truth for every project
+capability's GeePlay alignment status and implementation path. Keep it current:
+
+- Every upstream merge/rebase/cherry-pick into a GeePlay branch MUST update the affected rows in
+  `CAPABILITY-ALIGNMENT.md` (status, Geely implementation path, evidence) as part of the same change.
+  The merge is not done until this table and the standalone checklist agree.
+- When a capability's status changes outside a merge (new Geely implementation, EVCC property verified,
+  real-car confirmation, feature removed), update the row and append a line to its "变更记录" section.
+- Keep the table's status/implementation legends and the per-capability numbering consistent with
+  `docs/BYD-TO-GEELY-FEATURE-MIGRATION-ASSESSMENT.md` and
+  `docs/BYD-TO-GEELY-UNALIGNED-CAPABILITIES-MIGRATION-SPEC.md`. If you add a new capability, add it to the
+  assessment matrix, the alignment table, and (if not yet implemented) the migration Spec.
+- EVCC stays the preferred capability source (vehicle properties, Shell, actions). Only fall back to a
+  Geely OEM API or a brand-neutral host command when the EVCC contract does not support the capability,
+  and record that reason in the table.
+
 ## Upstream merge review for GeePlay
 
 Every merge, rebase or cherry-pick from the DiPlay upstream into a GeePlay branch MUST include a new,
@@ -74,9 +92,10 @@ it from GeePlay, and do not expose it in GeePlay until the checklist explicitly 
 ### Merge completion
 
 The merge is not done until the standalone checklist has no unclassified item, all required tests/evidence
-are linked, the GeePlay exclusion gates are rechecked, and both the base CI command and the GeePlay command
-above pass. `EVIDENCE_PENDING` items may remain open only when the runtime setting stays disabled and the
-checklist states the missing evidence and next validation action.
+are linked, the GeePlay exclusion gates are rechecked, `CAPABILITY-ALIGNMENT.md` is updated for every
+affected capability, and both the base CI command and the GeePlay command above pass. `EVIDENCE_PENDING`
+items may remain open only when the runtime setting stays disabled and the checklist states the missing
+evidence and next validation action.
 
 ## Adding or moving a setting
 

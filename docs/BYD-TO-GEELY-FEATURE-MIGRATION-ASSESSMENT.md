@@ -2,16 +2,19 @@
 
 状态：代码盘点与方案评估完成；除已存在的 EVCC 车辆数据链路外，本文不代表其余能力已经实施或完成实车验证
 
-评估日期：2026-10-12
+评估日期：2026-10-12（基线于 2026-10-12 更新到 `geely/main` 合并后）
 
-评估分支：`feat/evcc-carplay-vehicle-data`
+评估分支：`geely/main`（源自 `feat/evcc-carplay-vehicle-data`，已合并）
 
-代码基线：`d1311cc1ca91`（评估时工作树另有未提交的 Geely 集群显示调试改动；本文只新增本文件，没有修改这些代码）
+代码基线：`f16878e9`（merge: integrate EVCC CarPlay vehicle data；两个父提交为 `d566c2b0 feat: add menu block` 和 `c0b25edc feat: expand Geely vehicle and CarPlay integration`）
+
+初始评估基线：`d1311cc1ca91`，结论未因合并发生实质变更；增量仅为 `d566c2b0` 的上游 BYD 菜单屏蔽（见 3.1）
 
 目标车机：当前连接的 Geely G636
 
 关联文档：
 
+- [未对齐能力迁移到 Geely 的实施 Spec](BYD-TO-GEELY-UNALIGNED-CAPABILITIES-MIGRATION-SPEC.md)
 - [EVCC 1.2 与 GeePlay CarPlay 车辆数据联动分析](EVCC-1.2-CARPLAY-INTEGRATION-ANALYSIS.md)
 - [EVCC 1.2 → CarPlay/iPhone 车辆数据同步 Spec](EVCC-CARPLAY-VEHICLE-DATA-SYNC-SPEC.md)
 - [EVCC 1.2 Siri 车辆控制分析](EVCC-1.2-SIRI-VEHICLE-CONTROL.md)
@@ -101,6 +104,12 @@ BYD 功能不能按“把 ADB 命令换成 EVCC Shell”整体迁移。应按能
 
 下面这些代码也包含 BYD 判断或命名，但不是上述 22 项之外的新车辆能力。它们仍需要纳入解耦计划，否则上游 merge 时会继续制造冲突。
 
+> 基线更新（`d566c2b0 feat: add menu block`）：主分支已落地上游 BYD 菜单屏蔽机制，与本文“按能力位隐藏上游菜单、不删源码”的建议一致：
+> - `LegacyBydSettingsPolicy.sections` 固定为 `BYD_ADB`、`BYD_NAVIGATION`、`CLUSTER_MAP`、`NAVIGATION_WHEEL`、`AMBIENT_LIGHTING`；
+> - `GeelyProductSettings.blockLegacyBydMenus`（`geeplay_product` SharedPreferences，默认 `true`）控制是否隐藏；
+> - `GeePlayApplication.legacyBydSettingsAvailable()` 返回 `!blockLegacyBydMenus`，`DiPlayActivity.filteredSection()` 据此跳过这些分区；
+> - 这是“UI 可见性门”，不等于底层解耦。6.4 节列出的 common/shared 直接引用 BYD singleton 的问题仍然存在，仍需按本文方案逐步替换。
+
 | 路径 | 当前 BYD 假设 | Geely 处理 |
 | --- | --- | --- |
 | `DiLink51ClusterLayout` / `DiLink51ClusterMonitor` | 按 DiLink 5.1 fingerprint、窗口和 Usage Access 调整中心屏/仪表布局 | 不迁移 fingerprint；Geely 尺寸和 Display 选择只通过 product display policy/profile 注入 |
@@ -110,6 +119,7 @@ BYD 功能不能按“把 ADB 命令换成 EVCC Shell”整体迁移。应按能
 | `MapEmbedService` / external map embedding | 上游为 BYD launcher/第三方 launcher 暴露集群地图 Surface | `GeePlayApplication.externalMapEmbeddingAvailable=false`；没有 Geely launcher consumer 时不迁移 |
 | `VoiceFilter` 与部分 audio copy | 以 DiLink 音响特征解释低频过滤、stream 选择 | 算法可复用，但设置和默认值由 Geely `LocalMediaAudioPolicy`/实车结果决定，不能继承 BYD 默认 |
 | OEM label/icon 与 setup 文案 | `BYD` 是上游默认 OEM 名称和车辆图标 | GeePlay 已通过 `VehicleIntegrationProvider` 替换为 `GEELY` 和独立资源；继续保持在 product composition |
+| 上游 BYD 设置分区可见性 | 上游默认把 `BYD_ADB` 等 5 个分区直接展示 | 已由 `LegacyBydSettingsPolicy` + `GeelyProductSettings.blockLegacyBydMenus` 默认隐藏；底层仍需按 6.4 节解耦 |
 | `DiPlaySessionService` / Activity cleanup | common 仍直接调用 `BydNavigationOutputs.endNow()` | 将 session cleanup 纳入已注入的 `VehicleSessionHooks.close/sessionEnded`，逐步移除 common 对 BYD singleton 的直接调用 |
 
 ## 4. 分组分析
@@ -495,6 +505,8 @@ EvccConnectionCore
 3. 扩展品牌中立 host command Seam，让 Geely OneOS/Flyme 输入直接复用现有 CarPlay answer/end/knob/zoom 能力。
 
 集群视频、HUD、歌曲和来电卡片应采用“先拿到 Geely OEM 接口证据，再写 Adapter”的策略。系统补丁类功能则采用“先在 G636 复现问题，再决定是否需要产品能力”的策略。这样既能保留当前 GeePlay 的快速演进，也能把与上游的冲突压缩在少量稳定 composition point 上。
+
+未对齐能力（本文矩阵中“高/中/低/条件”各项）的逐项落地方案，见 [BYD-TO-GEELY-UNALIGNED-CAPABILITIES-MIGRATION-SPEC.md](BYD-TO-GEELY-UNALIGNED-CAPABILITIES-MIGRATION-SPEC.md)。该 Spec 以 EVCC 作为首选能力来源（车辆属性读/写、Shell、Action、音量组），只有 EVCC 契约不支持时才回退到 Geely OEM API 或品牌中立 host 命令。
 
 ## 12. 主要代码证据索引
 
