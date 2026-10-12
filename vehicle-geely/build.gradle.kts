@@ -24,6 +24,7 @@ android {
 
 dependencies {
     api(project(":shared"))
+    implementation(project(":evccapi-client"))
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.17")
 }

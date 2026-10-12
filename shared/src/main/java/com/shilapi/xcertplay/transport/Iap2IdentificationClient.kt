@@ -6,7 +6,7 @@ import com.shilapi.xcertplay.iap2.message.Iap2Messages
 import com.shilapi.xcertplay.iap2.session.Iap2Session
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import com.shilapi.xcertplay.iap2.wire.Iap2Parameter
-import com.shilapi.xcertplay.transport.Iap2VehicleStatus.electricVehicleComponents
+import com.shilapi.xcertplay.transport.Iap2VehicleStatus.vehicleComponents
 import java.io.IOException
 import kotlin.math.min
 
@@ -52,8 +52,10 @@ data class Iap2IdentificationConfig(
     val wireless: Iap2WirelessIdentification? = null,
     /** Advertises and enables iAP2 LocationInformation from the accessory to the phone. */
     val locationInformationEnabled: Boolean = false,
-    /** Declares an electric vehicle and answers the phone's vehicle-status subscription. */
+    /** Declares a vehicle and answers the phone's vehicle-status subscription. */
     val vehicleStatusEnabled: Boolean = false,
+    /** Repeated iAP2 EngineType values advertised with [vehicleStatusEnabled]. */
+    val vehicleEngineTypes: Set<VehicleEngineType> = setOf(VehicleEngineType.ELECTRIC),
     /** The charging inlets declared with [vehicleStatusEnabled]. */
     val chargingConnectors: EvChargingConnectors = EvChargingConnectors.CCS2_TYPE2,
     /** Also offer wheel speed ($PASCD) in the location component; needs [locationInformationEnabled]. */
@@ -103,6 +105,7 @@ data class Iap2IdentificationConfig(
         require(carPlayUsbInterfaceNumber in 0..0xff) {
             "carPlayUsbInterfaceNumber must be in 0..255"
         }
+        require(vehicleEngineTypes.isNotEmpty()) { "vehicleEngineTypes must not be empty" }
     }
 }
 
@@ -377,7 +380,9 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
                         void(5)
                     }
                 }
-                if (config.vehicleStatusEnabled) electricVehicleComponents(config.manufacturer, config.chargingConnectors)
+                if (config.vehicleStatusEnabled) {
+                    vehicleComponents(config.manufacturer, config.vehicleEngineTypes, config.chargingConnectors)
+                }
                 if (config.locationInformationEnabled) {
                     group(22) {
                         u16(0, 0)

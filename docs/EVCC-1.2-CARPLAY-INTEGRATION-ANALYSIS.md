@@ -171,7 +171,8 @@ Identification 使用：
 - 参数 20：`VehicleInformation`
 - 参数 21：`VehicleStatus`
 
-车辆被声明为电动车，并附带充电接口类型。iPhone 发送：
+纯电车声明一个 Electric `EngineType`；增程车重复参数 2，分别声明 Gasoline 和 Electric，
+并附带充电接口类型。iPhone 发送：
 
 ```text
 0xA100 StartVehicleStatusUpdates
@@ -191,19 +192,23 @@ iPhone 发送 `0xA102 StopVehicleStatusUpdates` 后停止。当前刷新周期�
 | ---: | --- | --- |
 | 3 | `Range` | `rangeKm` |
 | 6 | `RangeWarning` | `rangeWarning` |
-| 11 | `RangeElectric` | `rangeKm` |
-| 15 | `RangeWarningElectric` | `rangeWarning` |
+| 9 | `RangeGasoline` | 汽油续航（存在时） |
+| 11 | `RangeElectric` | 纯电续航 |
+| 13 | `RangeWarningGasoline` | 汽油低续航状态（已知时） |
+| 15 | `RangeWarningElectric` | 电池低续航状态 |
 | 21 | `MinBatteryCharge` | 有电量数据时发送 0 |
 | 22 | `CurrentBatteryCharge` | `currentChargeWh`，可省略 |
 | 23 | `MaxBatteryCharge` | `maxChargeWh`，可省略 |
 | 24 | `DisplayedBatteryPercentage` | `batteryPercent * 1000` |
 | 25 | `isCharging` | `charging` |
 | 30 | `MaxRangeElectric` | `maxRangeKm` |
+| 31 | `MaxRangeGasoline` | 最大汽油续航（已知时） |
 
 静态 VehicleInformation 还包含：
 
 - 车辆名称和显示名称；
-- `EngineType = electric`；
+- `EngineType` 是可重复枚举：`Gasoline=0`、`Diesel=1`、`Electric=2`、`CNG=3`；
+- G636 增程车型同时声明 `Gasoline=0` 和 `Electric=2`，不把两者按 bitmask 合并为一个值；
 - `CCS2/Type2`、`GB/T` 或 `CCS1/J1772` 充电接口声明。
 
 ### 4.2 LocationInformation
@@ -262,7 +267,8 @@ GeePlay 已经能将 Geely OneOS/Flyme 输入转给 CarPlay：
 
 该目录标注的样本固件为 `qti/e171/e171:12/.../user/test-keys`，只能用于发现候选，不能视为所有 Geely 车型或新版 EVCC 1.2 的稳定协议。正式实现必须通过 1.2 运行时目录重新验证。
 
-第一期建议优先验证以下 `GEELY_CAPI` sensor：
+以下是旧 APK 静态目录阶段提出的历史候选。2026-10-11 的 G636 运行时验证已经证明，
+其中多个 ID 在可用 source 中具有完全不同的语义，不能直接进入生产 Profile：
 
 | CarPlay/GeePlay 字段 | EVCC 候选名称 | ID | 类型/访问 |
 | --- | --- | ---: | --- |
@@ -277,7 +283,8 @@ GeePlay 已经能将 Geely OneOS/Flyme 输入转给 CarPlay：
 
 映射约束：
 
-- 先用 `querySourceStates()` 确认 `GEELY_CAPI` 可用。
+- 历史方案要求先确认 `GEELY_CAPI` 可用；G636 实测后，生产 Profile 改为显式检查
+  `ADAPT_API` 和 `CAPI`。
 - 使用普通目录和 `resolveProperty()` 核对 descriptor，不默认执行 `LIVE_FULL_SCAN`。
 - 读取时使用显式 `source + id + areaId`，避免不同来源同 ID/名称歧义。
 - 挡位和充电状态必须在目标车上确认 enum 值，不能根据名称猜测。
@@ -285,6 +292,36 @@ GeePlay 已经能将 Geely OneOS/Flyme 输入转给 CarPlay：
 - `maxRangeKm` 可以暂时沿用当前 BYD 算法，由当前续航和 SOC 估算；有可靠额定续航字段后再替换。
 - `rangeWarning` 继续由本地低电量阈值计算。
 - 任何值过期、来源换代、授权失效或事件序号缺口都必须使快照失效，不能继续发送旧车辆状态。
+
+### 6.1 G636 运行时验证结果（2026-10-11）
+
+独立只读 Probe 在 EVCC 3.2.14 / EvccApi 1.1 上完成全目录扫描，并对最终候选执行
+`resolve/read/subscribe`。12 个目标 selector 全部收到 `INITIAL_SNAPSHOT`：
+
+| 字段 | 已验证 selector | 观测值 |
+| --- | --- | --- |
+| SOC | `ADAPT_API:1051136 / SENSOR_TYPE_EV_BATTERY_LEVEL` | `94 → 88` |
+| SOC 交叉验证 | `VEHICLE_AIDL:561024570 / paegyhvbattsoc` | 与主值一致 |
+| 综合续航 | `ADAPT_API:1050624 / SENSOR_TYPE_ENDURANCE_MILEAGE` | `173 km` |
+| 汽油续航 | `ADAPT_API:1054720 / SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL` | `89 km` |
+| EV 续航 | `ADAPT_API:1054976 / SENSOR_TYPE_ENDURANCE_MILEAGE_EV` | `84 → 78 km` |
+| 车速 | `ADAPT_API:1048832 / SENSOR_TYPE_CAR_SPEED` | 静止时 `0.0` |
+| 车速备选 | `ADAPT_API:1055232 / SENSOR_TYPE_CAR_SPEED_FROM_IPK` | 静止时 `0.0` |
+| 挡位 | `CAPI:289408000 / GEAR_SELECTION` | `4=PARK` |
+| 充电状态 | `ADAPT_API:605225728 / CHARGE_FUNC_CHARGING_STATE` | 未充电时 `0` |
+
+真机同时证明：
+
+- `ADAPT_API:4195840` 是 `TYPE_JOY_LIMIT_STATE`，不是 SOC；
+- `ADAPT_API:1049088` 是 `SENSOR_TYPE_PM25_AMBIENT`，不是续航；
+- 车速备选正确 ID 是 `1055232`，不是 `1070336`；
+- `GEELY_CAPI`/`GEELY_AIDL` 未启用；可用 source 为 `ADAPT_API`、`CAPI`、
+  `VEHICLE_AIDL`；
+- `VEHICLE_AIDL:557874322` 返回的续航估算与标准 EV 续航不同，不能作为无条件 fallback；
+- 充电口连接只表示插枪，不得替代 `isCharging`。
+
+生产代码仍保持 EvccApi 1.2 门禁；以上 1.1 结果用于修正车型 Profile，安装新版 EVCC 后
+必须再次验证 selector、车速单位和充电态正值。
 
 ## 7. CarPlay 不能直接承载的 EVCC 写能力
 
@@ -397,7 +434,7 @@ EVCC gateway 应由 `GeePlayApplication` 或等价的进程级组件持有，不
 推荐流程：
 
 1. GeePlay 启动且用户启用联动时连接 EVCC。
-2. 查询 API 版本、会话权限、能力和 `GEELY_CAPI` 状态。
+2. 查询 API 版本、会话权限、能力，以及 Profile 所需的 `ADAPT_API`/`CAPI` 状态。
 3. 解析并订阅 SOC、续航、充电、车速和挡位。
 4. 等待有界时间获得初始快照。
 5. 构建 `Iap2IdentificationConfig`，只声明已经有可信数据的能力。

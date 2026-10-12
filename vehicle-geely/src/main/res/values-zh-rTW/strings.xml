@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">將 stream 111 投射到已驗證的儀表螢幕</string>
     <string name="settings_geely_cluster_display_description">只對經實車驗證且與目前韌體、顯示器精確匹配的 profile 開放；修改將在下次連線時生效。</string>
     <string name="settings_geely_cluster_display_unavailable">目前韌體沒有匹配的實車驗證顯示 profile。直投保持關閉；請匯出診斷以記錄顯示器清單。</string>
+    <string name="settings_geely_cluster_debug_description">僅供除錯。可暫時選擇非預設 Android Presentation 顯示器並略過實車驗證 profile；下次連線 CarPlay 時生效。</string>
+    <string name="settings_geely_cluster_debug_no_displays">目前沒有可用的非預設 Android Presentation 顯示器。目標顯示器出現後請重新開啟設定。</string>
+    <string name="settings_geely_cluster_debug_target">除錯目標顯示器</string>
+    <string name="settings_geely_cluster_debug_disabled">關閉</string>
+    <string name="settings_geely_cluster_debug_confirm_title">投射到這個顯示器？</string>
+    <string name="settings_geely_cluster_debug_confirm_message">這會略過實車驗證顯示 profile，並可能覆蓋原車儀表內容。僅在停車時使用；下次連線 CarPlay 時生效。</string>
+    <string name="settings_geely_cluster_debug_confirm_action">使用此顯示器</string>
     <string name="settings_geely_diagnostics_title">吉利整合診斷</string>
     <string name="settings_geely_refresh">重新整理吉利介面並重試清理</string>
     <string name="settings_geely_diagnostics_status">導航 SDK：%1$s\nDriver：%2$s\n最近失敗：%3$s</string>
@@ -47,4 +54,17 @@
     <string name="settings_geely_upstream_compatibility_title">上游相容性</string>
     <string name="settings_geely_block_byd_menus">屏蔽 BYD 專屬設定</string>
     <string name="settings_geely_block_byd_menus_description">隱藏上游 DiPlay 中僅適用於 BYD 或 DiLink 的設定。GeePlay 建議保持開啟；修改立即生效，不會關閉共用 CarPlay 功能。</string>
+    <string name="settings_geely_evcc_title">EVCC 車輛資料（實驗性）</string>
+    <string name="settings_geely_evcc_description">從 EVCC 1.2 讀取已授權的車輛資料，並向已連線的 iPhone 傳送支援的電量、續航、車速和檔位資訊；修改將在下次連線時生效。</string>
+    <string name="settings_geely_evcc_vehicle_status">向 CarPlay 傳送電量和續航</string>
+    <string name="settings_geely_evcc_vehicle_status_description">EVCC 提供可信資料時，將動力電池電量、剩餘續航和充電狀態傳送給已連線的 iPhone；下次連線生效。</string>
+    <string name="settings_geely_evcc_vehicle_speed">向 CarPlay 定位傳送車速</string>
+    <string name="settings_geely_evcc_vehicle_speed_description">在 iPhone 要求的位置資料中加入 EVCC 輪速和檔位；還需要啟用位置共享；下次連線生效。</string>
+    <string name="settings_geely_evcc_low_charge_percent">低電量提醒門檻</string>
+    <string name="settings_geely_evcc_charging_connectors">充電介面</string>
+    <string name="settings_geely_evcc_confirm_title">啟用 EVCC 車輛資料？</string>
+    <string name="settings_geely_evcc_confirm_message">GeePlay 將從 EVCC 讀取所選車輛資料，並與已連線的 iPhone 分享；仍需在 EVCC 中授權。</string>
+    <string name="settings_geely_evcc_confirm_action">啟用</string>
+    <string name="settings_geely_evcc_open_settings">開啟 EVCC 授權</string>
+    <string name="settings_geely_evcc_unavailable">EVCC 車輛資料 Adapter 無法使用。</string>
 </resources>

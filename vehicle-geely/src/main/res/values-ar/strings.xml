@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">عرض stream 111 على شاشة العدادات المعتمدة</string>
     <string name="settings_geely_cluster_display_description">متاح فقط لملف تعريف دقيق للبرنامج الثابت والشاشة تم التحقق منه في السيارة. يُطبّق التغيير عند الاتصال التالي.</string>
     <string name="settings_geely_cluster_display_unavailable">لا يوجد ملف شاشة مُتحقق منه للسيارة يطابق هذا البرنامج الثابت. يبقى العرض المباشر معطلاً؛ صدّر التشخيص لتسجيل قائمة الشاشات.</string>
+    <string name="settings_geely_cluster_debug_description">للتصحيح فقط. اختر مؤقتًا شاشة Android Presentation غير الافتراضية لتجاوز الملف المتحقق منه. يُطبق عند اتصال CarPlay التالي.</string>
+    <string name="settings_geely_cluster_debug_no_displays">لا توجد شاشة Android Presentation غير افتراضية متاحة حاليًا. أعد فتح الإعدادات بعد ظهور الشاشة المستهدفة.</string>
+    <string name="settings_geely_cluster_debug_target">شاشة التصحيح المستهدفة</string>
+    <string name="settings_geely_cluster_debug_disabled">معطل</string>
+    <string name="settings_geely_cluster_debug_confirm_title">العرض على هذه الشاشة؟</string>
+    <string name="settings_geely_cluster_debug_confirm_message">يتجاوز هذا ملف الشاشة المتحقق منه وقد يغطي محتوى العدادات الأصلي. استخدمه فقط أثناء التوقف. يُطبق عند اتصال CarPlay التالي.</string>
+    <string name="settings_geely_cluster_debug_confirm_action">استخدام الشاشة</string>
     <string name="settings_geely_diagnostics_title">تشخيص تكامل Geely</string>
     <string name="settings_geely_refresh">تحديث واجهات Geely وإعادة محاولة التنظيف</string>
     <string name="settings_geely_diagnostics_status">SDK الملاحة: %1$s\nبرنامج التشغيل: %2$s\nآخر فشل: %3$s</string>
@@ -47,4 +54,17 @@
     <string name="settings_geely_upstream_compatibility_title">التوافق مع المنبع</string>
     <string name="settings_geely_block_byd_menus">إخفاء إعدادات BYD فقط</string>
     <string name="settings_geely_block_byd_menus_description">يخفي عناصر DiPlay القادمة من المنبع والمخصصة فقط لـ BYD أو DiLink. اتركه مفعّلًا في GeePlay. يُطبّق فورًا ولا يعطّل ميزات CarPlay المشتركة.</string>
+    <string name="settings_geely_evcc_title">بيانات مركبة EVCC (تجريبي)</string>
+    <string name="settings_geely_evcc_description">يقرأ بيانات المركبة المصرح بها من EVCC 1.2 ويرسل معلومات البطارية والمدى والسرعة والترس المدعومة إلى iPhone المتصل. تُطبق التغييرات عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_vehicle_status">إرسال البطارية والمدى إلى CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_status_description">يشارك نسبة بطارية الدفع والمدى المتبقي وحالة الشحن عندما يوفر EVCC قراءة موثوقة. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_vehicle_speed">إرسال سرعة المركبة إلى تحديد موقع CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_speed_description">يضيف سرعة العجلات والترس من EVCC إلى بيانات الموقع التي يطلبها iPhone. يجب تفعيل مشاركة الموقع أيضًا. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_low_charge_percent">حد تحذير انخفاض الشحن</string>
+    <string name="settings_geely_evcc_charging_connectors">موصلات الشحن</string>
+    <string name="settings_geely_evcc_confirm_title">هل تريد تفعيل بيانات EVCC؟</string>
+    <string name="settings_geely_evcc_confirm_message">سيقرأ GeePlay قيم المركبة المحددة من EVCC ويشاركها مع iPhone المتصل. ما زال تفويض EVCC مطلوبًا.</string>
+    <string name="settings_geely_evcc_confirm_action">تفعيل</string>
+    <string name="settings_geely_evcc_open_settings">فتح تفويض EVCC</string>
+    <string name="settings_geely_evcc_unavailable">مهايئ بيانات مركبة EVCC غير متاح.</string>
 </resources>

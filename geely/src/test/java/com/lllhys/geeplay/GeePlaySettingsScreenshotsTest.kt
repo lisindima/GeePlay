@@ -4,7 +4,9 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.hardware.display.DisplayManager
 import android.os.Looper
+import android.view.Display
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
@@ -26,6 +28,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDisplayManager
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -104,6 +107,71 @@ class GeePlaySettingsScreenshotsTest {
         }
     }
 
+    @Test
+    fun writesCompactFullAndArabicEvccSettingsScreenshots() {
+        listOf(
+            Triple("en", 600, 1.3f),
+            Triple("en", 1280, 1.5f),
+            Triple("ar", 600, 1.3f),
+        ).forEach { (locale, widthDp, fontScale) ->
+            val activity = openSettings(locale, widthDp, fontScale, "ADVANCED")
+            try {
+                val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+                layout(root, widthDp)
+                val evccTitle = descendants(root).filterIsInstance<TextView>().firstOrNull {
+                    it.text == activity.getString(GeelyR.string.settings_geely_evcc_title)
+                }
+                assertTrue(evccTitle != null)
+                val evccCard = settingsCardFor(evccTitle!!)
+                assertTrue(evccCard.width > 0 && evccCard.height > 0)
+                writeScreenshot(evccCard, "evcc-$locale-${widthDp}dp-font-$fontScale.png")
+            } finally {
+                activity.finish()
+                shadowOf(Looper.getMainLooper()).idle()
+            }
+        }
+    }
+
+    @Test
+    fun writesCompactFullAndArabicClusterDebugSettingsScreenshots() {
+        val manager = RuntimeEnvironment.getApplication().getSystemService(DisplayManager::class.java)
+        val displayId = ShadowDisplayManager.addDisplay("w2880dp-h1080dp-mdpi", 5)
+        shadowOf(manager.getDisplay(displayId)).apply {
+            setName("Geely debug cluster")
+            setFlags(Display.FLAG_PRESENTATION)
+        }
+        try {
+            listOf(
+                Triple("en", 600, 1.3f),
+                Triple("en", 1280, 1.5f),
+                Triple("ar", 600, 1.3f),
+            ).forEach { (locale, widthDp, fontScale) ->
+                val activity = openSettings(locale, widthDp, fontScale, "ADVANCED")
+                try {
+                    val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+                    layout(root, widthDp)
+                    val title = descendants(root).filterIsInstance<TextView>().firstOrNull {
+                        it.text == activity.getString(GeelyR.string.settings_geely_cluster_display_title)
+                    }
+                    assertTrue(title != null)
+                    val card = settingsCardFor(title!!)
+                    assertTrue(card.width > 0 && card.height > 0)
+                    assertTrue(descendants(card).filterIsInstance<TextView>().any {
+                        it.text.toString().contains(
+                            activity.getString(GeelyR.string.settings_geely_cluster_debug_target),
+                        )
+                    })
+                    writeScreenshot(card, "cluster-debug-$locale-${widthDp}dp-font-$fontScale.png")
+                } finally {
+                    activity.finish()
+                    shadowOf(Looper.getMainLooper()).idle()
+                }
+            }
+        } finally {
+            ShadowDisplayManager.removeDisplay(displayId)
+        }
+    }
+
     private fun openSettings(
         locale: String,
         widthDp: Int,
@@ -160,6 +228,10 @@ class GeePlaySettingsScreenshotsTest {
             bitmap.recycle()
         }
     }
+
+    private fun settingsCardFor(target: View): View =
+        generateSequence(target.parent as? View) { it.parent as? View }
+            .first { it is ViewGroup && it.background != null }
 
     private fun descendants(view: View): Sequence<View> = sequence {
         yield(view)

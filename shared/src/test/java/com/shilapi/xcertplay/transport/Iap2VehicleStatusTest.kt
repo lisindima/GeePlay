@@ -19,6 +19,19 @@ class Iap2VehicleStatusTest {
     )
 
     @Test
+    fun engineTypeWireValuesMatchIap2() {
+        assertEquals(
+            mapOf(
+                VehicleEngineType.GASOLINE to 0,
+                VehicleEngineType.DIESEL to 1,
+                VehicleEngineType.ELECTRIC to 2,
+                VehicleEngineType.CNG to 3,
+            ),
+            VehicleEngineType.entries.associateWith(VehicleEngineType::wireValue),
+        )
+    }
+
+    @Test
     fun anElectricVehicleIsDeclaredOnlyWithABatteryReading() {
         val enabled = identification(vehicleStatusEnabled = true)
 
@@ -46,6 +59,62 @@ class Iap2VehicleStatusTest {
         assertEquals(listOf(1, 4), connectors(EvChargingConnectors.CCS2_TYPE2))
         assertEquals(listOf(5, 6), connectors(EvChargingConnectors.GB_T))
         assertEquals(listOf(0, 2), connectors(EvChargingConnectors.CCS1_J1772))
+    }
+
+    @Test
+    fun rangeExtenderDeclaresGasolineAndElectricAsRepeatedEngineTypes() {
+        val status = reading.copy(
+            rangeKm = 173,
+            powertrainRanges = linkedMapOf(
+                VehicleEngineType.GASOLINE to VehiclePowertrainRange(rangeKm = 89),
+                VehicleEngineType.ELECTRIC to VehiclePowertrainRange(
+                    rangeKm = 84,
+                    rangeWarning = false,
+                    maxRangeKm = 165,
+                ),
+            ),
+        )
+
+        val identified = identification(vehicleStatusEnabled = true).withVehicleStatusFrom { status }
+        val components = parameters(identified)
+        val vehicleInformation = Iap2ParameterList.parse(components.first(20)!!.payload)
+        val vehicleStatus = Iap2ParameterList.parse(components.first(21)!!.payload)
+
+        assertEquals(setOf(VehicleEngineType.GASOLINE, VehicleEngineType.ELECTRIC), identified.vehicleEngineTypes)
+        assertEquals(listOf(0, 2), vehicleInformation.all(2).map { it.payload.single().toInt() })
+        assertTrue(vehicleStatus.first(9) != null)
+        assertTrue(vehicleStatus.first(11) != null)
+        assertTrue(vehicleStatus.first(30) != null)
+        assertTrue(vehicleStatus.first(31) != null)
+    }
+
+    @Test
+    fun rangeExtenderReportsCombinedGasolineAndElectricRangesSeparately() {
+        val status = reading.copy(
+            rangeKm = 173,
+            powertrainRanges = linkedMapOf(
+                VehicleEngineType.GASOLINE to VehiclePowertrainRange(
+                    rangeKm = 89,
+                    rangeWarning = false,
+                    maxRangeKm = 500,
+                ),
+                VehicleEngineType.ELECTRIC to VehiclePowertrainRange(
+                    rangeKm = 84,
+                    rangeWarning = true,
+                    maxRangeKm = 165,
+                ),
+            ),
+        )
+
+        val parameters = Iap2ParameterList.parse(Iap2VehicleStatus.update(status).payload)
+
+        assertEquals(173, u16(parameters, 3))
+        assertEquals(89, u16(parameters, 9))
+        assertEquals(84, u16(parameters, 11))
+        assertEquals(0, parameters.first(13)!!.payload.single().toInt())
+        assertEquals(1, parameters.first(15)!!.payload.single().toInt())
+        assertEquals(500, u16(parameters, 31))
+        assertEquals(165, u16(parameters, 30))
     }
 
     @Test
@@ -91,4 +160,7 @@ class Iap2VehicleStatusTest {
         List(bytes.size / 2) { index ->
             ((bytes[index * 2].toInt() and 0xff) shl 8) or (bytes[index * 2 + 1].toInt() and 0xff)
         }
+
+    private fun u16(parameters: Iap2ParameterList, id: Int): Int =
+        ByteBuffer.wrap(parameters.first(id)!!.payload).short.toInt() and 0xffff
 }

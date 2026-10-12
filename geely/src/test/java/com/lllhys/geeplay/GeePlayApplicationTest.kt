@@ -4,7 +4,9 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.hardware.display.DisplayManager
 import android.os.LocaleList
+import android.view.Display
 import com.lllhys.geeplay.vehicle.geely.GeelyClusterDisplaySettings
 import com.lllhys.geeplay.vehicle.geely.GeelyProductSettings
 import com.shilapi.xcertplay.MapEmbedService
@@ -22,7 +24,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowDisplayManager
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -68,6 +72,7 @@ class GeePlayApplicationTest {
             application.updateReleasesUrl(application),
         )
         assertEquals(MediaOutputOwner.OEM_BLUETOOTH, application.mediaAudioPolicy(application).owner)
+        assertNotNull(application.carPlayVehicleDataAdapter(application))
         assertFalse(application.legacyBydSettingsAvailable(application))
         assertEquals("GeePlay", application.diagnosticExportDirectoryName(application))
         assertEquals(
@@ -142,6 +147,30 @@ class GeePlayApplicationTest {
             assertEquals(false, application.requiresClusterStream(application))
         } finally {
             GeelyClusterDisplaySettings.saveEnabled(application, false)
+        }
+    }
+
+    @Test
+    fun `explicit debug display can request stream 111 without a validated profile`() {
+        val application = RuntimeEnvironment.getApplication() as GeePlayApplication
+        val manager = application.getSystemService(DisplayManager::class.java)
+        val displayId = ShadowDisplayManager.addDisplay("w2880dp-h1080dp-mdpi", 5)
+        shadowOf(manager.getDisplay(displayId)).apply {
+            setName("Geely debug cluster")
+            setFlags(Display.FLAG_PRESENTATION)
+        }
+        GeelyClusterDisplaySettings.saveDebugDisplayId(application, displayId)
+        try {
+            assertTrue(application.requiresClusterStream(application))
+            assertEquals(
+                displayId,
+                application.clusterDisplayPolicy(application)
+                    .select(GeelyClusterDisplaySettings.debugCandidates(application))
+                    ?.displayId,
+            )
+        } finally {
+            GeelyClusterDisplaySettings.saveDebugDisplayId(application, null)
+            ShadowDisplayManager.removeDisplay(displayId)
         }
     }
 }

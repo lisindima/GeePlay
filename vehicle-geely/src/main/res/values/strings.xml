@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">Project stream 111 to the validated instrument display</string>
     <string name="settings_geely_cluster_display_description">Available only for an exact, vehicle-validated firmware and display profile. Changes apply on the next connection.</string>
     <string name="settings_geely_cluster_display_unavailable">No vehicle-validated display profile matches this firmware. Direct projection remains disabled; export diagnostics to capture the display inventory.</string>
+    <string name="settings_geely_cluster_debug_description">Debug only. Select a non-default Android Presentation display to bypass the validated profile temporarily. The choice applies on the next CarPlay connection.</string>
+    <string name="settings_geely_cluster_debug_no_displays">No non-default Android Presentation display is currently available. Reopen Settings after the target display appears.</string>
+    <string name="settings_geely_cluster_debug_target">Debug target display</string>
+    <string name="settings_geely_cluster_debug_disabled">Disabled</string>
+    <string name="settings_geely_cluster_debug_confirm_title">Project to this display?</string>
+    <string name="settings_geely_cluster_debug_confirm_message">This bypasses the vehicle-validated display profile and may cover original instrument content. Use only while parked. It applies on the next CarPlay connection.</string>
+    <string name="settings_geely_cluster_debug_confirm_action">Use display</string>
     <string name="settings_geely_diagnostics_title">Geely integration diagnostics</string>
     <string name="settings_geely_refresh">Refresh Geely interfaces and retry cleanup</string>
     <string name="settings_geely_diagnostics_status">Navigation SDK: %1$s\nDriver: %2$s\nLast failure: %3$s</string>
@@ -47,4 +54,17 @@
     <string name="settings_geely_upstream_compatibility_title">Upstream compatibility</string>
     <string name="settings_geely_block_byd_menus">Hide BYD-only settings</string>
     <string name="settings_geely_block_byd_menus_description">Hides upstream DiPlay controls that apply only to BYD or DiLink. Keep this enabled for GeePlay. Changes apply immediately and do not disable shared CarPlay features.</string>
+    <string name="settings_geely_evcc_title">EVCC vehicle data (experimental)</string>
+    <string name="settings_geely_evcc_description">Reads approved vehicle data from EVCC 1.2 and sends supported battery, range, speed and gear information to the connected iPhone. Changes apply on the next connection.</string>
+    <string name="settings_geely_evcc_vehicle_status">Send battery and range to CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_status_description">Shares traction-battery percentage, remaining range and charging state with the connected iPhone when EVCC provides a verified reading. Applies on the next connection.</string>
+    <string name="settings_geely_evcc_vehicle_speed">Send vehicle speed to CarPlay positioning</string>
+    <string name="settings_geely_evcc_vehicle_speed_description">Adds EVCC wheel speed and gear to location updates requested by the iPhone. Location sharing must also be enabled. Applies on the next connection.</string>
+    <string name="settings_geely_evcc_low_charge_percent">Low-charge warning</string>
+    <string name="settings_geely_evcc_charging_connectors">Charging connectors</string>
+    <string name="settings_geely_evcc_confirm_title">Enable EVCC vehicle data?</string>
+    <string name="settings_geely_evcc_confirm_message">GeePlay will read the selected vehicle values from EVCC and share them with the connected iPhone. EVCC authorization is still required.</string>
+    <string name="settings_geely_evcc_confirm_action">Enable</string>
+    <string name="settings_geely_evcc_open_settings">Open EVCC authorization</string>
+    <string name="settings_geely_evcc_unavailable">EVCC vehicle-data adapter is unavailable.</string>
 </resources>

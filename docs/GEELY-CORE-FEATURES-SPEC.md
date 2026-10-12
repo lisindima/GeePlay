@@ -302,6 +302,15 @@ stream `111` 仍由现有 AirPlay alt-screen、`MediaCodec` 和 `MapMirrors` 解
 - 不回退到 BYD display 规则；
 - 不猜测 display 1/2 或通过接口存在推断支持。
 
+为采集物理仪表验证证据，Advanced 可以提供一个独立的调试 override。它不是正式 profile，必须同时满足：
+
+- 默认关闭，并经过明确风险确认；
+- 只列出当前有效、非默认且带 `FLAG_PRESENTATION` 的 Android display；
+- 选择保存显式 displayId，修改在下一次 CarPlay 连接生效；
+- displayId 消失、变为默认屏或不再带 Presentation flag 时 fail-closed；
+- 不回退主屏、不回退 BYD 规则、不自动写入 `VALIDATED_PROFILES`；
+- 诊断使用 `debug-display-{id}` 标记，并记录 display inventory，方便验证后形成正式 profile。
+
 ### 10.4 路口显示
 
 - iPhone 若在 MAP/TURN_CARD/INSTRUMENTS stream 中绘制路口图，GeePlay 原样显示。
@@ -372,7 +381,8 @@ merged manifest 门禁必须证明不存在：
 - 新 `settings_*` 文案覆盖 `values`、`ar`、`es`、`ru`、`uk`、`zh-rCN`、`zh-rTW`。
 - Choice 行使用 `Title · Value` 和 chevron 语义。
 - 下一次连接生效的设置调用 `markReconnectNeeded()`；只有“应用并重新连接”按钮可立即 reconnect。
-- 物理仪表 profile 未验证时控件 disabled，不能只显示 warning 后仍允许打开。
+- 正式物理仪表开关在 profile 未验证时必须 disabled；独立的调试目标屏 Choice 只有满足 10.3
+  的显式确认和 fail-closed 条件时才允许绕过，不能伪装成正式支持。
 - 不显示 AutoDisplay 或 launcher map sharing 设置。
 - GeePlay 默认屏蔽上游 BYD/DiLink 专属菜单；用户可在 Advanced 临时关闭屏蔽，用于兼容性排查，但这不构成 GeePlay 支持证据。
 - BYD-only section 必须集中登记在 `LegacyBydSettingsPolicy`；混合卡片只 gate 其中的 BYD 控件，不能误隐藏通用功能。

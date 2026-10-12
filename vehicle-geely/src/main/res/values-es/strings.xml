@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">Proyectar stream 111 en la pantalla validada</string>
     <string name="settings_geely_cluster_display_description">Solo está disponible para un perfil exacto de firmware y pantalla validado en el vehículo. El cambio se aplica en la próxima conexión.</string>
     <string name="settings_geely_cluster_display_unavailable">Ningún perfil de pantalla validado coincide con este firmware. La proyección directa sigue desactivada; exporta el diagnóstico para registrar las pantallas.</string>
+    <string name="settings_geely_cluster_debug_description">Solo para depuración. Selecciona temporalmente una pantalla Android Presentation no predeterminada para omitir el perfil validado. Se aplica en la próxima conexión de CarPlay.</string>
+    <string name="settings_geely_cluster_debug_no_displays">No hay ninguna pantalla Android Presentation no predeterminada disponible. Vuelve a abrir Ajustes cuando aparezca la pantalla de destino.</string>
+    <string name="settings_geely_cluster_debug_target">Pantalla de depuración</string>
+    <string name="settings_geely_cluster_debug_disabled">Desactivado</string>
+    <string name="settings_geely_cluster_debug_confirm_title">¿Proyectar en esta pantalla?</string>
+    <string name="settings_geely_cluster_debug_confirm_message">Esto omite el perfil validado y puede cubrir contenido original del cuadro. Úsalo solo con el vehículo estacionado. Se aplica en la próxima conexión de CarPlay.</string>
+    <string name="settings_geely_cluster_debug_confirm_action">Usar pantalla</string>
     <string name="settings_geely_diagnostics_title">Diagnóstico de integración de Geely</string>
     <string name="settings_geely_refresh">Actualizar interfaces Geely y reintentar la limpieza</string>
     <string name="settings_geely_diagnostics_status">SDK de navegación: %1$s\nControlador: %2$s\nÚltimo fallo: %3$s</string>
@@ -47,4 +54,17 @@
     <string name="settings_geely_upstream_compatibility_title">Compatibilidad con upstream</string>
     <string name="settings_geely_block_byd_menus">Ocultar ajustes exclusivos de BYD</string>
     <string name="settings_geely_block_byd_menus_description">Oculta controles de DiPlay procedentes de upstream que solo corresponden a BYD o DiLink. Déjalo activado en GeePlay. Se aplica de inmediato y no desactiva funciones compartidas de CarPlay.</string>
+    <string name="settings_geely_evcc_title">Datos del vehículo EVCC (experimental)</string>
+    <string name="settings_geely_evcc_description">Lee datos autorizados del vehículo desde EVCC 1.2 y envía al iPhone la batería, la autonomía, la velocidad y la marcha compatibles. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_evcc_vehicle_status">Enviar batería y autonomía a CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_status_description">Comparte el nivel de la batería de tracción, la autonomía restante y el estado de carga cuando EVCC proporciona una lectura verificada. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_evcc_vehicle_speed">Enviar velocidad al posicionamiento de CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_speed_description">Añade la velocidad y la marcha de EVCC a los datos de ubicación solicitados por el iPhone. También debe estar activada la ubicación. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_evcc_low_charge_percent">Aviso de carga baja</string>
+    <string name="settings_geely_evcc_charging_connectors">Conectores de carga</string>
+    <string name="settings_geely_evcc_confirm_title">¿Activar los datos EVCC?</string>
+    <string name="settings_geely_evcc_confirm_message">GeePlay leerá los valores seleccionados mediante EVCC y los compartirá con el iPhone conectado. Aún se requiere autorización en EVCC.</string>
+    <string name="settings_geely_evcc_confirm_action">Activar</string>
+    <string name="settings_geely_evcc_open_settings">Abrir autorización de EVCC</string>
+    <string name="settings_geely_evcc_unavailable">El adaptador de datos EVCC no está disponible.</string>
 </resources>

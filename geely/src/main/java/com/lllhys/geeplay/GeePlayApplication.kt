@@ -17,10 +17,16 @@ import com.lllhys.geeplay.vehicle.geely.GeelyClusterDisplaySettings
 import com.lllhys.geeplay.vehicle.geely.GeelyIntegrationDiagnostics
 import com.lllhys.geeplay.vehicle.geely.GeelyNavigationRecovery
 import com.lllhys.geeplay.vehicle.geely.GeelyProductSettings
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataAdapter
+import com.shilapi.xcertplay.vehicle.CarPlayVehicleDataAdapter
 
 class GeePlayApplication : Application(), VehicleIntegrationProvider {
+    private lateinit var evccVehicleData: EvccVehicleDataAdapter
+
     override fun onCreate() {
         super.onCreate()
+        evccVehicleData = EvccVehicleDataAdapter(this)
+        evccVehicleData.prepare()
         GeelyNavigationRecovery.restoreOnAppOpen(this)
     }
 
@@ -29,6 +35,8 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
             context.applicationContext,
             onStatus = GeelyNavigationStatusStore::update,
         )
+
+    override fun carPlayVehicleDataAdapter(context: Context): CarPlayVehicleDataAdapter = evccVehicleData
 
     override fun mediaAudioPolicy(context: Context): LocalMediaAudioPolicy =
         when (GeelyMediaSettings.loadOwner(context)) {
@@ -57,13 +65,27 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
     override fun diagnosticExportDirectoryName(context: Context): String = "GeePlay"
 
     override fun clusterDisplayPolicy(context: Context): VehicleClusterDisplayPolicy =
-        GeelyClusterDisplayPolicy(enabled = GeelyClusterDisplaySettings.enabled(context))
+        geelyClusterDisplayPolicy(context)
 
     override fun requiresClusterStream(context: Context): Boolean =
-        GeelyClusterDisplaySettings.enabled(context) && GeelyClusterDisplayPolicy().hasValidatedFirmware()
+        geelyClusterDisplayPolicy(context).select(GeelyClusterDisplaySettings.debugCandidates(context)) != null
 
     override fun updateReleasesUrl(context: Context): String =
         "https://api.github.com/repos/lllhys/GeePlay/releases?per_page=3"
 
-    override fun diagnosticReport(context: Context): String = GeelyIntegrationDiagnostics.report(context)
+    override fun diagnosticReport(context: Context): String = buildString {
+        append(GeelyIntegrationDiagnostics.report(context))
+        append('\n')
+        append(evccVehicleData.diagnostics())
+    }
+
+    override fun onTerminate() {
+        if (::evccVehicleData.isInitialized) evccVehicleData.close()
+        super.onTerminate()
+    }
+
+    private fun geelyClusterDisplayPolicy(context: Context) = GeelyClusterDisplayPolicy(
+        enabled = GeelyClusterDisplaySettings.enabled(context),
+        debugDisplayId = GeelyClusterDisplaySettings.debugDisplayId(context),
+    )
 }

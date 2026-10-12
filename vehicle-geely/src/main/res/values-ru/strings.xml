@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">Выводить stream 111 на проверенный дисплей приборов</string>
     <string name="settings_geely_cluster_display_description">Доступно только для точно совпадающего профиля прошивки и дисплея, проверенного на автомобиле. Изменение применяется при следующем подключении.</string>
     <string name="settings_geely_cluster_display_unavailable">Для этой прошивки нет проверенного на автомобиле профиля дисплея. Прямой вывод отключён; экспортируйте диагностику для записи списка дисплеев.</string>
+    <string name="settings_geely_cluster_debug_description">Только для отладки. Временно выберите неосновной дисплей Android Presentation в обход проверенного профиля. Применяется при следующем подключении CarPlay.</string>
+    <string name="settings_geely_cluster_debug_no_displays">Нет доступного неосновного дисплея Android Presentation. Откройте настройки снова после появления целевого дисплея.</string>
+    <string name="settings_geely_cluster_debug_target">Отладочный дисплей</string>
+    <string name="settings_geely_cluster_debug_disabled">Выключено</string>
+    <string name="settings_geely_cluster_debug_confirm_title">Вывести изображение на этот дисплей?</string>
+    <string name="settings_geely_cluster_debug_confirm_message">Это обходит проверенный профиль и может перекрыть штатное содержимое приборной панели. Используйте только на стоянке. Применяется при следующем подключении CarPlay.</string>
+    <string name="settings_geely_cluster_debug_confirm_action">Использовать дисплей</string>
     <string name="settings_geely_diagnostics_title">Диагностика интеграции Geely</string>
     <string name="settings_geely_refresh">Обновить интерфейсы Geely и повторить очистку</string>
     <string name="settings_geely_diagnostics_status">SDK навигации: %1$s\nДрайвер: %2$s\nПоследняя ошибка: %3$s</string>
@@ -47,4 +54,17 @@
     <string name="settings_geely_upstream_compatibility_title">Совместимость с upstream</string>
     <string name="settings_geely_block_byd_menus">Скрыть настройки только для BYD</string>
     <string name="settings_geely_block_byd_menus_description">Скрывает элементы upstream DiPlay, предназначенные только для BYD или DiLink. Для GeePlay оставьте включённым. Применяется сразу и не отключает общие функции CarPlay.</string>
+    <string name="settings_geely_evcc_title">Данные автомобиля EVCC (экспериментально)</string>
+    <string name="settings_geely_evcc_description">Считывает разрешённые данные через EVCC 1.2 и передаёт подключённому iPhone заряд, запас хода, скорость и передачу. Изменения применяются при следующем подключении.</string>
+    <string name="settings_geely_evcc_vehicle_status">Передавать заряд и запас хода в CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_status_description">Передаёт iPhone заряд тяговой батареи, запас хода и состояние зарядки при наличии проверенных данных EVCC. Применяется при следующем подключении.</string>
+    <string name="settings_geely_evcc_vehicle_speed">Передавать скорость для позиционирования CarPlay</string>
+    <string name="settings_geely_evcc_vehicle_speed_description">Добавляет скорость и передачу EVCC к данным геопозиции по запросу iPhone. Передача геопозиции также должна быть включена. Применяется при следующем подключении.</string>
+    <string name="settings_geely_evcc_low_charge_percent">Порог низкого заряда</string>
+    <string name="settings_geely_evcc_charging_connectors">Разъёмы зарядки</string>
+    <string name="settings_geely_evcc_confirm_title">Включить данные EVCC?</string>
+    <string name="settings_geely_evcc_confirm_message">GeePlay будет читать выбранные значения через EVCC и передавать их подключённому iPhone. Требуется отдельное разрешение в EVCC.</string>
+    <string name="settings_geely_evcc_confirm_action">Включить</string>
+    <string name="settings_geely_evcc_open_settings">Открыть разрешения EVCC</string>
+    <string name="settings_geely_evcc_unavailable">Адаптер данных EVCC недоступен.</string>
 </resources>

@@ -45,6 +45,7 @@ interface VehicleSessionHooks : Closeable {
 /** Application-level composition point for product-specific vehicle integrations. */
 interface VehicleIntegrationProvider {
     fun createVehicleSessionHooks(context: Context): VehicleSessionHooks
+    fun carPlayVehicleDataAdapter(context: Context): CarPlayVehicleDataAdapter? = null
     fun mediaAudioPolicy(context: Context): LocalMediaAudioPolicy = LocalMediaAudioPolicy.DIPLAY
     fun vehicleSettings(context: Context): VehicleSettingsController? = null
     /** Whether this product should render DiPlay's legacy BYD settings and availability copy. */

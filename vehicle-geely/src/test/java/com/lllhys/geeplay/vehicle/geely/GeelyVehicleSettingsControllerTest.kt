@@ -1,9 +1,12 @@
 package com.lllhys.geeplay.vehicle.geely
 
 import android.content.Context
+import android.hardware.display.DisplayManager
+import android.view.Display
 import com.shilapi.xcertplay.media.MediaOutputOwner
 import com.shilapi.xcertplay.vehicle.VehicleSettingRow
 import com.shilapi.xcertplay.vehicle.VehicleSettingsPlacement
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataSettings
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,6 +15,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowDisplayManager
 
 @RunWith(RobolectricTestRunner::class)
 class GeelyVehicleSettingsControllerTest {
@@ -26,6 +31,9 @@ class GeelyVehicleSettingsControllerTest {
         GeelyMediaSettings.saveOwner(context, MediaOutputOwner.OEM_BLUETOOTH)
         GeelyInputSettings.saveProfile(context, GeelyInputProfile.DISABLED)
         GeelyProductSettings.saveBlockLegacyBydMenus(context, true)
+        EvccVehicleDataSettings.saveVehicleStatusEnabled(context, false)
+        EvccVehicleDataSettings.saveVehicleSpeedEnabled(context, false)
+        GeelyClusterDisplaySettings.saveDebugDisplayId(context, null)
     }
 
     @Test
@@ -51,7 +59,7 @@ class GeelyVehicleSettingsControllerTest {
             GeelyNavigationConfig(true, GeelyNavigationBackend.AUTO, true, false, 0),
         )
         val backend = GeelyVehicleSettingsController().cards(context)
-            .single { it.placement == VehicleSettingsPlacement.NAVIGATION }
+            .single { it.id == "geely_navigation" }
             .rows.filterIsInstance<VehicleSettingRow.Choice>()
             .single { it.id == "geely_navigation_backend" }
 
@@ -97,7 +105,7 @@ class GeelyVehicleSettingsControllerTest {
         val display = cards.single { it.id == "geely_cluster_display" }
             .rows.filterIsInstance<VehicleSettingRow.Toggle>()
             .single { it.id == "geely_cluster_display_enabled" }
-        val junction = cards.single { it.placement == VehicleSettingsPlacement.NAVIGATION }
+        val junction = cards.single { it.id == "geely_navigation" }
             .rows.filterIsInstance<VehicleSettingRow.Toggle>()
             .single { it.id == "geely_semantic_junction_enabled" }
 
@@ -133,6 +141,60 @@ class GeelyVehicleSettingsControllerTest {
 
         assertEquals(com.shilapi.xcertplay.vehicle.VehicleSettingEffect.REFRESH_SETTINGS, input.effect)
         assertEquals(com.shilapi.xcertplay.vehicle.VehicleSettingEffect.NEXT_CONNECTION, media.effect)
+    }
+
+    @Test
+    fun `EVCC vehicle data is opt in and connection scoped`() {
+        val card = GeelyVehicleSettingsController().cards(context)
+            .single { it.id == "geely_evcc_vehicle_data" }
+        val toggles = card.rows.filterIsInstance<VehicleSettingRow.Toggle>().associateBy { it.id }
+
+        assertEquals(VehicleSettingsPlacement.ADVANCED, card.placement)
+        assertFalse(toggles.getValue("geely_evcc_vehicle_status").checked)
+        assertFalse(toggles.getValue("geely_evcc_vehicle_speed").checked)
+        assertEquals(
+            com.shilapi.xcertplay.vehicle.VehicleSettingEffect.NEXT_CONNECTION,
+            toggles.getValue("geely_evcc_vehicle_status").effect,
+        )
+
+        toggles.getValue("geely_evcc_vehicle_status").save(true)
+        toggles.getValue("geely_evcc_vehicle_speed").save(true)
+
+        assertTrue(EvccVehicleDataSettings.vehicleStatusEnabled(context))
+        assertTrue(EvccVehicleDataSettings.vehicleSpeedEnabled(context))
+    }
+
+    @Test
+    fun `cluster debug target lists only a non default presentation display`() {
+        val manager = context.getSystemService(DisplayManager::class.java)
+        val displayId = ShadowDisplayManager.addDisplay("w2880dp-h1080dp-mdpi", 5)
+        shadowOf(manager.getDisplay(displayId)).apply {
+            setName("Geely debug cluster")
+            setFlags(Display.FLAG_PRESENTATION)
+        }
+        try {
+            val choice = GeelyVehicleSettingsController().cards(context)
+                .single { it.id == "geely_cluster_display" }
+                .rows.filterIsInstance<VehicleSettingRow.Choice>()
+                .single { it.id == "geely_cluster_debug_display" }
+
+            assertEquals(0, choice.selectedIndex)
+            assertTrue(choice.options.single { "$displayId" in it }.contains("2880×1080"))
+            assertTrue(choice.confirmations.containsKey(1))
+            choice.save(1)
+            assertEquals(displayId, GeelyClusterDisplaySettings.debugDisplayId(context))
+            assertEquals(
+                1,
+                GeelyVehicleSettingsController().cards(context)
+                    .single { it.id == "geely_cluster_display" }
+                    .rows.filterIsInstance<VehicleSettingRow.Choice>()
+                    .single { it.id == "geely_cluster_debug_display" }
+                    .selectedIndex,
+            )
+        } finally {
+            GeelyClusterDisplaySettings.saveDebugDisplayId(context, null)
+            ShadowDisplayManager.removeDisplay(displayId)
+        }
     }
 
     @Test

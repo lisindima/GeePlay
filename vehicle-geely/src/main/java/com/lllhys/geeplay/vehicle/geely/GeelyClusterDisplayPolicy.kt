@@ -1,6 +1,7 @@
 package com.lllhys.geeplay.vehicle.geely
 
 import android.os.Build
+import android.view.Display
 import com.shilapi.xcertplay.vehicle.VehicleClusterDisplayPolicy
 import com.shilapi.xcertplay.vehicle.VehicleClusterDisplayTarget
 import com.shilapi.xcertplay.vehicle.VehicleDisplayCandidate
@@ -18,8 +19,15 @@ class GeelyClusterDisplayPolicy(
     private val fingerprint: String = Build.FINGERPRINT,
     private val profiles: List<GeelyClusterDisplayProfile> = VALIDATED_PROFILES,
     private val enabled: Boolean = true,
+    private val debugDisplayId: Int? = null,
 ) : VehicleClusterDisplayPolicy {
     override fun select(candidates: List<VehicleDisplayCandidate>): VehicleClusterDisplayTarget? {
+        debugDisplayId?.let { displayId ->
+            return candidates.singleOrNull { candidate ->
+                candidate.displayId == displayId && candidate.displayId != Display.DEFAULT_DISPLAY &&
+                    candidate.flags and Display.FLAG_PRESENTATION != 0
+            }?.let { VehicleClusterDisplayTarget(it.displayId, "debug-display-${it.displayId}") }
+        }
         if (!enabled) return null
         val matches = profiles.filter { it.fingerprint.matches(fingerprint) }.mapNotNull { profile ->
             candidates.singleOrNull {

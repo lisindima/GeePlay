@@ -99,6 +99,10 @@ BUILD SUCCESSFUL in 10m 24s
 
 - `GeelyClusterDisplayPolicy.VALIDATED_PROFILES` 故意为空。
 - 无精确 fingerprint/display/恢复证据时设置 disabled、`requiresClusterStream=false`，且不回退到 BYD display 规则。
+- Advanced 增加默认关闭的调试目标屏选择：只列出非默认、有效且带 `FLAG_PRESENTATION` 的显示屏；
+  用户确认后可临时以 `debug-display-{id}` 绕过白名单，并在下次 CarPlay 连接请求 stream 111。
+- 调试 displayId 消失、变为默认屏或失去 Presentation flag 时立即 fail-closed，不回退主屏或 BYD 规则；
+  这一能力只用于采集实车证据，不会写入 `VALIDATED_PROFILES`。
 - 诊断包括 OEM 方法/结果、route/frame 计数、OneOS lifecycle、display profile 选择、mirror/decoder 数量和 cleanup journal。
 - 日志与导出不包含道路名、lane description、SSID、蓝牙地址、Binder token 或原始帧。
 
