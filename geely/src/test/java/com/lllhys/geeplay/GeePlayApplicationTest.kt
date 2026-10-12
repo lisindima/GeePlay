@@ -45,9 +45,12 @@ class GeePlayApplicationTest {
             HostR.string.in_carplay_swipe_down_with_three_fingers_to_open_diplay_se,
             HostR.string.diplay,
             HostR.string.settings_interface_size_hint,
+            HostR.string.backup_open_description,
+            HostR.string.backup_import_invalid,
+            HostR.string.settings_background_update_checks_description,
         )
 
-        listOf("en", "ar", "es", "ru", "uk", "zh-CN", "zh-TW").forEach { languageTag ->
+        listOf("en", "ar", "es", "ja", "ru", "uk", "zh-CN", "zh-TW").forEach { languageTag ->
             val localized = application.createConfigurationContext(
                 Configuration(application.resources.configuration).apply {
                     setLocales(LocaleList(Locale.forLanguageTag(languageTag)))
@@ -76,6 +79,9 @@ class GeePlayApplicationTest {
         assertEquals(MediaOutputOwner.OEM_BLUETOOTH, application.mediaAudioPolicy(application).owner)
         assertNotNull(application.carPlayVehicleDataAdapter(application))
         assertFalse(application.legacyBydSettingsAvailable(application))
+        assertFalse(application.embeddedGeelyWheelKeysAvailable(application))
+        assertFalse(application.legacyPhoneAudioRouteAvailable(application))
+        assertFalse(application.harmanFullscreenAvailable(application))
         assertEquals("GeePlay", application.diagnosticExportDirectoryName(application))
         assertEquals(
             setOf(
@@ -160,6 +166,29 @@ class GeePlayApplicationTest {
             // Expected.
         }
         assertFalse(application.externalMapEmbeddingAvailable(application))
+    }
+
+    @Test
+    fun `GeePlay excludes the BYD Telecom audio route`() {
+        val application = RuntimeEnvironment.getApplication() as GeePlayApplication
+        val component = ComponentName(
+            application.packageName,
+            "com.shilapi.xcertplay.telecom.PhoneAudioConnectionService",
+        )
+        try {
+            @Suppress("DEPRECATION")
+            application.packageManager.getServiceInfo(component, 0)
+            fail("PhoneAudioConnectionService must be removed from the GeePlay manifest")
+        } catch (_: PackageManager.NameNotFoundException) {
+            // Expected: this service only drives BYD/DiLink's Telecom audio state.
+        }
+        @Suppress("DEPRECATION")
+        val requestedPermissions = application.packageManager
+            .getPackageInfo(application.packageName, PackageManager.GET_PERMISSIONS)
+            .requestedPermissions
+            .orEmpty()
+            .toSet()
+        assertFalse("android.permission.MANAGE_OWN_CALLS" in requestedPermissions)
     }
 
     @Test

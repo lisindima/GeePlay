@@ -355,6 +355,31 @@ class AppleRouteGuidanceStoreTest {
         assertEquals(before, store.current())
     }
 
+    @Test
+    fun `retained NoRoute expires when the session stays active`() {
+        var now = 0L
+        val store = populatedStore(nanoTime = { now }, keepAcrossNoRoute = true)
+
+        store.accept(AppleRouteGuidanceParser.ROUTE_GUIDANCE_UPDATE, tlvs(tlv(0x0001, 0)))
+        now = AppleRouteGuidanceStore.DEFAULT_NO_ROUTE_HIDE_NANOS - 1
+        assertNotNull(store.current())
+        now = AppleRouteGuidanceStore.DEFAULT_NO_ROUTE_HIDE_NANOS
+        assertNull(store.current())
+    }
+
+    @Test
+    fun `handoff clears the retained NoRoute expiry`() {
+        var now = 0L
+        val store = populatedStore(nanoTime = { now }, keepAcrossNoRoute = true)
+
+        store.accept(AppleRouteGuidanceParser.ROUTE_GUIDANCE_UPDATE, tlvs(tlv(0x0001, 0)))
+        store.holdAcrossDrop()
+        now = AppleRouteGuidanceStore.DEFAULT_NO_ROUTE_HIDE_NANOS * 2
+        store.accept(AppleRouteGuidanceParser.ROUTE_GUIDANCE_UPDATE, tlvs(tlv(0x0001, 0)))
+
+        assertNotNull(store.current())
+    }
+
     private fun populatedStore(
         laneIndex: Int? = null,
         nanoTime: () -> Long = { 0L },

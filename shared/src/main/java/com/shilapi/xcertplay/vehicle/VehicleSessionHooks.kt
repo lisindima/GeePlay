@@ -64,6 +64,12 @@ interface VehicleIntegrationProvider {
     fun vehicleSettings(context: Context): VehicleSettingsController? = null
     /** Whether this product should render DiPlay's legacy BYD settings and availability copy. */
     fun legacyBydSettingsAvailable(context: Context): Boolean = true
+    /** Whether the upstream Geely wheel-key singleton may bind outside the product input adapter. */
+    fun embeddedGeelyWheelKeysAvailable(context: Context): Boolean = true
+    /** Whether the BYD/DiLink Telecom call-audio workaround may register or appear in Settings. */
+    fun legacyPhoneAudioRouteAvailable(context: Context): Boolean = true
+    /** Whether this product targets the Harman firmware that accepts the OEM fullscreen flag. */
+    fun harmanFullscreenAvailable(context: Context): Boolean = true
     /** Whether this product exposes DiPlay's launcher-facing map embedding feature. */
     fun externalMapEmbeddingAvailable(context: Context): Boolean = true
     /** Visible subdirectory below Downloads used for exported diagnostic reports. */

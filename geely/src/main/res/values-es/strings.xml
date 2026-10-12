@@ -7,4 +7,7 @@
     <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">En CarPlay, desliza hacia abajo con tres dedos para abrir los ajustes de GeePlay.</string>
     <string name="diplay">GeePlay</string>
     <string name="settings_interface_size_hint">Tamaño del texto y los controles en las pantallas de GeePlay. Automático los agranda en pantallas grandes de baja densidad. No afecta a CarPlay.</string>
+    <string name="backup_open_description">Muestra un código QR para exportar o importar los ajustes de GeePlay desde el navegador de un teléfono en la misma red. El servicio se detiene al salir de la página.</string>
+    <string name="backup_import_invalid">Este archivo no es una copia de seguridad de ajustes de GeePlay.</string>
+    <string name="settings_background_update_checks_description">Una vez al día, GeePlay busca una versión nueva en GitHub y la muestra en la pantalla de inicio. Nunca descarga sin que lo toques.</string>
 </resources>

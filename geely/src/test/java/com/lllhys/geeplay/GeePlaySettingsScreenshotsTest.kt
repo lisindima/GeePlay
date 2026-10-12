@@ -58,6 +58,9 @@ class GeePlaySettingsScreenshotsTest {
             assertFalse(activity.getString(HostR.string.settings_navigation_wheel_volume) in visible)
             assertFalse(activity.getString(HostR.string.settings_ambient_title) in visible)
             assertFalse(activity.getString(HostR.string.advanced_vehicle_data) in visible)
+            assertFalse(activity.getString(HostR.string.phone_audio_route) in visible)
+            assertFalse(activity.getString(HostR.string.phone_audio_route_apps) in visible)
+            assertFalse(activity.getString(HostR.string.settings_harman_fullscreen_experimental) in visible)
 
             @Suppress("UNCHECKED_CAST")
             val results = DiPlayActivity::class.java.getDeclaredMethod("buildSettingsSearchIndex")
@@ -73,10 +76,40 @@ class GeePlaySettingsScreenshotsTest {
                 HostR.string.settings_ambient_title,
                 HostR.string.advanced_vehicle_data,
                 HostR.string.byd_adb_features,
+                HostR.string.phone_audio_route,
+                HostR.string.phone_audio_route_apps,
+                HostR.string.settings_harman_fullscreen_experimental,
             ).forEach { blocked -> assertFalse(activity.getString(blocked) in titles) }
         } finally {
             activity.finish()
             shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    @Test
+    fun writesCompactFullAndArabicAboutSettingsScreenshots() {
+        listOf(
+            Triple("en", 600, 1.3f),
+            Triple("en", 1280, 1.5f),
+            Triple("ar", 600, 1.3f),
+        ).forEach { (locale, widthDp, fontScale) ->
+            val activity = openSettings(locale, widthDp, fontScale, "ABOUT")
+            try {
+                val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+                layout(root, widthDp)
+                val visible = descendants(root).filterIsInstance<TextView>().map { it.text.toString() }.toSet()
+                assertTrue("GeePlay" in visible)
+                assertTrue(activity.getString(HostR.string.backup_title) in visible)
+                val backupHtml = DiPlayActivity::class.java.getDeclaredMethod("backupPageHtml")
+                    .apply { isAccessible = true }
+                    .invoke(activity) as ByteArray
+                assertTrue(backupHtml.toString(Charsets.UTF_8).contains("GeePlay settings"))
+                assertFalse(backupHtml.toString(Charsets.UTF_8).contains("DiPlay"))
+                writeScreenshot(root, "about-$locale-${widthDp}dp-font-$fontScale.png")
+            } finally {
+                activity.finish()
+                shadowOf(Looper.getMainLooper()).idle()
+            }
         }
     }
 

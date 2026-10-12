@@ -103,6 +103,12 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
     override fun legacyBydSettingsAvailable(context: Context): Boolean =
         !GeelyProductSettings.blockLegacyBydMenus(context)
 
+    override fun embeddedGeelyWheelKeysAvailable(context: Context): Boolean = false
+
+    override fun legacyPhoneAudioRouteAvailable(context: Context): Boolean = false
+
+    override fun harmanFullscreenAvailable(context: Context): Boolean = false
+
     override fun externalMapEmbeddingAvailable(context: Context): Boolean = false
 
     override fun diagnosticExportDirectoryName(context: Context): String = "GeePlay"

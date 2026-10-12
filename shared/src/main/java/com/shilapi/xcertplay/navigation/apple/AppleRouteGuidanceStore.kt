@@ -10,6 +10,7 @@ class AppleRouteGuidanceStore(
     private val staleRouteNanos: Long = DEFAULT_STALE_ROUTE_NANOS,
     private val emptyManeuverListNanos: Long = DEFAULT_EMPTY_LIST_NANOS,
     private val keepAcrossNoRoute: Boolean = false,
+    private val noRouteHideNanos: Long = DEFAULT_NO_ROUTE_HIDE_NANOS,
 ) {
     private val maneuvers = boundedMap<Int, AppleManeuver>(AppleRouteGuidanceParser.MAX_MANEUVER_CACHE_SIZE)
     private val laneEvents = boundedMap<Int, AppleLaneGuidance>(AppleRouteGuidanceParser.MAX_LANE_EVENT_CACHE_SIZE)
@@ -26,6 +27,8 @@ class AppleRouteGuidanceStore(
     private var laneGuidanceTotalCount: Int? = null
     private var emptyListSinceNanos: Long? = null
     private var lastRouteUpdateNanos: Long? = null
+    private var noRouteSinceNanos: Long? = null
+    private var holdingAcrossDrop = false
     private var revision = 0L
 
     @Synchronized
@@ -84,8 +87,20 @@ class AppleRouteGuidanceStore(
         return hadState
     }
 
+    /** Preserve an active route through teardown NoRouteSet frames during a source handoff. */
+    @Synchronized
+    fun holdAcrossDrop() {
+        noRouteSinceNanos = null
+        holdingAcrossDrop = true
+    }
+
     private fun applyRouteUpdate(update: AppleRouteUpdate) {
-        if (keepAcrossNoRoute && update.state == AppleRouteState.NO_ROUTE_SET) return
+        if (keepAcrossNoRoute && update.state == AppleRouteState.NO_ROUTE_SET) {
+            if (!holdingAcrossDrop && noRouteSinceNanos == null) noRouteSinceNanos = nanoTime()
+            return
+        }
+        noRouteSinceNanos = null
+        holdingAcrossDrop = false
         lastRouteUpdateNanos = nanoTime()
         if (update.state == AppleRouteState.NO_ROUTE_SET || update.state == AppleRouteState.ARRIVED) {
             clearState()
@@ -138,6 +153,8 @@ class AppleRouteGuidanceStore(
         laneGuidanceTotalCount = null
         emptyListSinceNanos = null
         lastRouteUpdateNanos = null
+        noRouteSinceNanos = null
+        holdingAcrossDrop = false
         maneuvers.clear()
         laneEvents.clear()
     }
@@ -148,6 +165,8 @@ class AppleRouteGuidanceStore(
         if (nanoTime() - routeUpdated >= staleRouteNanos) return null
         val emptySince = emptyListSinceNanos
         if (emptySince != null && nanoTime() - emptySince >= emptyManeuverListNanos) return null
+        val noRouteSince = noRouteSinceNanos
+        if (noRouteSince != null && nanoTime() - noRouteSince >= noRouteHideNanos) return null
         val maneuver = activeManeuverIndex?.let(maneuvers::get) ?: return null
         return VisibleState(
             routeState = routeState,
@@ -175,6 +194,7 @@ class AppleRouteGuidanceStore(
     companion object {
         const val DEFAULT_STALE_ROUTE_NANOS = 30_000_000_000L
         const val DEFAULT_EMPTY_LIST_NANOS = 3_000_000_000L
+        const val DEFAULT_NO_ROUTE_HIDE_NANOS = 5_000_000_000L
 
         private fun <K, V> boundedMap(maximumSize: Int): LinkedHashMap<K, V> =
             object : LinkedHashMap<K, V>(maximumSize + 1, 0.75f, true) {

@@ -5,7 +5,7 @@
 > 维护规则：每次从 DiPlay 上游合并（merge/rebase/cherry-pick）到 GeePlay 分支，都必须按 `AGENTS.md`“Upstream merge review for GeePlay”在本表更新受影响能力的状态；本表与 `docs/upstream-merge-checklists/<date>-<sha>.md` 配套，不可只写 checklist 而不更新本表。
 
 - 维护分支：`geely/main`
-- 当前基线：`f16878e9`（merge: integrate EVCC CarPlay vehicle data）
+- 当前上游基线：`d9881b4a`（DiPlay `main`，2026-10-12 合并；见本次 upstream checklist）
 - 最近更新：2026-10-12
 
 ## 相关文档
@@ -47,20 +47,22 @@
 
 | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | --- | --- | --- | --- |
-| 有线/无线连接、配对、USB/热点引导 | ⬛ 继承 | n/a | `CarPlayController`/`CarPlayHostActivity` 上游通用链路；GeePlay 不改协议 |
-| 视频解码与多 Surface、触控 | ⬛ 继承 | n/a | 上游 `MediaEngine`/stream 处理 |
-| 音频媒体/导航流 | 🟡 部分对齐 | n/a（产品策略） | 媒体 owner 由 `GeelyMediaSettings`/`LocalMediaAudioPolicy` 决定；默认值待实车音频 |
-| 产品身份（名称/图标/OEM label/更新源） | ✅ 已对齐 | n/a | `GeePlayApplication` 覆写 `VehicleIntegrationProvider`（`GEELY` 标签、独立更新源） |
-| 上游 BYD 设置分区可见性 | ✅ 已对齐 | n/a | `LegacyBydSettingsPolicy` + `GeelyProductSettings.blockLegacyBydMenus`（默认隐藏，不删源码） |
+| 有线/无线连接、配对、USB/热点引导 | ⬛ 继承 | n/a | `CarPlayController`/`CarPlayHostActivity` 上游通用链路；`d9881b4a` 的 USBMUX、VPN scope、无效 RFCOMM、配置选择及恢复修复已继承 |
+| 视频解码与多 Surface、触控 | ⬛ 继承 | n/a | 上游 `MediaEngine`/stream 处理；`d9881b4a` 的 safe-area、尺寸、MTK 回退和解码等待修复已继承，Harman 专用全屏在 GeePlay 禁用 |
+| 音频媒体/导航流 | 🟡 部分对齐 | n/a（产品策略） | 媒体 owner 由 `GeelyMediaSettings`/`LocalMediaAudioPolicy` 决定；已继承 AAC drain、麦克风恢复/统计和可选 speech rate，默认值待实车音频 |
+| 设置备份/恢复 | ⬛ 继承 | n/a | `SettingsBackupServer`/`SettingsBackupCodec`；仅在 About 的备份页存活，导入使用 allowlist，覆盖后提示下次重连 |
+| 设置 IA、搜索与多语言 | ⬛ 继承 | n/a | About 已纳入设置层级，搜索监听清理与日语/阿拉伯语补全已继承；GeePlay compact/full/RTL 大字体截图由 `GeePlaySettingsScreenshotsTest` 生成 |
+| 产品身份（名称/图标/OEM label/更新源） | ✅ 已对齐 | n/a | `GeePlayApplication` 覆写 `VehicleIntegrationProvider`（`GEELY` 标签、独立更新源）；本次随上游 0.2.18 更新为 `0.2.18-geely.4` |
+| 上游厂商设置边界 | ✅ 已对齐 | n/a | `LegacyBydSettingsPolicy` + `GeelyProductSettings.blockLegacyBydMenus` 默认隐藏 BYD/FCE/cluster 项；产品 capability gate 另行禁用 BYD Telecom、Harman 全屏和上游内嵌 Geely 输入，不删上游源码 |
 
 ## B. 导航与仪表显示
 
 | # | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | ---: | --- | --- | --- | --- |
-| 1 | 导航箭头/道路/距离/车道/路口到仪表 | ✅ 已对齐 | DIM | `GeelyVehicleSessionHooks`→`RouteGuidanceCoordinator`→`GeelyNavigationOutput`/`GeelyDimNavigationAdapter`；待实车 |
+| 1 | 导航箭头/道路/距离/车道/路口到仪表 | ✅ 已对齐 | DIM | `GeelyVehicleSessionHooks`→`RouteGuidanceCoordinator`→`GeelyNavigationOutput`/`GeelyDimNavigationAdapter`；`d9881b4a` 的 NoRoute/handoff 超时语义已迁入品牌中立 `AppleRouteGuidanceStore`；待实车 |
 | 7 | 保持/不被原厂地图抢占仪表 | ✅ 已对齐（等价目标） | DIM | `GeelyNavigationDriver` 用 `notifyTurnByTurnStarted/Stopped` + cleanup journal 表达所有权，不禁用 OEM 包 |
 | 2 | 挡风 HUD 导航输出 | 📝 待实现 | DIM→OEM-API | 先验证 DIM 是否自动分发到 HUD；否则 `GeelyHudNavigationOutput`（Spec §10.1） |
-| 5 | CarPlay 仪表地图/私有 Display 路由 | 🧪 条件开放 | OEM-API/Display | `VehicleClusterDisplayPolicy` 已就位，`VALIDATED_PROFILES` 为空，仅 debug 选择（Spec §10.2） |
+| 5 | CarPlay 仪表地图/私有 Display 路由 | 🧪 条件开放 | OEM-API/Display | `VehicleClusterDisplayPolicy` 已就位，`VALIDATED_PROFILES` 为空，仅 debug 选择；上游新增 cluster speedometer/music overlay 仍由被屏蔽的 `CLUSTER_MAP` 控制，未作为 Geely 生产能力开放（Spec §10.2） |
 | 6 | 仪表地图流随导航模式暂停 | 🧪 条件开放 | EVCC-read→OEM-API | 已实现保守目录发现、`ClusterMapVisibilitySource` 与 session 控制；未发现可信属性时保持流开启（Spec §6） |
 | 3 | 独立 HUD 广播输出 | 🚫 不迁移 | n/a | BYD `com.byd.clusterdebug` 私有广播；目标由 #1/#2 覆盖 |
 | 4 | DiLink3 仪表模式/投屏准备 | 🚫 不迁移 | n/a | BYD `AutoContainer` 私有容器；Geely 走 DIM 或已验证 Display |
@@ -79,7 +81,7 @@
 
 | # | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | ---: | --- | --- | --- | --- |
-| 15a | 媒体键（播放/暂停/上一首/下一首）+ Siri | ✅ 已对齐 | OneOS-input | `GeelyInputRuntime`/`OneOsWheelAdapter`→`VehicleHostControls` |
+| 15a | 媒体键（播放/暂停/上一首/下一首）+ Siri | ✅ 已对齐 | OneOS-input | `GeelyInputRuntime`/`OneOsWheelAdapter`→`VehicleHostControls`；上游 `GeelyWheelKeys` 直连 singleton 在 GeePlay 由 `embeddedGeelyWheelKeysAvailable=false` 禁用，避免双注册 |
 | 14 | 方向盘接听/挂断 CarPlay 电话 | 🧪 条件开放 | OneOS-input + host-cmd | 已扩展 host 命令、OneOS 注册和通话门禁；待 G636 raw keycode 实证（Spec §8） |
 | 15b | 方向盘地图缩放、旋钮/摇杆 | 🧪 条件开放 | OneOS-input + host-cmd | 已接 `sendKnob`/`zoomDashboardMap` 和标准 keycode；待 G636 raw keycode 实证（Spec §8） |
 
@@ -87,7 +89,7 @@
 
 | # | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | ---: | --- | --- | --- | --- |
-| 12 | CarPlay 歌曲显示到仪表 | 🧪 条件开放 | OEM-API | 已建立 `InstrumentMediaOutput`、通用解析和生命周期；Geely 无已验证 API 时注入 NONE（Spec §9） |
+| 12 | CarPlay 歌曲显示到仪表 | 🧪 条件开放 | OEM-API | 已建立 `InstrumentMediaOutput`、通用解析和生命周期；Geely 无已验证 API 时注入 NONE。`d9881b4a` 的 cluster music overlay 依赖未验证的仪表 Display，GeePlay 保持设置不可见（Spec §9） |
 | 13 | CarPlay 来电卡片到仪表/HUD | 🧪 条件开放 | OEM-API | 已建立 `InstrumentCallOutput`、通用解析和生命周期；Geely 无已验证 API 时注入 NONE（Spec §9） |
 
 ## F. 车内氛围（EVCC 写）
@@ -110,8 +112,9 @@
 | # | 能力/路径 | 状态 | Geely 实现方式 | 说明/证据 |
 | ---: | --- | --- | --- | --- |
 | 22 | BYD-only 调试/演示工具 | 🚫 不迁移 | n/a | `BydStarterBridge`/HUD demo/`Byd13CatalogProbeMain` 不进产品图 |
+| 23 | BYD/DiLink Telecom 电话音频状态 | 🚫 不迁移 | n/a | 上游 `PhoneAudioRoute`/`PhoneAudioConnectionService` 仅解决 DiLink 通话回声；GeePlay 以 capability gate 禁止 attach/显示，并从合并 manifest 移除 service 与 `MANAGE_OWN_CALLS` |
 | aux | common/shared 直接引用 BYD 单例 | 🟡 部分对齐 | 解耦改造 | 驻车、胎压、氛围灯已换 product Interface；`CarPlayCallKeys`、旧 cluster 路径等仍待后续上游解耦 |
-| aux | DiLink51 布局 / HomeScreenMonitor / UsbAutoConfirm / WifiScanPause / MapEmbed | 🚫 不迁移 / 🧪 条件开放 | 按需 product policy | 见评估 §3.1；无 Geely 证据前不迁移 |
+| aux | DiLink51 / FCE / Harman 布局、HomeScreenMonitor、UsbAutoConfirm、WifiScanPause、MapEmbed | 🚫 不迁移 / 🧪 条件开放 | 按需 product policy | FCE/Harman/MapEmbed 由 section、capability 或 manifest gate 排除；无 Geely 证据前不迁移，见评估 §3.1 |
 
 ## 进程级 EVCC 架构（所有 EVCC 能力的共同依赖）
 
@@ -126,3 +129,4 @@
 | 2026-10-12 | `f16878e9` | 初版；记录 22 项核心能力 + 辅助耦合对齐状态；#8/#9 EVCC 已对齐，#1/#7 DIM 已对齐，其余按 Spec 分级 |
 | 2026-10-12 | `f16878e9` | #16 从「🚫不迁移」升级为「📝待实现」：G636 复现车机蓝牙/CarPlay 音频抢占；方案改为媒体 owner + 自动断 A2DP（Spec §11A），不迁移 BYD ADB 关 radio |
 | 2026-10-12 | `cf4ac2f2` 后工作区 | 完成未对齐 Spec 的软件接线：进程级 EVCC core/read/control、#6/#10/#11、#14/#15、#16、#17、#19/#20，以及 #12/#13 证据门禁；实车/descriptor/OEM API 未验证项保持 🟡/🧪 |
+| 2026-10-12 | `d9881b4a` | 合并 DiPlay main：继承连接/USB/VPN/解码/备份/本地化改进；NoRoute handoff 语义迁入 `AppleRouteGuidanceStore`；新增 #23，并对上游内嵌 Geely 输入、BYD Telecom、FCE/cluster 与 Harman 功能保持显式 GeePlay 边界 |

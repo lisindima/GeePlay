@@ -9,6 +9,8 @@
 
     <uses-permission android:name="com.permission.adnaviservice" />
     <uses-permission android:name="com.kooo.evcc.permission.ACCESS_EVCC_API" />
+    <!-- The inherited Telecom workaround is specific to BYD/DiLink audio routing. -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" tools:node="remove" />
 
     <application
         android:name=".GeePlayApplication"
@@ -22,6 +24,9 @@
         tools:replace="android:label">
         <!-- GeePlay does not expose DiPlay's launcher-facing map embedding service. -->
         <service android:name="com.shilapi.xcertplay.MapEmbedService" tools:node="remove" />
+        <service
+            android:name="com.shilapi.xcertplay.telecom.PhoneAudioConnectionService"
+            tools:node="remove" />
         <receiver
             android:name="com.shilapi.xcertplay.PhoneBluetoothReceiver"
             android:enabled="true"

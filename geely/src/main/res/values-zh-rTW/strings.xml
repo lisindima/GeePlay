@@ -7,4 +7,7 @@
     <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">在 CarPlay 介面用三指向下滑動，即可開啟 GeePlay 設定。</string>
     <string name="diplay">GeePlay</string>
     <string name="settings_interface_size_hint">GeePlay 自身畫面中文字與控制項的大小。自動模式會在大尺寸低密度螢幕上放大它們。不影響 CarPlay。</string>
+    <string name="backup_open_description">顯示 QR 碼，同一網路內的手機瀏覽器即可匯出或匯入 GeePlay 設定。離開頁面後服務自動停止。</string>
+    <string name="backup_import_invalid">這不是 GeePlay 設定備份檔。</string>
+    <string name="settings_background_update_checks_description">GeePlay 每天會在 GitHub 上檢查一次新版本，並顯示在主畫面上。未經你點擊，絕不會下載。</string>
 </resources>

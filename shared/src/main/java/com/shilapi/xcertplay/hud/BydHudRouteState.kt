@@ -42,7 +42,14 @@ internal class BydHudRouteState(
     nanoTime: () -> Long = System::nanoTime,
     staleRouteNs: Long = STALE_ROUTE_NS,
     emptyListHideNs: Long = EMPTY_LIST_HIDE_NS,
+    /**
+     * The dashboard overlay keeps the last instruction across a wireless session drop: the iPhone
+     * often sends NoRouteSet (0) while the tunnel is tearing down, which is not a real arrival.
+     * Arrived (2) still ends the route. While the session stays up, NoRouteSet is the driver
+     * ending guidance, and the card goes after [noRouteHideNs] unless guidance comes back.
+     */
     keepAcrossNoRoute: Boolean = false,
+    noRouteHideNs: Long = NO_ROUTE_HIDE_NS,
 ) {
     // Kept mutable for the existing deterministic expiry tests and diagnostic tooling.
     private var nanoTime: () -> Long = nanoTime
@@ -51,6 +58,7 @@ internal class BydHudRouteState(
         staleRouteNanos = staleRouteNs,
         emptyManeuverListNanos = emptyListHideNs,
         keepAcrossNoRoute = keepAcrossNoRoute,
+        noRouteHideNanos = noRouteHideNs,
     )
 
     fun accept(messageId: Int, payload: ByteArray): BydHudRouteChange {
@@ -93,10 +101,13 @@ internal class BydHudRouteState(
 
     fun clear(): Boolean = route.clear()
 
+    fun holdAcrossDrop() = route.holdAcrossDrop()
+
     companion object {
         const val ROUTE_GUIDANCE_UPDATE = AppleRouteGuidanceParser.ROUTE_GUIDANCE_UPDATE
         const val ROUTE_GUIDANCE_MANEUVER_UPDATE = AppleRouteGuidanceParser.ROUTE_GUIDANCE_MANEUVER_UPDATE
         private const val STALE_ROUTE_NS = AppleRouteGuidanceStore.DEFAULT_STALE_ROUTE_NANOS
         private const val EMPTY_LIST_HIDE_NS = AppleRouteGuidanceStore.DEFAULT_EMPTY_LIST_NANOS
+        private const val NO_ROUTE_HIDE_NS = AppleRouteGuidanceStore.DEFAULT_NO_ROUTE_HIDE_NANOS
     }
 }

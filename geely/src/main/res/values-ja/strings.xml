@@ -1,0 +1,13 @@
+<resources>
+    <string name="setup_error_auth">CarPlay認証を読み込めませんでした。このアプリに完全版GeePlayを上書きインストールしてください。アンインストールやホットスポット設定の変更は不要です。</string>
+    <string name="make_diplay_feel_right_for_your_car">GeePlayを車に合わせて設定します。</string>
+    <string name="settings_language_summary">GeePlayの言語を選択</string>
+    <string name="about_diplay">GeePlayについて</string>
+    <string name="reports_save_to_downloads_diplay">レポートはDownloads/GeePlayに保存されます。\u0020</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">CarPlayで3本指を下にスワイプすると、GeePlayの設定を開けます。</string>
+    <string name="diplay">GeePlay</string>
+    <string name="settings_interface_size_hint">GeePlay自体の文字と操作部のサイズです。「自動」は画面密度が低い大画面で拡大します。CarPlayの表示には影響しません。</string>
+    <string name="backup_open_description">QRコードを表示します。同じネットワーク上のスマートフォンからブラウザーでGeePlayの設定を書き出したり、取り込んだりできます。この画面を離れるとサービスは停止します。</string>
+    <string name="backup_import_invalid">GeePlayの設定バックアップファイルではありません。</string>
+    <string name="settings_background_update_checks_description">GeePlayは1日に1回GitHubで新しいバージョンを確認し、ホーム画面に表示します。タップしない限りダウンロードしません。</string>
+</resources>

@@ -7,4 +7,7 @@
     <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">В CarPlay проведите тремя пальцами вниз, чтобы открыть настройки GeePlay.</string>
     <string name="diplay">GeePlay</string>
     <string name="settings_interface_size_hint">Размер текста и элементов управления на экранах GeePlay. В автоматическом режиме они увеличиваются на больших экранах с низкой плотностью. CarPlay не меняется.</string>
+    <string name="backup_open_description">Показывает QR-код, чтобы браузер телефона в той же сети мог экспортировать или импортировать настройки GeePlay. Сервис останавливается при выходе со страницы.</string>
+    <string name="backup_import_invalid">Этот файл не является резервной копией настроек GeePlay.</string>
+    <string name="settings_background_update_checks_description">Раз в сутки GeePlay проверяет GitHub на новую версию и показывает её на главном экране. Загрузка начинается только после вашего нажатия.</string>
 </resources>

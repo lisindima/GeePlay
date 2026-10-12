@@ -2,11 +2,11 @@
 
 状态：代码盘点与方案评估完成；未对齐 Spec 的品牌中立接口、EVCC 读/写/系统动作、设置和证据门禁已完成软件接线；无 G636 descriptor 或 Geely OEM API 的能力仍 fail-closed，本文不代表完成实车验证
 
-评估日期：2026-10-12（基线于 2026-10-12 更新到 `geely/main` 合并后）
+评估日期：2026-10-12（基线于 2026-10-12 更新到 DiPlay `main` 的 `d9881b4a`）
 
 评估分支：`geely/main`（源自 `feat/evcc-carplay-vehicle-data`，已合并）
 
-代码基线：`f16878e9`（merge: integrate EVCC CarPlay vehicle data；两个父提交为 `d566c2b0 feat: add menu block` 和 `c0b25edc feat: expand Geely vehicle and CarPlay integration`）
+代码基线：GeePlay 合并前 `60d9a2c9` + DiPlay `main` `d9881b4a`（独立审查见 `docs/upstream-merge-checklists/2026-10-12-d9881b4a.md`）
 
 初始评估基线：`d1311cc1ca91`，结论未因合并发生实质变更；增量仅为 `d566c2b0` 的上游 BYD 菜单屏蔽（见 3.1）
 
@@ -46,7 +46,7 @@ BYD 功能不能按“把 ADB 命令换成 EVCC Shell”整体迁移。应按能
 随后：Geely 输入扩展 → 通话键、地图缩放、旋钮/摇杆
 条件能力：验证 Geely Presentation Display；验证 EVCC 氛围灯 typed write
 暂缓：仪表歌曲、仪表来电卡片、挡风 HUD 专用输出，等待 Geely OEM API 证据
-不迁移：BYD AutoContainer、autoservice 地址探测、BYD 包禁用、BYD 弹窗守护和演示工具
+不迁移：BYD AutoContainer、autoservice 地址探测、BYD 包禁用、BYD 弹窗守护、DiLink Telecom 音频路由和演示工具
 ```
 
 关键架构判断：现有 `CarPlayVehicleDataAdapter`、`NavigationOutput`、`VehicleSessionHooks`、`VehicleSettingsController` 和 `VehicleClusterDisplayPolicy` 已形成可复用 Seam。后续不应继续给 `VehicleSessionHooks` 塞入所有能力，也不应创建多个各自管理订阅的 EVCC client。应在 `:vehicle-geely` 内形成一个进程级、Deep 的 `EvccGateway` Module，再通过多个窄 Interface 向上提供只读遥测、驻车状态、胎压和经审核的写控制。
@@ -99,6 +99,7 @@ BYD 功能不能按“把 ADB 命令换成 EVCC Shell”整体迁移。应按能
 | 20 | 开机自启修复、doze/appops 白名单 | `BydBootStartRepair` 用 ADB `appops set`、`cmd deviceidle whitelist` 并检查结果 | 是 | 不可以作为自动能力；EVCC Shell 会进入逐次系统写确认 | 先验证 G636 是否丢 BOOT_COMPLETED/后台启动。优先 OEM 自启动设置页、标准电池优化豁免引导或签名 allowlist；不默认修改系统状态 | 低 | 冷启动、休眠唤醒、强停、OTA、用户撤销；设置必须可见且可逆 | 独立 `BootStartSupport` 诊断/引导 Module；不进入 CarPlay session hot path |
 | 21 | ADB 能力探测与固件地址发现 | `BydVehicleCapabilityProbe`、`Byd13CatalogProbeMain`、`BydVehicleFields`；ADB `app_process` 枚举 BYD SDK，再试读 autoservice 地址 | 是 | 可以替代“车辆属性发现”，不能替代任意厂商服务逆向 | Geely 使用 EVCC `queryPropertyDirectory/resolve/read/subscribe` 和 source generation；`property.full_scan` 只放诊断工具，不作为每次启动流程。生产仍使用实车确认的 profile allowlist | 已支持（能力发现） | 新版 EVCC 1.2 目录、车型/固件变化、source generation、候选冲突、错误单位和错误语义 | 进程级 `EvccGateway` + `VehiclePropertyProfile`；诊断 discovery 与生产 profile 分离 |
 | 22 | BYD-only 调试/演示工具 | `BydStarterBridge`、HUD demo/standalone packet demo、`Byd13CatalogProbeMain` 等为 BYD 协议开发、演示或探测入口 | 混合 | 否；也没有产品迁移价值 | 不进入 GeePlay 产品图。需要 Geely 调试时，重新基于 Geely Interface 写可删除的诊断工具，不引用 BYD packet/SDK | 不迁移 | 确认 release variant 不暴露危险入口；诊断输出不包含授权/隐私数据 | debug source set 或独立 tooling Module；禁止成为生产 fallback |
+| 23 | DiLink Telecom 电话音频状态 | `PhoneAudioRoute`/`PhoneAudioConnectionService` 持有 self-managed Telecom call，使 DiLink 进入电话音频状态并使用车机回声消除 | 否 | 否；这是 BYD/DiLink 音频策略，不是车辆属性 | GeePlay 不注册或展示该能力；`VehicleIntegrationProvider.legacyPhoneAudioRouteAvailable=false`，并从 GeePlay manifest 移除 service 与 `MANAGE_OWN_CALLS`。若 G636 出现通话回声，应在 Geely 音频 owner/官方电话策略上独立建模 | 不迁移 | 仅在 G636 明确复现并拿到 Geely 音频策略证据后重新评估；不得假设 Telecom call 对 Geely 有相同副作用 | 不复用 BYD preference；如有证据则新增 Geely-only `PhoneAudioPolicy`，并保持默认关闭和对称清理 |
 
 ### 3.1 其余 BYD 假设与辅助路径
 
