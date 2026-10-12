@@ -512,6 +512,12 @@ class CarPlayHostActivity : ComponentActivity() {
     // The side panel's tyres (TPMS), front left, front right, rear left, rear right; hidden without a reading.
     private var sidePanelTyres: LinearLayout? = null
     private var sidePanelTyreTexts: List<TextView> = emptyList()
+    private val productVehicleIntegration by lazy {
+        application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
+    }
+    private val vehicleTyreTelemetrySource by lazy {
+        productVehicleIntegration?.vehicleTyreTelemetrySource(applicationContext)
+    }
     // The side panel's whole screen in window pixels and the panel edge that faces CarPlay (Gravity.START when
     // the panel is right of CarPlay, END when left of it, TOP when below it), for dragging that edge.
     private var sidePanelScreen: RectF? = null
@@ -2283,7 +2289,7 @@ class CarPlayHostActivity : ComponentActivity() {
         sidePanelShown = show
         sidePanel?.visibility = if (show) View.VISIBLE else View.GONE
         mainHandler.removeCallbacks(sidePanelTick)
-        if (show) startSidePanelTyres() else com.shilapi.xcertplay.hud.BydTyreStatus.stop()
+        if (show) startSidePanelTyres() else stopSidePanelTyres()
         if (show) sidePanelTick.run()
         if (show) showSidePanelGripHint()
         updateVideoLayout(view.width, view.height)
@@ -2293,13 +2299,19 @@ class CarPlayHostActivity : ComponentActivity() {
         sidePanelShown = false
         sidePanel?.visibility = View.GONE
         mainHandler.removeCallbacks(sidePanelTick)
-        com.shilapi.xcertplay.hud.BydTyreStatus.stop()
+        stopSidePanelTyres()
         videoView?.let { placeSidePanelTab(it.width, it.height) }
     }
 
     // Tyres through the head unit's adb shell; the reader stops by itself where there is no BYD autoservice.
     private fun startSidePanelTyres() {
-        com.shilapi.xcertplay.hud.BydTyreStatus.start(this)
+        vehicleTyreTelemetrySource?.start()
+        if (productVehicleIntegration == null) com.shilapi.xcertplay.hud.BydTyreStatus.start(this)
+    }
+
+    private fun stopSidePanelTyres() {
+        vehicleTyreTelemetrySource?.stop()
+        if (productVehicleIntegration == null) com.shilapi.xcertplay.hud.BydTyreStatus.stop()
     }
 
     // Stops the hints and the blur of a host that goes away.
@@ -2336,12 +2348,24 @@ class CarPlayHostActivity : ComponentActivity() {
             com.shilapi.xcertplay.hud.BydNavigationOutputs.batteryStatus(applicationContext).snapshot()
         } else null
         sidePanelBattery?.text = battery?.let { "🔋 ${Math.round(it.batteryPercent)} %  ·  ${it.rangeKm} km" }.orEmpty()
-        val tyres = com.shilapi.xcertplay.hud.BydTyreStatus.latest()
-        sidePanelTyres?.visibility = if (tyres == null) View.GONE else View.VISIBLE
-        if (tyres != null) sidePanelTyreTexts.forEachIndexed { tyre, text ->
-            val pressure = tyres.pressureKpa.getOrNull(tyre)?.let { "$it kPa" } ?: "—"
-            val temperature = tyres.temperatureC.getOrNull(tyre)?.let { "\n$it °C" }.orEmpty()
-            text.text = pressure + temperature
+        val productTyres = vehicleTyreTelemetrySource?.snapshot(10_000L)
+        val bydTyres = if (productVehicleIntegration == null) com.shilapi.xcertplay.hud.BydTyreStatus.latest() else null
+        val tyreVisible = productTyres != null || bydTyres != null
+        sidePanelTyres?.visibility = if (tyreVisible) View.VISIBLE else View.GONE
+        if (productTyres != null) {
+            val positions = com.shilapi.xcertplay.vehicle.VehicleWheelPosition.entries
+            sidePanelTyreTexts.forEachIndexed { index, text ->
+                val reading = productTyres.wheels[positions[index]]
+                val pressure = reading?.pressureKpa?.let { "${Math.round(it)} kPa" } ?: "—"
+                val temperature = reading?.temperatureC?.let { "\n${Math.round(it)} °C" }.orEmpty()
+                text.text = pressure + temperature
+            }
+        } else if (bydTyres != null) {
+            sidePanelTyreTexts.forEachIndexed { tyre, text ->
+                val pressure = bydTyres.pressureKpa.getOrNull(tyre)?.let { "$it kPa" } ?: "—"
+                val temperature = bydTyres.temperatureC.getOrNull(tyre)?.let { "\n$it °C" }.orEmpty()
+                text.text = pressure + temperature
+            }
         }
     }
 
@@ -4448,7 +4472,9 @@ class CarPlayHostActivity : ComponentActivity() {
             model = normalizedModel(),
             oemLabel = oemLabel,
             icons = listOf(loadAirPlayIcon()),
-            videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
+            videoInCar = (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+                ?.videoInCarEnabled(applicationContext)
+                ?: com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
             mainBufferedAudio = AirPlayPersistence.loadMainBufferedAudio(this),
             disableAudioOutput = !mediaPolicy.advertiseAudio,
         )

@@ -56,6 +56,7 @@ sealed interface VehicleSettingRow {
         val id: String,
         val title: String,
         val primary: Boolean = false,
+        val confirmation: VehicleSettingConfirmation? = null,
         val run: () -> Unit,
     ) : VehicleSettingRow
 }

@@ -1,9 +1,14 @@
 package com.lllhys.geeplay.vehicle.geely
 
+import android.Manifest
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import com.shilapi.xcertplay.media.MediaOutputOwner
+import com.shilapi.xcertplay.media.AmbientMusicSettings
 import com.shilapi.xcertplay.transport.EvChargingConnectors
 import com.shilapi.xcertplay.vehicle.VehicleSettingConfirmation
 import com.shilapi.xcertplay.vehicle.VehicleSettingEffect
@@ -12,13 +17,18 @@ import com.shilapi.xcertplay.vehicle.VehicleSettingsCard
 import com.shilapi.xcertplay.vehicle.VehicleSettingsController
 import com.shilapi.xcertplay.vehicle.VehicleSettingsPlacement
 import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
+import com.shilapi.xcertplay.vehicle.VehicleSystemAction
 import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataAdapter
 import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataSettings
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccAmbientLightingProvider
 
 class GeelyVehicleSettingsController : VehicleSettingsController {
     override fun cards(context: Context): List<VehicleSettingsCard> {
         val navigation = GeelyNavigationSettings.load(context)
         val mediaOwner = GeelyMediaSettings.loadOwner(context)
+        val bluetoothAutoAvoid = GeelyMediaSettings.bluetoothAutoAvoid(context)
+        val ambientSettings = AmbientMusicSettings.load(context)
+        val ambientAvailable = EvccAmbientLightingProvider.VALIDATED_PROFILES.isNotEmpty()
         val inputProfile = GeelyInputSettings.loadProfile(context)
         val navigationAvailable = navigationSdkAvailable(context)
         val clusterPolicy = GeelyClusterDisplayPolicy()
@@ -35,6 +45,8 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
         val status = GeelyNavigationStatusStore.snapshot()
         val evccAdapter = (context.applicationContext as? VehicleIntegrationProvider)
             ?.carPlayVehicleDataAdapter(context) as? EvccVehicleDataAdapter
+        val systemActions = (context.applicationContext as? VehicleIntegrationProvider)
+            ?.vehicleSystemActionPort(context)
         return listOf(
             VehicleSettingsCard(
                 id = "geely_navigation",
@@ -178,6 +190,38 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                             evccAdapter?.prepare()
                         },
                     ),
+                    VehicleSettingRow.Toggle(
+                        id = "geely_evcc_video_while_parked",
+                        title = context.getString(R.string.settings_geely_evcc_video_while_parked),
+                        description = context.getString(R.string.settings_geely_evcc_video_while_parked_description),
+                        checked = EvccVehicleDataSettings.videoWhileParkedEnabled(context),
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        enableConfirmation = VehicleSettingConfirmation(
+                            title = context.getString(R.string.settings_geely_evcc_video_confirm_title),
+                            message = context.getString(R.string.settings_geely_evcc_video_confirm_message),
+                            positiveLabel = context.getString(R.string.settings_geely_evcc_confirm_action),
+                        ),
+                        save = { enabled ->
+                            EvccVehicleDataSettings.saveVideoWhileParkedEnabled(context, enabled)
+                            evccAdapter?.prepare()
+                        },
+                    ),
+                    VehicleSettingRow.Toggle(
+                        id = "geely_evcc_tyre_telemetry",
+                        title = context.getString(R.string.settings_geely_evcc_tyre_telemetry),
+                        description = context.getString(R.string.settings_geely_evcc_tyre_telemetry_description),
+                        checked = EvccVehicleDataSettings.tyreTelemetryEnabled(context),
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        enableConfirmation = VehicleSettingConfirmation(
+                            title = context.getString(R.string.settings_geely_evcc_confirm_title),
+                            message = context.getString(R.string.settings_geely_evcc_tyre_confirm_message),
+                            positiveLabel = context.getString(R.string.settings_geely_evcc_confirm_action),
+                        ),
+                        save = { enabled ->
+                            EvccVehicleDataSettings.saveTyreTelemetryEnabled(context, enabled)
+                            evccAdapter?.prepare()
+                        },
+                    ),
                     VehicleSettingRow.Choice(
                         id = "geely_evcc_low_charge_percent",
                         title = context.getString(R.string.settings_geely_evcc_low_charge_percent),
@@ -239,11 +283,90 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                         ),
                         selectedIndex = if (mediaOwner == MediaOutputOwner.DIPLAY) 1 else 0,
                         effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        confirmations = mapOf(1 to bluetoothMediaConfirmation(context)),
                         save = { index ->
-                            GeelyMediaSettings.saveOwner(
-                                context,
-                                if (index == 1) MediaOutputOwner.DIPLAY else MediaOutputOwner.OEM_BLUETOOTH,
-                            )
+                            if (index == 1) {
+                                GeelyMediaSettings.saveCarPlayOwnerWithAutoAvoid(context)
+                                requestBluetoothConnectPermission(context)
+                            } else {
+                                GeelyMediaSettings.saveOwner(context, MediaOutputOwner.OEM_BLUETOOTH)
+                            }
+                        },
+                    ),
+                    VehicleSettingRow.Toggle(
+                        id = "geely_bluetooth_media_auto_avoid",
+                        title = context.getString(R.string.settings_geely_bluetooth_media_auto_avoid),
+                        description = context.getString(R.string.settings_geely_bluetooth_media_auto_avoid_description),
+                        checked = bluetoothAutoAvoid,
+                        enabled = mediaOwner == MediaOutputOwner.DIPLAY,
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        enableConfirmation = bluetoothMediaConfirmation(context),
+                        save = { enabled ->
+                            GeelyMediaSettings.saveBluetoothAutoAvoid(context, enabled)
+                            if (enabled) requestBluetoothConnectPermission(context)
+                        },
+                    ),
+                ),
+            ),
+            VehicleSettingsCard(
+                id = "geely_evcc_system_actions",
+                placement = VehicleSettingsPlacement.ADVANCED,
+                title = context.getString(R.string.settings_geely_evcc_system_actions_title),
+                rows = listOf(
+                    VehicleSettingRow.Information(
+                        context.getString(R.string.settings_geely_evcc_system_actions_description),
+                    ),
+                    VehicleSettingRow.Action(
+                        id = "geely_evcc_grant_hotspot",
+                        title = context.getString(R.string.settings_geely_evcc_grant_hotspot),
+                        confirmation = systemActionConfirmation(context),
+                        run = { systemActions?.execute(VehicleSystemAction.GRANT_WRITE_SETTINGS) },
+                    ),
+                    VehicleSettingRow.Action(
+                        id = "geely_evcc_grant_overlay",
+                        title = context.getString(R.string.settings_geely_evcc_grant_overlay),
+                        confirmation = systemActionConfirmation(context),
+                        run = { systemActions?.execute(VehicleSystemAction.GRANT_OVERLAY) },
+                    ),
+                    VehicleSettingRow.Action(
+                        id = "geely_evcc_allow_background",
+                        title = context.getString(R.string.settings_geely_evcc_allow_background),
+                        confirmation = systemActionConfirmation(context),
+                        run = { systemActions?.execute(VehicleSystemAction.ALLOW_BACKGROUND) },
+                    ),
+                    VehicleSettingRow.Action(
+                        id = "geely_evcc_allow_doze",
+                        title = context.getString(R.string.settings_geely_evcc_allow_doze),
+                        confirmation = systemActionConfirmation(context),
+                        run = { systemActions?.execute(VehicleSystemAction.ALLOW_DOZE) },
+                    ),
+                ),
+            ),
+            VehicleSettingsCard(
+                id = "geely_evcc_ambient_lighting",
+                placement = VehicleSettingsPlacement.ADVANCED,
+                title = context.getString(R.string.settings_geely_evcc_ambient_title),
+                rows = listOf(
+                    VehicleSettingRow.Information(
+                        context.getString(
+                            if (ambientAvailable) R.string.settings_geely_evcc_ambient_description
+                            else R.string.settings_geely_evcc_ambient_unavailable,
+                        ),
+                    ),
+                    VehicleSettingRow.Toggle(
+                        id = "geely_evcc_ambient_enabled",
+                        title = context.getString(R.string.settings_geely_evcc_ambient_enable),
+                        description = context.getString(R.string.settings_geely_evcc_ambient_description),
+                        checked = ambientAvailable && ambientSettings.enabled,
+                        enabled = ambientAvailable,
+                        effect = VehicleSettingEffect.IMMEDIATE,
+                        enableConfirmation = VehicleSettingConfirmation(
+                            title = context.getString(R.string.settings_geely_evcc_ambient_confirm_title),
+                            message = context.getString(R.string.settings_geely_evcc_ambient_confirm_message),
+                            positiveLabel = context.getString(R.string.settings_geely_evcc_confirm_action),
+                        ),
+                        save = { enabled ->
+                            AmbientMusicSettings.save(context, ambientSettings.copy(enabled = enabled))
                         },
                     ),
                 ),
@@ -392,6 +515,28 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
         Class.forName(GeelyDimNavigationAdapter.NAVIGATION_INFORMATION, false, context.classLoader)
     }.isSuccess
 
+    private fun bluetoothMediaConfirmation(context: Context) = VehicleSettingConfirmation(
+        title = context.getString(R.string.settings_geely_bluetooth_media_confirm_title),
+        message = context.getString(R.string.settings_geely_bluetooth_media_confirm_message),
+        positiveLabel = context.getString(R.string.settings_geely_bluetooth_media_confirm_action),
+    )
+
+    private fun systemActionConfirmation(context: Context) = VehicleSettingConfirmation(
+        title = context.getString(R.string.settings_geely_evcc_system_confirm_title),
+        message = context.getString(R.string.settings_geely_evcc_system_confirm_message),
+        positiveLabel = context.getString(R.string.settings_geely_evcc_system_confirm_action),
+    )
+
+    private fun requestBluetoothConnectPermission(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        ) return
+        (context as? Activity)?.requestPermissions(
+            arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
+            BLUETOOTH_CONNECT_REQUEST,
+        )
+    }
+
     fun oneOsServiceAvailable(context: Context): Boolean =
         context.packageManager.resolveService(
             Intent().setComponent(
@@ -402,4 +547,8 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
             ),
             0,
         ) != null
+
+    private companion object {
+        const val BLUETOOTH_CONNECT_REQUEST = 0x4742
+    }
 }

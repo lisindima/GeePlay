@@ -12,6 +12,7 @@ import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.hud.BydNavigationOutputs
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.orchestration.CarPlayVideoListener
+import com.shilapi.xcertplay.vehicle.VehicleParkStateSource
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -27,11 +28,14 @@ internal object CarPlayVideo : CarPlayVideoListener {
     private const val TAG = "DiPlay-Video"
     const val SKIP_MILLIS = 10_000
     private const val URL_TIMEOUT_SECONDS = 10L
+    private const val PARKED_MAX_AGE_MILLIS = 2_000L
 
     private val main = Handler(Looper.getMainLooper())
     private val sender = Executors.newSingleThreadExecutor { Thread(it, "diplay-video-reply").apply { isDaemon = true } }
     @Volatile private var appContext: Context? = null
     @Volatile private var controller: CarPlayController? = null
+    @Volatile private var parkedSource: VehicleParkStateSource? = null
+    @Volatile private var legacyBydParked = true
 
     // Main-thread state; CarPlayVideoActivity applies it. The stream and item are also read by loader threads.
     @Volatile private var streamId: Long? = null
@@ -51,10 +55,14 @@ internal object CarPlayVideo : CarPlayVideoListener {
     fun attach(context: Context, next: CarPlayController) {
         appContext = context.applicationContext
         controller = next
+        val provider = context.applicationContext as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
+        legacyBydParked = provider == null
+        parkedSource = provider?.vehicleParkStateSource(context.applicationContext)
         next.videoListener = this
     }
 
-    override fun readParked(): Boolean? = appContext?.let(BydNavigationOutputs::parked)
+    override fun readParked(): Boolean? = parkedSource?.parked(PARKED_MAX_AGE_MILLIS)
+        ?: appContext?.takeIf { legacyBydParked }?.let(BydNavigationOutputs::parked)
 
     override fun onVideoAllowedChanged(allowed: Boolean) {
         if (!allowed) main.post { closePlayer("the car left P") }

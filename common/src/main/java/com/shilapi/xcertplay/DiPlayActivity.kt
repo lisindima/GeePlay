@@ -2289,8 +2289,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }
             is VehicleSettingRow.Action -> parent.addView(
                 button(row.title, row.primary) {
-                    row.run()
-                    render()
+                    val run = {
+                        row.run()
+                        render()
+                    }
+                    row.confirmation?.let { confirmation ->
+                        appDialogBuilder()
+                            .setTitle(confirmation.title)
+                            .setMessage(confirmation.message)
+                            .setPositiveButton(confirmation.positiveLabel) { _, _ -> run() }
+                            .setNegativeButton(R.string.cancel, null)
+                            .show()
+                    } ?: run()
                 },
                 matchButton(8, 56),
             )

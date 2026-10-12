@@ -23,7 +23,12 @@
     <string name="settings_geely_audio_description">Choose who plays music. Factory Bluetooth keeps music and media keys in the vehicle while GeePlay continues navigation, Siri and call audio. Changes apply on the next connection.</string>
     <string name="settings_geely_media_owner">Music output</string>
     <string name="settings_geely_media_owner_bluetooth">Factory Bluetooth</string>
-    <string name="settings_geely_media_owner_diplay">GeePlay</string>
+    <string name="settings_geely_media_owner_diplay">CarPlay</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">Automatically avoid car Bluetooth media (experimental)</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">With CarPlay music selected, temporarily disconnects only the car’s A2DP media profile to prevent play/pause contention. Calls and pairing stay available; A2DP is restored when CarPlay ends. Applies on the next connection.</string>
+    <string name="settings_geely_bluetooth_media_confirm_title">Use CarPlay for music?</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay will automatically disconnect the car’s Bluetooth media profile while CarPlay runs. It does not turn Bluetooth off or disconnect calls, and restores media when CarPlay ends. Nearby devices permission is required.</string>
+    <string name="settings_geely_bluetooth_media_confirm_action">Use CarPlay and enable avoidance</string>
     <string name="settings_geely_input_title">Geely steering-wheel input (experimental)</string>
     <string name="settings_geely_input_description">OneOS media keys and the Flyme voice broadcast require an active CarPlay session. Factory Bluetooth disables interception. Profile changes apply immediately.</string>
     <string name="settings_geely_input_profile">Input platform</string>
@@ -60,6 +65,13 @@
     <string name="settings_geely_evcc_vehicle_status_description">Shares traction-battery percentage, remaining range and charging state with the connected iPhone when EVCC provides a verified reading. Applies on the next connection.</string>
     <string name="settings_geely_evcc_vehicle_speed">Send vehicle speed to CarPlay positioning</string>
     <string name="settings_geely_evcc_vehicle_speed_description">Adds EVCC wheel speed and gear to location updates requested by the iPhone. Location sharing must also be enabled. Applies on the next connection.</string>
+    <string name="settings_geely_evcc_video_while_parked">Allow in-car video only while parked (experimental)</string>
+    <string name="settings_geely_evcc_video_while_parked_description">Uses the verified EVCC gear value and fails closed when it is missing or stale. Applies on the next connection.</string>
+    <string name="settings_geely_evcc_video_confirm_title">Enable parked video?</string>
+    <string name="settings_geely_evcc_video_confirm_message">Video is offered only while EVCC reports P. Unknown, stale or disconnected vehicle data disables playback. Use only where lawful.</string>
+    <string name="settings_geely_evcc_tyre_telemetry">Show EVCC tyre pressure and temperature (experimental)</string>
+    <string name="settings_geely_evcc_tyre_telemetry_description">Discovers read-only tyre descriptors for this firmware and shows fresh four-wheel readings in the side panel. Applies on the next connection.</string>
+    <string name="settings_geely_evcc_tyre_confirm_message">GeePlay will inspect EVCC’s read-only property directory for tyre pressure and temperature. Unsupported or ambiguous wheel mappings remain hidden.</string>
     <string name="settings_geely_evcc_low_charge_percent">Low-charge warning</string>
     <string name="settings_geely_evcc_charging_connectors">Charging connectors</string>
     <string name="settings_geely_evcc_confirm_title">Enable EVCC vehicle data?</string>
@@ -67,4 +79,19 @@
     <string name="settings_geely_evcc_confirm_action">Enable</string>
     <string name="settings_geely_evcc_open_settings">Open EVCC authorization</string>
     <string name="settings_geely_evcc_unavailable">EVCC vehicle-data adapter is unavailable.</string>
+    <string name="settings_geely_evcc_system_actions_title">EVCC system actions (experimental)</string>
+    <string name="settings_geely_evcc_system_actions_description">Explicit one-time actions only. Each write requires EVCC Shell authorization and a separate confirmation on the car screen; GeePlay never runs them automatically.</string>
+    <string name="settings_geely_evcc_grant_hotspot">Allow hotspot system settings through EVCC</string>
+    <string name="settings_geely_evcc_grant_overlay">Allow overlay startup through EVCC</string>
+    <string name="settings_geely_evcc_allow_background">Allow background execution through EVCC</string>
+    <string name="settings_geely_evcc_allow_doze">Add GeePlay to the doze allowlist through EVCC</string>
+    <string name="settings_geely_evcc_system_confirm_title">Send this system action to EVCC?</string>
+    <string name="settings_geely_evcc_system_confirm_message">EVCC requires shell.exec and shell.system_write authorization and will ask for a separate confirmation on the car screen. The action is not retried automatically.</string>
+    <string name="settings_geely_evcc_system_confirm_action">Continue in EVCC</string>
+    <string name="settings_geely_evcc_ambient_title">EVCC ambient lighting (experimental)</string>
+    <string name="settings_geely_evcc_ambient_enable">Follow CarPlay music with cabin lighting</string>
+    <string name="settings_geely_evcc_ambient_description">Uses only a vehicle-validated EVCC writable-property profile with validate, read-back and restore.</string>
+    <string name="settings_geely_evcc_ambient_unavailable">No vehicle-validated writable ambient-light profile matches this firmware. Writes remain disabled.</string>
+    <string name="settings_geely_evcc_ambient_confirm_title">Control ambient lighting through EVCC?</string>
+    <string name="settings_geely_evcc_ambient_confirm_message">GeePlay will save the current lighting, validate every write, read it back and restore the original state when playback ends. EVCC property.write authorization is required.</string>
 </resources>

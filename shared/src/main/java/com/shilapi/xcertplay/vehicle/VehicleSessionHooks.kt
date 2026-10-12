@@ -2,6 +2,7 @@ package com.shilapi.xcertplay.vehicle
 
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import com.shilapi.xcertplay.media.LocalMediaAudioPolicy
+import com.shilapi.xcertplay.media.AmbientLightingProvider
 import com.shilapi.xcertplay.navigation.runtime.RouteGuidanceSource
 import java.io.Closeable
 import android.content.Context
@@ -19,6 +20,10 @@ interface VehicleHostControls {
     fun sendMediaButton(index: Int): Boolean
     fun requestSiri(): Boolean
     fun isCommunicationActive(): Boolean
+    fun answerCall(): Boolean = false
+    fun endCall(): Boolean = false
+    fun zoomDashboardMap(zoomIn: Boolean): Boolean = false
+    fun sendKnob(wheel: Int = 0, select: Boolean = false, back: Boolean = false): Boolean = false
 }
 
 /**
@@ -46,6 +51,15 @@ interface VehicleSessionHooks : Closeable {
 interface VehicleIntegrationProvider {
     fun createVehicleSessionHooks(context: Context): VehicleSessionHooks
     fun carPlayVehicleDataAdapter(context: Context): CarPlayVehicleDataAdapter? = null
+    fun vehicleParkStateSource(context: Context): VehicleParkStateSource? = null
+    fun vehicleTyreTelemetrySource(context: Context): VehicleTyreTelemetrySource? = null
+    fun clusterMapVisibilitySource(context: Context): ClusterMapVisibilitySource? = null
+    /** null keeps the upstream product's own parked-video setting. */
+    fun videoInCarEnabled(context: Context): Boolean? = null
+    fun instrumentMediaOutput(context: Context): InstrumentMediaOutput = InstrumentMediaOutput.NONE
+    fun instrumentCallOutput(context: Context): InstrumentCallOutput = InstrumentCallOutput.NONE
+    fun ambientLightingProvider(context: Context): AmbientLightingProvider? = null
+    fun vehicleSystemActionPort(context: Context): VehicleSystemActionPort? = null
     fun mediaAudioPolicy(context: Context): LocalMediaAudioPolicy = LocalMediaAudioPolicy.DIPLAY
     fun vehicleSettings(context: Context): VehicleSettingsController? = null
     /** Whether this product should render DiPlay's legacy BYD settings and availability copy. */

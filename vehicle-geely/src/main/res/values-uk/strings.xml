@@ -23,7 +23,12 @@
     <string name="settings_geely_audio_description">Виберіть джерело музики. Штатний Bluetooth залишає музику й медіакнопки автомобілю, а GeePlay продовжує відтворювати навігацію, Siri та дзвінки. Зміни застосовуються під час наступного підключення.</string>
     <string name="settings_geely_media_owner">Вивід музики</string>
     <string name="settings_geely_media_owner_bluetooth">Штатний Bluetooth</string>
-    <string name="settings_geely_media_owner_diplay">GeePlay</string>
+    <string name="settings_geely_media_owner_diplay">CarPlay</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">Автоматично вимикати Bluetooth-медіа автомобіля (експериментально)</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">Для музики CarPlay тимчасово від’єднує лише профіль A2DP, усуваючи конфлікт відтворення. Дзвінки й сполучення зберігаються; профіль відновлюється після CarPlay. Застосовується під час наступного підключення.</string>
+    <string name="settings_geely_bluetooth_media_confirm_title">Використовувати CarPlay для музики?</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay тимчасово від’єднає Bluetooth-медіа під час CarPlay. Bluetooth і дзвінки залишаться активними, профіль відновиться після завершення. Потрібен дозвіл на пристрої поблизу.</string>
+    <string name="settings_geely_bluetooth_media_confirm_action">Використовувати CarPlay і ввімкнути уникнення</string>
     <string name="settings_geely_input_title">Кнопки керма Geely (експериментально)</string>
     <string name="settings_geely_input_description">Медіакнопки OneOS і голосова подія Flyme працюють лише під час активного CarPlay. Штатний Bluetooth вимикає перехоплення. Зміни введення застосовуються одразу.</string>
     <string name="settings_geely_input_profile">Платформа введення</string>
@@ -60,6 +65,13 @@
     <string name="settings_geely_evcc_vehicle_status_description">Передає iPhone заряд тягової батареї, запас ходу та стан заряджання за наявності перевірених даних EVCC. Застосовується під час наступного підключення.</string>
     <string name="settings_geely_evcc_vehicle_speed">Передавати швидкість для позиціювання CarPlay</string>
     <string name="settings_geely_evcc_vehicle_speed_description">Додає швидкість і передачу EVCC до даних геопозиції на запит iPhone. Передавання геопозиції також має бути ввімкнене. Застосовується під час наступного підключення.</string>
+    <string name="settings_geely_evcc_video_while_parked">Дозволяти відео лише на парковці (експериментально)</string>
+    <string name="settings_geely_evcc_video_while_parked_description">Використовує перевірену передачу EVCC і блокує відео за відсутніх або застарілих даних. Застосовується під час наступного підключення.</string>
+    <string name="settings_geely_evcc_video_confirm_title">Увімкнути відео на парковці?</string>
+    <string name="settings_geely_evcc_video_confirm_message">Відео доступне лише коли EVCC повідомляє P. Невідомі, застарілі або від’єднані дані забороняють відтворення. Використовуйте лише там, де це дозволено.</string>
+    <string name="settings_geely_evcc_tyre_telemetry">Показувати тиск і температуру шин EVCC (експериментально)</string>
+    <string name="settings_geely_evcc_tyre_telemetry_description">Знаходить властивості шин лише для читання й показує свіжі дані чотирьох коліс у бічній панелі. Застосовується під час наступного підключення.</string>
+    <string name="settings_geely_evcc_tyre_confirm_message">GeePlay перевірить каталог EVCC лише для читання. Непідтримувані або неоднозначні позиції коліс залишаться прихованими.</string>
     <string name="settings_geely_evcc_low_charge_percent">Поріг низького заряду</string>
     <string name="settings_geely_evcc_charging_connectors">Роз’єми заряджання</string>
     <string name="settings_geely_evcc_confirm_title">Увімкнути дані EVCC?</string>
@@ -67,4 +79,19 @@
     <string name="settings_geely_evcc_confirm_action">Увімкнути</string>
     <string name="settings_geely_evcc_open_settings">Відкрити дозволи EVCC</string>
     <string name="settings_geely_evcc_unavailable">Адаптер даних EVCC недоступний.</string>
+    <string name="settings_geely_evcc_system_actions_title">Системні дії EVCC (експериментально)</string>
+    <string name="settings_geely_evcc_system_actions_description">Лише явні одноразові дії. Кожен запис потребує дозволу EVCC Shell і окремого підтвердження на екрані автомобіля; GeePlay не запускає їх автоматично.</string>
+    <string name="settings_geely_evcc_grant_hotspot">Дозволити налаштування точки доступу через EVCC</string>
+    <string name="settings_geely_evcc_grant_overlay">Дозволити запуск поверх вікон через EVCC</string>
+    <string name="settings_geely_evcc_allow_background">Дозволити фонову роботу через EVCC</string>
+    <string name="settings_geely_evcc_allow_doze">Додати GeePlay до винятків сну через EVCC</string>
+    <string name="settings_geely_evcc_system_confirm_title">Надіслати системну дію до EVCC?</string>
+    <string name="settings_geely_evcc_system_confirm_message">EVCC потребує дозволів shell.exec і shell.system_write та окремого підтвердження на екрані автомобіля. Автоповтору не буде.</string>
+    <string name="settings_geely_evcc_system_confirm_action">Продовжити в EVCC</string>
+    <string name="settings_geely_evcc_ambient_title">Підсвічування EVCC (експериментально)</string>
+    <string name="settings_geely_evcc_ambient_enable">Синхронізувати підсвічування з музикою CarPlay</string>
+    <string name="settings_geely_evcc_ambient_description">Використовує лише перевірений на автомобілі профіль EVCC із перевіркою, читанням результату та відновленням.</string>
+    <string name="settings_geely_evcc_ambient_unavailable">Для цієї прошивки немає перевіреного профілю запису підсвічування. Запис вимкнено.</string>
+    <string name="settings_geely_evcc_ambient_confirm_title">Керувати підсвічуванням через EVCC?</string>
+    <string name="settings_geely_evcc_ambient_confirm_message">GeePlay збереже поточний стан, перевірить і прочитає кожен запис та відновить його після відтворення. Потрібен property.write EVCC.</string>
 </resources>

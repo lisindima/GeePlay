@@ -23,7 +23,12 @@
     <string name="settings_geely_audio_description">選擇音樂播放方。原車藍牙模式由車輛播放音樂並處理媒體鍵，GeePlay 仍播放導航、Siri 和通話音訊；修改將在下次連線時生效。</string>
     <string name="settings_geely_media_owner">音樂輸出</string>
     <string name="settings_geely_media_owner_bluetooth">原車藍牙</string>
-    <string name="settings_geely_media_owner_diplay">GeePlay</string>
+    <string name="settings_geely_media_owner_diplay">CarPlay</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">自動避讓車機藍牙媒體（實驗性）</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">選擇 CarPlay 播放音樂時，僅暫時中斷車機 A2DP 媒體，避免播放/暫停搶佔；不會關閉藍牙或中斷通話，CarPlay 結束後自動恢復；下次連線生效。</string>
+    <string name="settings_geely_bluetooth_media_confirm_title">使用 CarPlay 播放音樂？</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay 將在 CarPlay 執行期間自動中斷車機藍牙媒體，不會關閉藍牙或中斷通話，並會在 CarPlay 結束後恢復；需要「附近裝置」權限。</string>
+    <string name="settings_geely_bluetooth_media_confirm_action">使用 CarPlay 並開啟避讓</string>
     <string name="settings_geely_input_title">吉利方向盤輸入（實驗性）</string>
     <string name="settings_geely_input_description">OneOS 媒體鍵和 Flyme 語音廣播只在 CarPlay 工作階段啟用；原車藍牙模式不攔截媒體鍵；輸入方式修改立即生效。</string>
     <string name="settings_geely_input_profile">輸入平台</string>
@@ -60,6 +65,13 @@
     <string name="settings_geely_evcc_vehicle_status_description">EVCC 提供可信資料時，將動力電池電量、剩餘續航和充電狀態傳送給已連線的 iPhone；下次連線生效。</string>
     <string name="settings_geely_evcc_vehicle_speed">向 CarPlay 定位傳送車速</string>
     <string name="settings_geely_evcc_vehicle_speed_description">在 iPhone 要求的位置資料中加入 EVCC 輪速和檔位；還需要啟用位置共享；下次連線生效。</string>
+    <string name="settings_geely_evcc_video_while_parked">僅駐車時允許車內影片（實驗性）</string>
+    <string name="settings_geely_evcc_video_while_parked_description">使用已驗證的 EVCC 檔位；資料缺失或過期時禁止播放；下次連線生效。</string>
+    <string name="settings_geely_evcc_video_confirm_title">啟用駐車影片？</string>
+    <string name="settings_geely_evcc_video_confirm_message">僅 EVCC 回報 P 檔時提供影片；車輛資料未知、過期或中斷時會禁止播放。請僅在法律允許時使用。</string>
+    <string name="settings_geely_evcc_tyre_telemetry">顯示 EVCC 胎壓和胎溫（實驗性）</string>
+    <string name="settings_geely_evcc_tyre_telemetry_description">發現目前韌體的唯讀輪胎屬性，並在側邊欄顯示四輪新鮮資料；下次連線生效。</string>
+    <string name="settings_geely_evcc_tyre_confirm_message">GeePlay 將檢查 EVCC 唯讀屬性目錄中的胎壓和胎溫；不支援或輪位不明確的資料會保持隱藏。</string>
     <string name="settings_geely_evcc_low_charge_percent">低電量提醒門檻</string>
     <string name="settings_geely_evcc_charging_connectors">充電介面</string>
     <string name="settings_geely_evcc_confirm_title">啟用 EVCC 車輛資料？</string>
@@ -67,4 +79,19 @@
     <string name="settings_geely_evcc_confirm_action">啟用</string>
     <string name="settings_geely_evcc_open_settings">開啟 EVCC 授權</string>
     <string name="settings_geely_evcc_unavailable">EVCC 車輛資料 Adapter 無法使用。</string>
+    <string name="settings_geely_evcc_system_actions_title">EVCC 系統操作（實驗性）</string>
+    <string name="settings_geely_evcc_system_actions_description">僅限使用者主動觸發的一次性操作；每次寫入都需要 EVCC Shell 授權和車機端單獨確認，GeePlay 不會自動執行。</string>
+    <string name="settings_geely_evcc_grant_hotspot">透過 EVCC 允許熱點系統設定</string>
+    <string name="settings_geely_evcc_grant_overlay">透過 EVCC 允許懸浮視窗啟動</string>
+    <string name="settings_geely_evcc_allow_background">透過 EVCC 允許背景執行</string>
+    <string name="settings_geely_evcc_allow_doze">透過 EVCC 加入休眠白名單</string>
+    <string name="settings_geely_evcc_system_confirm_title">將此系統操作傳送給 EVCC？</string>
+    <string name="settings_geely_evcc_system_confirm_message">需要在 EVCC 授權 shell.exec 和 shell.system_write，並在車機螢幕再次確認；操作失敗後不會自動重試。</string>
+    <string name="settings_geely_evcc_system_confirm_action">繼續到 EVCC</string>
+    <string name="settings_geely_evcc_ambient_title">EVCC 氛圍燈（實驗性）</string>
+    <string name="settings_geely_evcc_ambient_enable">讓車內燈光跟隨 CarPlay 音樂</string>
+    <string name="settings_geely_evcc_ambient_description">僅使用通過實車驗證的 EVCC 可寫屬性 Profile，並執行驗證、回讀和恢復。</string>
+    <string name="settings_geely_evcc_ambient_unavailable">目前韌體沒有通過實車驗證的可寫氛圍燈 Profile，寫入保持停用。</string>
+    <string name="settings_geely_evcc_ambient_confirm_title">透過 EVCC 控制氛圍燈？</string>
+    <string name="settings_geely_evcc_ambient_confirm_message">GeePlay 將儲存目前燈光、驗證每次寫入並回讀結果，播放結束時恢復原狀態；需要 EVCC property.write 授權。</string>
 </resources>

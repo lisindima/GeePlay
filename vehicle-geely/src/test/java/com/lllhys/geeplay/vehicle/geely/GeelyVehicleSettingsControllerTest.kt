@@ -29,10 +29,13 @@ class GeelyVehicleSettingsControllerTest {
             GeelyNavigationConfig(false, GeelyNavigationBackend.AUTO, false, false, 0),
         )
         GeelyMediaSettings.saveOwner(context, MediaOutputOwner.OEM_BLUETOOTH)
+        GeelyMediaSettings.saveBluetoothAutoAvoid(context, false)
         GeelyInputSettings.saveProfile(context, GeelyInputProfile.DISABLED)
         GeelyProductSettings.saveBlockLegacyBydMenus(context, true)
         EvccVehicleDataSettings.saveVehicleStatusEnabled(context, false)
         EvccVehicleDataSettings.saveVehicleSpeedEnabled(context, false)
+        EvccVehicleDataSettings.saveVideoWhileParkedEnabled(context, false)
+        EvccVehicleDataSettings.saveTyreTelemetryEnabled(context, false)
         GeelyClusterDisplaySettings.saveDebugDisplayId(context, null)
     }
 
@@ -78,10 +81,18 @@ class GeelyVehicleSettingsControllerTest {
             .rows.filterIsInstance<VehicleSettingRow.Choice>()
             .single()
         assertEquals(0, row.selectedIndex)
+        assertTrue(row.confirmations.containsKey(1))
 
         row.save(1)
 
         assertEquals(MediaOutputOwner.DIPLAY, GeelyMediaSettings.loadOwner(context))
+        assertTrue(GeelyMediaSettings.bluetoothAutoAvoid(context))
+        val autoAvoid = GeelyVehicleSettingsController().cards(context)
+            .single { it.id == "geely_audio" }
+            .rows.filterIsInstance<VehicleSettingRow.Toggle>()
+            .single { it.id == "geely_bluetooth_media_auto_avoid" }
+        assertTrue(autoAvoid.enabled)
+        assertTrue(autoAvoid.checked)
     }
 
     @Test
@@ -152,6 +163,8 @@ class GeelyVehicleSettingsControllerTest {
         assertEquals(VehicleSettingsPlacement.ADVANCED, card.placement)
         assertFalse(toggles.getValue("geely_evcc_vehicle_status").checked)
         assertFalse(toggles.getValue("geely_evcc_vehicle_speed").checked)
+        assertFalse(toggles.getValue("geely_evcc_video_while_parked").checked)
+        assertFalse(toggles.getValue("geely_evcc_tyre_telemetry").checked)
         assertEquals(
             com.shilapi.xcertplay.vehicle.VehicleSettingEffect.NEXT_CONNECTION,
             toggles.getValue("geely_evcc_vehicle_status").effect,
@@ -159,9 +172,13 @@ class GeelyVehicleSettingsControllerTest {
 
         toggles.getValue("geely_evcc_vehicle_status").save(true)
         toggles.getValue("geely_evcc_vehicle_speed").save(true)
+        toggles.getValue("geely_evcc_video_while_parked").save(true)
+        toggles.getValue("geely_evcc_tyre_telemetry").save(true)
 
         assertTrue(EvccVehicleDataSettings.vehicleStatusEnabled(context))
         assertTrue(EvccVehicleDataSettings.vehicleSpeedEnabled(context))
+        assertTrue(EvccVehicleDataSettings.videoWhileParkedEnabled(context))
+        assertTrue(EvccVehicleDataSettings.tyreTelemetryEnabled(context))
     }
 
     @Test

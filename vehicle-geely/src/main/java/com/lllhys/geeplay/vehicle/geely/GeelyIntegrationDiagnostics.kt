@@ -20,6 +20,7 @@ object GeelyIntegrationDiagnostics {
     @Volatile private var sessionGeneration = 0L
     @Volatile private var sessionActive = false
     @Volatile private var inputStatus = "not started"
+    @Volatile private var bluetoothAudioStatus = "not started"
     @Volatile private var lastFrameAtMillis = 0L
     @Volatile private var lastPublishAtMillis = 0L
     @Volatile private var visibleManeuverCount = 0
@@ -78,6 +79,10 @@ object GeelyIntegrationDiagnostics {
         inputStatus = message.take(160)
     }
 
+    fun bluetoothAudio(message: String) {
+        bluetoothAudioStatus = message.take(160)
+    }
+
     fun report(context: Context): String = buildString {
         val navigation = GeelyNavigationSettings.load(context)
         val driver = GeelyNavigationStatusStore.snapshot()
@@ -95,7 +100,7 @@ object GeelyIntegrationDiagnostics {
         appendLine("geelyDriver state=${driver.state} stage=${driver.stage} failure=${driver.failureType ?: "none"} cleanupPending=${recovery != null}")
         appendLine("geelyOemCall method=$lastOemMethod result=$lastOemResult")
         appendLine("geelyRoute source=$activeSource sessionGeneration=$sessionGeneration sessionActive=$sessionActive frames5201=${routeUpdates.get()} frames5202=${maneuverUpdates.get()} frames5204=${laneUpdates.get()} rejected=${rejectedFrames.get()} lastFrameElapsedMs=$lastFrameAtMillis lastPublishElapsedMs=$lastPublishAtMillis maneuvers=$visibleManeuverCount lanes=$visibleLaneCount")
-        appendLine("geelyMedia owner=${GeelyMediaSettings.loadOwner(context)} retainBluetooth=${GeelyMediaSettings.loadOwner(context) == com.shilapi.xcertplay.media.MediaOutputOwner.OEM_BLUETOOTH}")
+        appendLine("geelyMedia owner=${GeelyMediaSettings.loadOwner(context)} retainBluetooth=${GeelyMediaSettings.loadOwner(context) == com.shilapi.xcertplay.media.MediaOutputOwner.OEM_BLUETOOTH} autoAvoid=${GeelyMediaSettings.bluetoothAutoAvoid(context)} arbitration=$bluetoothAudioStatus")
         val input = GeelyInputDiagnostics.snapshot()
         appendLine("geelyInput profile=${GeelyInputSettings.loadProfile(context)} status=$inputStatus bind=${input.bindAttempts} register=${input.registrations} unregister=${input.unregisterAttempts} death=${input.binderDeaths} quarantine=${input.quarantines} active=${input.registered}")
         val displays = context.getSystemService(DisplayManager::class.java)?.displays.orEmpty()

@@ -9,6 +9,7 @@ import android.os.LocaleList
 import android.view.Display
 import com.lllhys.geeplay.vehicle.geely.GeelyClusterDisplaySettings
 import com.lllhys.geeplay.vehicle.geely.GeelyProductSettings
+import com.lllhys.geeplay.vehicle.geely.GeelyMediaSettings
 import com.shilapi.xcertplay.MapEmbedService
 import com.shilapi.xcertplay.host.R as HostR
 import com.shilapi.xcertplay.media.MediaOutputOwner
@@ -19,6 +20,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertSame
 import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,6 +87,27 @@ class GeePlayApplicationTest {
             ),
             application.vehicleSettings(application).cards(application).map { it.placement }.toSet(),
         )
+    }
+
+    @Test
+    fun `Bluetooth media arbitration is created only for confirmed CarPlay ownership`() {
+        val application = RuntimeEnvironment.getApplication() as GeePlayApplication
+        GeelyMediaSettings.saveOwner(application, MediaOutputOwner.OEM_BLUETOOTH)
+        GeelyMediaSettings.saveBluetoothAutoAvoid(application, false)
+        try {
+            assertSame(
+                com.shilapi.xcertplay.vehicle.BluetoothAudioConflictPolicy.NONE,
+                application.bluetoothAudioConflictPolicy(application),
+            )
+
+            GeelyMediaSettings.saveCarPlayOwnerWithAutoAvoid(application)
+            val policy = application.bluetoothAudioConflictPolicy(application)
+            assertFalse(policy === com.shilapi.xcertplay.vehicle.BluetoothAudioConflictPolicy.NONE)
+            policy.close()
+        } finally {
+            GeelyMediaSettings.saveOwner(application, MediaOutputOwner.OEM_BLUETOOTH)
+            GeelyMediaSettings.saveBluetoothAutoAvoid(application, false)
+        }
     }
 
     @Test

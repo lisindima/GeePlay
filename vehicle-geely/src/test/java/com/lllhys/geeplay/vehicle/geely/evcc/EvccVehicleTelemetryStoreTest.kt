@@ -210,6 +210,46 @@ class EvccVehicleTelemetryStoreTest {
     }
 
     @Test
+    fun `park state fails closed when gear is missing or stale`() {
+        assertNull(store.parked(2_000))
+        accept(
+            EvccLogicalSignal.GEAR,
+            289_408_000L,
+            EvccValue.ofLong(4),
+            source = EvccApiContract.Source.CAPI,
+            gearValues = mapOf(4L to VehicleGear.PARK, 8L to VehicleGear.DRIVE),
+        )
+        assertEquals(true, store.parked(2_000))
+        now += 2_001
+        assertNull(store.parked(2_000))
+    }
+
+    @Test
+    fun `tyre telemetry applies profile scale and offset and expires`() {
+        accept(
+            EvccLogicalSignal.TYRE_PRESSURE_FRONT_LEFT,
+            1L,
+            EvccValue.ofDouble(2.5),
+            scale = 100.0,
+        )
+        accept(
+            EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_LEFT,
+            2L,
+            EvccValue.ofDouble(68.0),
+            scale = 5.0 / 9.0,
+            offset = -32.0 * 5.0 / 9.0,
+        )
+
+        val reading = store.tyreTelemetry(10_000)!!.wheels
+            .getValue(com.shilapi.xcertplay.vehicle.VehicleWheelPosition.FRONT_LEFT)
+        assertEquals(250.0, reading.pressureKpa!!, 0.001)
+        assertEquals(20.0, reading.temperatureC!!, 0.001)
+
+        now += 10_001
+        assertNull(store.tyreTelemetry(10_000))
+    }
+
+    @Test
     fun `motion diagnostics expose origin converted value and cache age`() {
         accept(
             EvccLogicalSignal.VEHICLE_SPEED,
@@ -245,6 +285,7 @@ class EvccVehicleTelemetryStoreTest {
         id: Long,
         value: EvccValue,
         scale: Double = 1.0,
+        offset: Double = 0.0,
         enumOptions: List<String> = emptyList(),
         sourceGeneration: Long = 1,
         source: String = EvccApiContract.Source.ADAPT_API,
@@ -262,7 +303,13 @@ class EvccVehicleTelemetryStoreTest {
             enumOptions = enumOptions,
             sourceGeneration = sourceGeneration,
         )
-        val candidate = EvccPropertyCandidate(id, source = source, scale = scale, gearValues = gearValues)
+        val candidate = EvccPropertyCandidate(
+            id,
+            source = source,
+            scale = scale,
+            offset = offset,
+            gearValues = gearValues,
+        )
         val selector = EvccPropertySelector(
             id = id,
             source = source,

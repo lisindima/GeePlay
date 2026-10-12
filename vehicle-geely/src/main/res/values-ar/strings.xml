@@ -23,7 +23,12 @@
     <string name="settings_geely_audio_description">اختر مشغل الموسيقى. يحتفظ بلوتوث السيارة بالموسيقى وأزرار الوسائط، بينما يشغل GeePlay الملاحة وSiri والمكالمات. تُطبّق التغييرات عند الاتصال التالي.</string>
     <string name="settings_geely_media_owner">إخراج الموسيقى</string>
     <string name="settings_geely_media_owner_bluetooth">بلوتوث السيارة</string>
-    <string name="settings_geely_media_owner_diplay">GeePlay</string>
+    <string name="settings_geely_media_owner_diplay">CarPlay</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">تجنب وسائط بلوتوث السيارة تلقائيًا (تجريبي)</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">عند تشغيل موسيقى CarPlay يفصل مؤقتًا ملف A2DP فقط لمنع تعارض التشغيل. تبقى المكالمات والاقتران متاحين ويُستعاد الملف بعد انتهاء CarPlay. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_bluetooth_media_confirm_title">استخدام CarPlay للموسيقى؟</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">سيفصل GeePlay وسائط بلوتوث السيارة مؤقتًا أثناء CarPlay من دون إيقاف البلوتوث أو المكالمات، ويستعيدها بعد الانتهاء. يلزم إذن الأجهزة القريبة.</string>
+    <string name="settings_geely_bluetooth_media_confirm_action">استخدام CarPlay وتفعيل التجنب</string>
     <string name="settings_geely_input_title">إدخال مقود Geely (تجريبي)</string>
     <string name="settings_geely_input_description">تعمل أزرار وسائط OneOS وبث صوت Flyme أثناء جلسة CarPlay النشطة فقط. يعطّل بلوتوث السيارة الاعتراض. تُطبّق تغييرات الإدخال فورًا.</string>
     <string name="settings_geely_input_profile">منصة الإدخال</string>
@@ -60,6 +65,13 @@
     <string name="settings_geely_evcc_vehicle_status_description">يشارك نسبة بطارية الدفع والمدى المتبقي وحالة الشحن عندما يوفر EVCC قراءة موثوقة. يُطبق عند الاتصال التالي.</string>
     <string name="settings_geely_evcc_vehicle_speed">إرسال سرعة المركبة إلى تحديد موقع CarPlay</string>
     <string name="settings_geely_evcc_vehicle_speed_description">يضيف سرعة العجلات والترس من EVCC إلى بيانات الموقع التي يطلبها iPhone. يجب تفعيل مشاركة الموقع أيضًا. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_video_while_parked">السماح بالفيديو عند التوقف فقط (تجريبي)</string>
+    <string name="settings_geely_evcc_video_while_parked_description">يستخدم ترس EVCC الموثق ويمنع التشغيل عند فقدان البيانات أو قدمها. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_video_confirm_title">تفعيل فيديو التوقف؟</string>
+    <string name="settings_geely_evcc_video_confirm_message">يتاح الفيديو فقط عندما يبلغ EVCC عن وضع P. تمنع البيانات المجهولة أو القديمة أو المنقطعة التشغيل. استخدمه حيث يسمح القانون فقط.</string>
+    <string name="settings_geely_evcc_tyre_telemetry">إظهار ضغط وحرارة الإطارات من EVCC (تجريبي)</string>
+    <string name="settings_geely_evcc_tyre_telemetry_description">يكتشف خصائص الإطارات للقراءة فقط ويعرض بيانات العجلات الأربع الحديثة في اللوحة الجانبية. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_tyre_confirm_message">سيفحص GeePlay دليل EVCC للقراءة فقط. ستبقى البيانات غير المدعومة أو ذات موضع العجلة غير الواضح مخفية.</string>
     <string name="settings_geely_evcc_low_charge_percent">حد تحذير انخفاض الشحن</string>
     <string name="settings_geely_evcc_charging_connectors">موصلات الشحن</string>
     <string name="settings_geely_evcc_confirm_title">هل تريد تفعيل بيانات EVCC؟</string>
@@ -67,4 +79,19 @@
     <string name="settings_geely_evcc_confirm_action">تفعيل</string>
     <string name="settings_geely_evcc_open_settings">فتح تفويض EVCC</string>
     <string name="settings_geely_evcc_unavailable">مهايئ بيانات مركبة EVCC غير متاح.</string>
+    <string name="settings_geely_evcc_system_actions_title">إجراءات نظام EVCC (تجريبي)</string>
+    <string name="settings_geely_evcc_system_actions_description">إجراءات صريحة لمرة واحدة فقط. تتطلب كل كتابة تفويض EVCC Shell وتأكيدًا منفصلًا على شاشة السيارة؛ لا يشغلها GeePlay تلقائيًا.</string>
+    <string name="settings_geely_evcc_grant_hotspot">السماح بإعدادات نقطة الاتصال عبر EVCC</string>
+    <string name="settings_geely_evcc_grant_overlay">السماح بالتشغيل فوق التطبيقات عبر EVCC</string>
+    <string name="settings_geely_evcc_allow_background">السماح بالتشغيل في الخلفية عبر EVCC</string>
+    <string name="settings_geely_evcc_allow_doze">إضافة GeePlay إلى قائمة استثناء السكون عبر EVCC</string>
+    <string name="settings_geely_evcc_system_confirm_title">إرسال إجراء النظام إلى EVCC؟</string>
+    <string name="settings_geely_evcc_system_confirm_message">يتطلب EVCC صلاحيتي shell.exec وshell.system_write وتأكيدًا منفصلًا على شاشة السيارة. لن تتم إعادة المحاولة تلقائيًا.</string>
+    <string name="settings_geely_evcc_system_confirm_action">المتابعة في EVCC</string>
+    <string name="settings_geely_evcc_ambient_title">إضاءة EVCC المحيطية (تجريبي)</string>
+    <string name="settings_geely_evcc_ambient_enable">مزامنة الإضاءة مع موسيقى CarPlay</string>
+    <string name="settings_geely_evcc_ambient_description">يستخدم فقط ملف EVCC قابلًا للكتابة تم التحقق منه على السيارة مع التحقق والقراءة والاستعادة.</string>
+    <string name="settings_geely_evcc_ambient_unavailable">لا يوجد ملف إضاءة قابل للكتابة تم التحقق منه لهذا البرنامج الثابت. تبقى الكتابة معطلة.</string>
+    <string name="settings_geely_evcc_ambient_confirm_title">التحكم في الإضاءة عبر EVCC؟</string>
+    <string name="settings_geely_evcc_ambient_confirm_message">سيحفظ GeePlay حالة الإضاءة ويتحقق من كل كتابة ويقرأها ثم يستعيد الأصل بعد التشغيل. يلزم تفويض property.write في EVCC.</string>
 </resources>

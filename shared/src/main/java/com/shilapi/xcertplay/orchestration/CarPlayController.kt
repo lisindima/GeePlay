@@ -184,6 +184,14 @@ class CarPlayController(
             override fun setClusterUiShown(shown: Boolean) = applyClusterUi(shown)
             override fun sendMediaButton(index: Int): Boolean = this@CarPlayController.sendMediaButton(index)
             override fun requestSiri(): Boolean = this@CarPlayController.requestSiri()
+            override fun answerCall(): Boolean = this@CarPlayController.answerCall()
+            override fun endCall(): Boolean = this@CarPlayController.endCall()
+            override fun zoomDashboardMap(zoomIn: Boolean): Boolean =
+                this@CarPlayController.zoomDashboardMap(zoomIn)
+            override fun sendKnob(wheel: Int, select: Boolean, back: Boolean): Boolean =
+                this@CarPlayController.sendKnob(
+                    AirPlayKnobState(wheel = wheel, select = select, back = back),
+                )
             override fun isCommunicationActive(): Boolean =
                 runCatching {
                     context.applicationContext.getSystemService(AudioManager::class.java)?.mode != AudioManager.MODE_NORMAL

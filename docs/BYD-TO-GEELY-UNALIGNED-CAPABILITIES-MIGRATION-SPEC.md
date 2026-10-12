@@ -1,6 +1,6 @@
 # 未对齐能力迁移到 Geely 的实施 Spec（EVCC 优先）
 
-状态：方案设计；除“已支持”的 EVCC 电池/车速/挡位链路外，本文定义的能力均未实施、未实车验证
+状态：软件方案已实施；已验证 selector 继续可用，胎压/仪表布局/氛围灯/OEM 仪表输出及 A2DP 自动避让仍按运行时证据 fail-closed，尚未完成 G636 端到端实车验收
 
 日期：2026-10-12
 
@@ -41,7 +41,7 @@ EVCC 契约证据（仓库内）：
 | 仪表来电卡片 | 13 | 低 |
 | 方向盘接听/挂断 | 14 | 高 |
 | 方向盘地图缩放/旋钮/摇杆 | 15 | 部分已支持 |
-| 蓝牙会话期暂停 | 16 | 不迁移 |
+| 车机蓝牙与 CarPlay 音频抢占仲裁 | 16 | 中（G636 已复现，升级为需支持） |
 | 音乐氛围灯 | 17 | 中 |
 | 隐藏原生来电弹窗 | 18 | 不迁移 |
 | 自动热点与权限授权 | 19 | 中 |
@@ -376,16 +376,123 @@ interface InstrumentCallOutput  { fun publish(call: CallSnapshot?); fun clear() 
 - 超时/拒绝/`RATE_LIMITED` 都要有明确 UI 反馈；绝不重试系统写入。
 - 全部为用户显式触发的一次性动作，禁止在启动或 session 回调里自动调用。
 
-## 12. 能力 #16/#18/#3/#4 不迁移项的处理
+## 11A. 能力 #16 车机蓝牙与 CarPlay 音频抢占仲裁（手动 + 自动）
+
+### 11A.1 问题定性（G636 已复现）
+
+现象：手机同时连「车机经典蓝牙」和「CarPlay」时，CarPlay 音乐一点播放就立即暂停。
+
+G636 实测的两条可用恢复路径：
+
+1. **让车机蓝牙播放**（用户当前采用的解法）：把音频源切到车机蓝牙，由车机原生蓝牙唯一拥有媒体，乒乓消失，但此时放的是车机蓝牙音乐，不是 CarPlay。
+2. **让 CarPlay 播放**：仅在 DiPlay/应用里切音频源**不足以**解决；必须额外到车机蓝牙设置里把「蓝牙音乐/媒体（A2DP）」禁用，CarPlay 才能播放。
+
+根因：同一手机的 A2DP 媒体流同时存在两个消费者（车机原生蓝牙音乐 + CarPlay），两边争夺 audio focus / AVRCP 控制权，产生 play/pause 乒乓。
+
+关键结论（决定方案）：**“让 CarPlay 出声”的真正开关是断开/禁用车机侧的 A2DP 媒体 profile，而不是只在应用内切 owner。** 用户手动做的“在蓝牙设置里禁用蓝牙媒体”，正是自动层要替用户完成的动作。
+
+与 BYD 既有机制的关系（证据）：
+
+- `MediaOutputOwner` / `LocalMediaAudioPolicy`（`shared/.../media/LocalMediaAudioPolicy.kt`）：决定音乐由 DiPlay 本地渲染（`DIPLAY`，占 MediaSession）还是交给车机蓝牙（`OEM_BLUETOOTH`，不本地渲染）。它表达“谁来播”的意图，但不负责断开车机 A2DP，因此在 G636 上单独切到 `DIPLAY` 仍会被车机 A2DP 抢占。
+- `BydBluetoothSuspend`（`shared/.../hud/BydBluetoothSuspend.kt`）：用 ADB `svc bluetooth disable` 直接关车机蓝牙 radio，`bt_suspend_during_carplay` 文案表明它主要为“让来电只在 CarPlay 响”，是通话路由解法，不是媒体抢占解法。
+
+因此 #16 从父评估的“🚫 不迁移”升级为“需支持”，实现**不照搬** `BydBluetoothSuspend` 的 ADB 关整机 radio，而是精确地**只断 A2DP 媒体 profile**。
+
+### 11A.2 EVCC-first 判定
+
+命中决策树第 4 步：这是 Android A2DP / audio-focus / AVRCP 仲裁，不是车辆属性，EVCC 不是能力来源。采用品牌中立媒体策略 + 标准 Android `BluetoothProfile`，不走 EVCC、不走 ADB radio 开关。
+
+### 11A.3 方案：手动 owner 开关 + 自动仲裁，两层
+
+两层能力都做，自动可被用户关掉退回纯手动。
+
+**第 1 层 手动音频源（已有后端，补 Geely 设置可见性）**
+
+- 复用 `GeelyMediaSettings.loadOwner/saveOwner` + `LocalMediaAudioPolicy`。
+- 在 `GeelyVehicleSettingsController` 增加明确的“音乐音频源”选择：
+  - `车机蓝牙播放`（= `MediaOutputOwner.OEM_BLUETOOTH`，DiPlay 不渲染、不占 MediaSession，车机蓝牙唯一拥有；对应 G636 恢复路径 1，当前用户用的就是这个，默认值）；
+  - `CarPlay 播放`（= `MediaOutputOwner.DIPLAY`，本地渲染并占 MediaSession）。
+- G636 已证明：选 `CarPlay 播放` 时，若不释放车机 A2DP，仍会被抢占。因此**选择 `CarPlay 播放` 时弹确认对话框，用户确认后同时自动打开第 2 层“自动避让车机蓝牙媒体”**（见 §11A.3 第 2 层与 §11A.5 流程）。
+- 文案须说明该选项解决“蓝牙与 CarPlay 争用导致音乐一播即停”，并标注生效时机（`NEXT_CONNECTION` 或 `REFRESH_SETTINGS`）。
+- 这一层不依赖任何权限，是 fail-safe 基线：自动层不可用时，用户永远能手动切到车机蓝牙，或手动去蓝牙设置禁用蓝牙媒体。
+
+**第 2 层 自动仲裁（默认关；切到 `CarPlay 播放` 并确认后自动打开）**
+
+目标：CarPlay 媒体会话取得 owner=`DIPLAY` 时，自动完成用户原本要手动做的“禁用车机蓝牙媒体”——断开车机经典蓝牙的 A2DP 媒体 profile，使 CarPlay 成为唯一媒体渲染者；CarPlay 结束时自动恢复。
+
+开关默认值与联动：
+
+- 自动避让开关默认 `关`（因为默认 owner 是 `车机蓝牙播放`，该模式下避让不触发，默认关最省事、不提前要权限）。
+- 用户把“音乐音频源”切到 `CarPlay 播放` 并在确认对话框点确认时，`saveOwner(DIPLAY)` 的同时 `saveBluetoothAutoAvoid(true)`，自动打开避让；确认框文案说明将在 CarPlay 期间自动禁用蓝牙媒体、需要蓝牙权限、通话不受影响、CarPlay 结束自动恢复。
+- 用户仍可在切到 `CarPlay 播放` 后单独关掉避让（回到“需手动在蓝牙设置禁用蓝牙媒体”）。
+- 切回 `车机蓝牙播放` 时不强制改避让开关值，但避让在该 owner 下不生效。
+
+新增品牌中立接缝（`:shared`）：
+
+```kotlin
+enum class BluetoothMediaArbitration { NONE, DISCONNECT_A2DP_DURING_CARPLAY }
+
+interface BluetoothAudioConflictPolicy {
+    /** CarPlay 媒体会话开始、owner=DIPLAY 且避让开启时调用；返回是否已避让。 */
+    fun onCarPlayMediaAcquired(): Boolean
+    /** CarPlay 会话结束/owner 变化时调用，恢复原状态。 */
+    fun release()
+    companion object { val NONE = object : BluetoothAudioConflictPolicy {
+        override fun onCarPlayMediaAcquired() = false
+        override fun release() {}
+    } }
+}
+```
+
+Geely 实现（`:vehicle-geely`，`GeelyBluetoothAudioConflictPolicy`）：
+
+- 仅断 **A2DP media profile**（等价于用户手动在蓝牙设置里“禁用蓝牙媒体”），不关整机蓝牙 radio、不碰 HFP/通话、不动配对。
+  - 用 `BluetoothProfile.A2DP` + `getConnectedDevices()`；对手机设备调用隐藏 `BluetoothA2dp.disconnect(device)`（反射），失败则降级为仅请求 `AudioManager` audio-focus 独占并提示用户手动在蓝牙设置禁用蓝牙媒体。
+  - 需要 `BLUETOOTH_CONNECT`（Android 12+）；确认开启避让时请求权限，拒绝授权则自动层不可用，回退第 1 层手动并提示。
+- 带 owner lease + journal：记录“曾由我们断开 A2DP 的设备”，CarPlay 结束 / owner 改为 `OEM_BLUETOOTH` / 进程重启 / 撤权时，`release()` 重连 A2DP，恢复用户原状态。
+- fail-closed：任何一步失败都不得让用户“既没蓝牙又没 CarPlay 声音”；失败即回到“未避让”并提示手动切音频源或手动禁用蓝牙媒体。
+- 仅在 owner=`DIPLAY` 且避让开启时触发；`OEM_BLUETOOTH`（默认）下不避让。
+
+### 11A.4 接线
+
+- `GeePlayApplication` 提供 `BluetoothAudioConflictPolicy`（owner=`DIPLAY` 且避让开启时为 `GeelyBluetoothAudioConflictPolicy`，否则 `NONE`）；DiPlay 默认 `NONE`，不改上游行为。
+- 由 `VehicleSessionHooks`（会话生命周期）在 `carPlaySessionStarted`（且 owner=`DIPLAY`、避让开启）调用 `onCarPlayMediaAcquired()`，在 `carPlaySessionEnded`/`close` 调用 `release()`。
+- 严禁进入 iAP2 control loop 热路径；蓝牙操作在自己的 worker。
+
+### 11A.5 设置与默认值
+
+- 默认 owner 维持现状 `MediaOutputOwner.OEM_BLUETOOTH`（= G636 当前可用的“车机蓝牙播放”，开箱不抢占）。
+- 自动避让开关默认 `关`；由“切到 `CarPlay 播放` 的确认”联动打开（见下）。
+- `VehicleSettingsPlacement.AUDIO`：
+  - “音乐音频源”选择（第 1 层，始终可见）：`车机蓝牙播放` / `CarPlay 播放`。
+    - 选 `CarPlay 播放` 使用 `VehicleSettingRow.Choice` 的 `confirmations`（参考 `geely_cluster_debug_display` 已有用法）弹确认框；确认回调里 `GeelyMediaSettings.saveOwner(DIPLAY)` + `saveBluetoothAutoAvoid(true)` 并请求 `BLUETOOTH_CONNECT`。
+    - 确认框文案：将在 CarPlay 连接期间自动禁用车机蓝牙媒体（A2DP），不关整机蓝牙，通话不受影响，CarPlay 结束后自动恢复；需要蓝牙权限。
+  - “自动避让车机蓝牙媒体（实验性）”开关（第 2 层，`(experimental)`/`（实验性）` 命名）：显示当前联动结果，允许用户在 `CarPlay 播放` 下单独关闭；仅在 owner=`CarPlay 播放` 时生效。
+- 新增持久化 `GeelyMediaSettings.bluetoothAutoAvoid`（`geeplay_geely_media`，默认 false）。
+- 字符串写入 `vehicle-geely/src/main/res/values/` 及全部 `values-*`。
+
+### 11A.6 验证（G636）
+
+- 切到 `CarPlay 播放` → 弹确认框 → 确认后避让自动打开并请求蓝牙权限：点击播放不再立即暂停（自动断 A2DP 生效）；CarPlay 结束后车机蓝牙 A2DP 自动恢复，车机蓝牙音乐可用。
+- 切到 `CarPlay 播放` → 确认后手动关掉避让 → 复现一播即停，且设置提示用户手动在蓝牙设置禁用蓝牙媒体（与现状手动解法一致）。
+- 确认框点取消 → owner 保持 `车机蓝牙播放`，避让不打开。
+- owner=`车机蓝牙播放`（默认）：不避让，车机蓝牙音乐正常，CarPlay 不抢。
+- 拒绝 `BLUETOOTH_CONNECT` / `disconnect` 反射失败：不崩、不静默失声，提示手动切或手动禁用蓝牙媒体。
+- 来电（HFP/SCO）在避让期间仍可用，不被误断（只断 A2DP，不断 HFP、不关 radio）。
+- 进程重启、撤权、CarPlay 异常断开后 A2DP 能恢复，或明确报告 pending。
+- 不迁移 `BydBluetoothSuspend` 的 ADB `svc bluetooth disable`；确认 Geely 路径不改整机 radio。
+
+## 12. 能力 #18/#3/#4 不迁移项的处理
 
 这些在 EVCC-first 下仍判定为“非 EVCC 来源且不默认迁移”：
 
 | 能力 | 原因 | Geely 处理 |
 | --- | --- | --- |
-| #16 蓝牙会话期暂停 | 系统 radio 状态；高风险且无法静默确认 | 默认不迁移；仅在 G636 复现无线握手冲突后，找 OEM Bluetooth arbitration API；`BluetoothConflictPolicy` 默认 NONE |
 | #18 隐藏原生来电弹窗 | 依赖 `nohup`/`setsid`/`app_process`/后台守护，被 EVCC Shell 永久拒绝 | 不迁移；若复现冲突，找 Geely 通信 UI policy 或让用户在 OEM 设置选择；`CommunicationUiPolicy` 默认 no-op |
 | #3 独立 HUD 广播 | BYD `com.byd.clusterdebug` 私有广播 | 不迁移；目标由 #2 Geely OEM 输出覆盖 |
 | #4 DiLink3 仪表模式/投屏 | BYD `AutoContainer` 私有容器 | 不迁移；Geely 走 DIM 结构化导航或 #5 已验证 Display |
+
+> #16（车机蓝牙与 CarPlay 音频抢占）已从“不迁移”升级为需支持，方案见 §11A；不复用 `BydBluetoothSuspend` 的 ADB 关 radio 做法。
 
 ## 13. 写/控制端口设计（`EvccControlGateway`）
 
@@ -430,12 +537,13 @@ internal interface EvccControlPort : Closeable {
 | P1 | 提取 `EvccGateway`（Connection/Read/Control 骨架，Control 懒创建） | P0 | 多消费者订阅并集/release 测试通过 |
 | P2 | #10 驻车 + #11 胎压（纯 EVCC 读） | P1 | fail-closed、四轮映射、staleness 验证 |
 | P3 | #14/#15 方向盘（host 命令 Seam 扩展） | — | 按键门禁与透传验证 |
+| P3B | #16 蓝牙音频仲裁（手动音频源 + 自动 A2DP 避让） | — | §11A.6 验证通过 |
 | P4 | #6 仪表地图可见性 + #5 Display 实车 profile | P1 | Display 清理与安全 UI 验证 |
 | P5 | #17 氛围灯（EVCC typed write，`EvccControlGateway`） | P1 | validate/read-back/restore/限流/撤权验证 |
 | P6 | #19/#20 系统动作（标准设置优先，EVCC Shell 可选确认） | P1 | 确认窗口/超时/回滚验证 |
 | P7 | #2 HUD / #12 歌曲 / #13 来电（有 Geely OEM API 才做） | — | 各自 OEM 输出验证 |
 
-#3/#4/#16/#18 维持不迁移，除非实车复现并找到官方接口。
+#3/#4/#18 维持不迁移，除非实车复现并找到官方接口。#16 已复现并纳入 P3B。
 
 ## 16. 验收要求（汇总）
 
@@ -443,6 +551,7 @@ internal interface EvccControlPort : Closeable {
 - **驻车**：unknown/stale/撤权=禁止播放；P 切出立即停止。
 - **胎压**：四轮位置、单位换算、缺失/故障轮位不显示旧值。
 - **输入**：按键去重、通话优先级、无 session 透传、不误吞音量。
+- **蓝牙音频仲裁**：切到 `CarPlay 播放` 弹确认、确认后自动打开避让并请求蓝牙权限，点击播放不再立即暂停（自动断 A2DP）；确认后手动关避让则复现并提示手动禁用蓝牙媒体；取消确认保持 `车机蓝牙播放`；owner=`车机蓝牙播放`（默认）不避让；拒权/反射失败不失声且提示手动；通话 HFP 不被误断；CarPlay 结束/撤权/重启后 A2DP 恢复；不改整机 radio。
 - **氛围灯写**：writable descriptor 绑定车型/固件；validate→write→read-back→restore 全链路；timeout 不重试；撤权即停；崩溃可恢复或明确 cleanup pending。
 - **系统 Shell 动作**：单段命令、allowlist、车机确认、超时/拒绝/`RATE_LIMITED` 有反馈、不自动触发。
 - **渲染输出**：HUD/歌曲/来电仅在 Geely OEM API 存在时启用，清除/切源/崩溃恢复可靠。
@@ -457,7 +566,7 @@ internal interface EvccControlPort : Closeable {
 - 不让 park/tyre/ambient 各自创建独立 EVCC client。
 - 不把写能力加进只读 `EvccClientPort`。
 - 不在未知固件自动选择仪表 Display。
-- 不默认关蓝牙、禁 OEM 包、改 appops/secure settings 或起后台 helper。
+- 不默认关蓝牙 radio、禁 OEM 包、改 appops/secure settings 或起后台 helper。#16 的自动避让只断 A2DP media profile，不关整机蓝牙。
 
 ## 18. 主要代码与契约证据
 
@@ -494,3 +603,10 @@ CarPlay host 命令（输入类复用）：
 - [`CarPlayHostActivity.kt`](../common/src/main/java/com/shilapi/xcertplay/CarPlayHostActivity.kt)（#11 胎压、#6 cluster）
 - [`AmbientMusicController.kt`](../shared/src/main/java/com/shilapi/xcertplay/media/AmbientMusicController.kt)（#17）
 - [`GeelyVehicleInput.kt`](../vehicle-geely/src/main/java/com/lllhys/geeplay/vehicle/geely/GeelyVehicleInput.kt)（#14/#15）
+
+媒体音频 owner / 蓝牙仲裁（#16）：
+
+- [`LocalMediaAudioPolicy.kt`](../shared/src/main/java/com/shilapi/xcertplay/media/LocalMediaAudioPolicy.kt)（`MediaOutputOwner` DIPLAY/OEM_BLUETOOTH/PHONE_OR_EXTERNAL）
+- [`GeelyNavigationSettings.kt`](../vehicle-geely/src/main/java/com/lllhys/geeplay/vehicle/geely/GeelyNavigationSettings.kt)（`GeelyMediaSettings.loadOwner/saveOwner`）
+- [`AndroidMediaSink.kt`](../shared/src/main/java/com/shilapi/xcertplay/media/AndroidMediaSink.kt)（媒体渲染/会话占用）
+- [`BydBluetoothSuspend.kt`](../shared/src/main/java/com/shilapi/xcertplay/hud/BydBluetoothSuspend.kt)（BYD 对照：ADB 关 radio，不迁移此做法）

@@ -6,6 +6,8 @@ import com.kooo.evcc.evccapi.EvccApiContract
 import com.kooo.evcc.evccapi.EvccApiInfo
 import com.kooo.evcc.evccapi.EvccCapability
 import com.kooo.evcc.evccapi.EvccOperationResult
+import com.kooo.evcc.evccapi.EvccPageRequest
+import com.kooo.evcc.evccapi.EvccPropertyPage
 import com.kooo.evcc.evccapi.EvccPropertyDescriptor
 import com.kooo.evcc.evccapi.EvccPropertyRecord
 import com.kooo.evcc.evccapi.EvccPropertySelector
@@ -33,6 +35,8 @@ class EvccVehicleDataAdapterTest {
     fun resetSettings() {
         EvccVehicleDataSettings.saveVehicleStatusEnabled(context, false)
         EvccVehicleDataSettings.saveVehicleSpeedEnabled(context, false)
+        EvccVehicleDataSettings.saveVideoWhileParkedEnabled(context, false)
+        EvccVehicleDataSettings.saveTyreTelemetryEnabled(context, false)
     }
 
     @Test
@@ -133,6 +137,9 @@ class EvccVehicleDataAdapterTest {
 
         override fun replaceSubscriptions(selectors: List<EvccPropertySelector>): EvccOperationResult =
             EvccOperationResult(status = EvccApiContract.Status.OK, acceptedCount = selectors.size)
+
+        override fun queryPropertyDirectory(request: EvccPageRequest): EvccPropertyPage =
+            EvccPropertyPage(requestId = request.requestId, status = EvccApiContract.Status.OK)
 
         override fun close() = Unit
 

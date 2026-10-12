@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Parcel
 import android.os.SystemClock
+import android.view.KeyEvent
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.media.MediaOutputOwner
 import com.shilapi.xcertplay.vehicle.VehicleHostControls
@@ -42,6 +43,14 @@ enum class GeelyInputAction {
     NEXT,
     PREVIOUS,
     SIRI,
+    ANSWER_CALL,
+    END_CALL,
+    ZOOM_IN,
+    ZOOM_OUT,
+    KNOB_PREVIOUS,
+    KNOB_NEXT,
+    KNOB_SELECT,
+    KNOB_BACK,
 }
 
 object GeelyInputMapping {
@@ -54,14 +63,25 @@ object GeelyInputMapping {
             GeelyInputProfile.ONE_OS -> media(event.rawCode)
             GeelyInputProfile.ECARX_XUI_DIAGNOSTIC,
             GeelyInputProfile.ONE_OS_2_DIAGNOSTIC,
-            -> media(event.rawCode) ?: if (event.rawCode == 200231) GeelyInputAction.SIRI else null
+            -> action(event.rawCode)
         }
     }
 
-    private fun media(rawCode: Int): GeelyInputAction? = when (rawCode) {
+    private fun media(rawCode: Int): GeelyInputAction? = action(rawCode)
+
+    private fun action(rawCode: Int): GeelyInputAction? = when (rawCode) {
         OneOsWheelProtocol.KEY_PLAY_PAUSE -> GeelyInputAction.PLAY_PAUSE
         OneOsWheelProtocol.KEY_NEXT -> GeelyInputAction.NEXT
         OneOsWheelProtocol.KEY_PREVIOUS -> GeelyInputAction.PREVIOUS
+        KeyEvent.KEYCODE_CALL -> GeelyInputAction.ANSWER_CALL
+        KeyEvent.KEYCODE_ENDCALL -> GeelyInputAction.END_CALL
+        KeyEvent.KEYCODE_ZOOM_IN -> GeelyInputAction.ZOOM_IN
+        KeyEvent.KEYCODE_ZOOM_OUT -> GeelyInputAction.ZOOM_OUT
+        KeyEvent.KEYCODE_DPAD_LEFT -> GeelyInputAction.KNOB_PREVIOUS
+        KeyEvent.KEYCODE_DPAD_RIGHT -> GeelyInputAction.KNOB_NEXT
+        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> GeelyInputAction.KNOB_SELECT
+        KeyEvent.KEYCODE_BACK -> GeelyInputAction.KNOB_BACK
+        200231 -> GeelyInputAction.SIRI
         else -> null
     }
 }
@@ -86,6 +106,9 @@ object OneOsWheelProtocol {
     const val KEY_NEXT = 200087
     const val KEY_PREVIOUS = 200088
     val mediaKeys = intArrayOf(KEY_PLAY_PAUSE, KEY_NEXT, KEY_PREVIOUS)
+    /** Populated only after G636 records a key and its unregister lifecycle without breaking media keys. */
+    val verifiedControlKeys = intArrayOf()
+    val requestedKeys = mediaKeys + verifiedControlKeys
 
     fun getInputService(manager: IBinder): IBinder {
         requireDescriptor(manager, MANAGER_DESCRIPTOR)
@@ -101,7 +124,7 @@ object OneOsWheelProtocol {
         transact(input, REGISTER, INPUT_DESCRIPTOR, write = {
             it.writeStrongBinder(listener)
             it.writeString(packageName)
-            it.writeIntArray(mediaKeys)
+            it.writeIntArray(requestedKeys)
         }, read = { Unit })
     }
 
@@ -171,7 +194,7 @@ internal class OneOsWheelListener(
             6 -> GeelyInputGesture.DOUBLE
             else -> null
         }
-        if (rawCode in OneOsWheelProtocol.mediaKeys && gesture != null) event(rawCode, gesture)
+        if (rawCode in OneOsWheelProtocol.requestedKeys && gesture != null) event(rawCode, gesture)
         reply?.writeNoException()
         return true
     }
@@ -507,7 +530,6 @@ class GeelyInputRuntime(
             profile == GeelyInputProfile.ECARX_XUI_DIAGNOSTIC -> xuiDiagnostic()
             profile == GeelyInputProfile.ONE_OS_2_DIAGNOSTIC -> xuiDiagnostic()
             token == null || target == null -> "waiting for an active CarPlay session"
-            target.isCommunicationActive() -> "platform input paused during a call"
             else -> null
         }
         if (blockedReason != null) {
@@ -543,7 +565,7 @@ class GeelyInputRuntime(
         val target = controls ?: return false
         if (closed || sessionToken !== token || generation != expectedGeneration ||
             GeelyMediaSettings.loadOwner(appContext) != MediaOutputOwner.DIPLAY ||
-            GeelyInputSettings.loadProfile(appContext) != profile || target.isCommunicationActive()
+            GeelyInputSettings.loadProfile(appContext) != profile
         ) return false
         val action = GeelyInputMapping.action(profile, event) ?: return false
         val timestamp = SystemClock.uptimeMillis()
@@ -553,11 +575,20 @@ class GeelyInputRuntime(
         ) return true
         lastAction = action
         lastActionAt = timestamp
+        val communication = target.isCommunicationActive()
         return when (action) {
-            GeelyInputAction.PLAY_PAUSE -> target.sendMediaButton(CarPlayMediaButton.PLAY_PAUSE)
-            GeelyInputAction.NEXT -> target.sendMediaButton(CarPlayMediaButton.NEXT)
-            GeelyInputAction.PREVIOUS -> target.sendMediaButton(CarPlayMediaButton.PREVIOUS)
-            GeelyInputAction.SIRI -> target.requestSiri()
+            GeelyInputAction.PLAY_PAUSE -> !communication && target.sendMediaButton(CarPlayMediaButton.PLAY_PAUSE)
+            GeelyInputAction.NEXT -> !communication && target.sendMediaButton(CarPlayMediaButton.NEXT)
+            GeelyInputAction.PREVIOUS -> !communication && target.sendMediaButton(CarPlayMediaButton.PREVIOUS)
+            GeelyInputAction.SIRI -> !communication && target.requestSiri()
+            GeelyInputAction.ANSWER_CALL -> communication && target.answerCall()
+            GeelyInputAction.END_CALL -> communication && target.endCall()
+            GeelyInputAction.ZOOM_IN -> !communication && target.zoomDashboardMap(true)
+            GeelyInputAction.ZOOM_OUT -> !communication && target.zoomDashboardMap(false)
+            GeelyInputAction.KNOB_PREVIOUS -> !communication && target.sendKnob(wheel = -1)
+            GeelyInputAction.KNOB_NEXT -> !communication && target.sendKnob(wheel = 1)
+            GeelyInputAction.KNOB_SELECT -> !communication && target.sendKnob(select = true)
+            GeelyInputAction.KNOB_BACK -> !communication && target.sendKnob(back = true)
         }
     }
 

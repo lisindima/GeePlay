@@ -3,7 +3,7 @@ package com.shilapi.xcertplay.media
 import android.content.Context
 import android.util.Log
 import com.shilapi.xcertplay.hud.BydAmbientLightClient
-import com.shilapi.xcertplay.hud.BydAmbientLightPolicy
+import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -32,19 +32,23 @@ object AmbientMusicController {
 
     private val lampSession = AmbientLampSession(
         factory = {
-            val real = BydAmbientLightClient(requireNotNull(context))
-            object : AmbientLampSession.Client {
+            val app = requireNotNull(context)
+            (app as? VehicleIntegrationProvider)?.ambientLightingProvider(app)?.create(app) ?: run {
+                val real = BydAmbientLightClient(app)
+                object : AmbientLightingClient {
                 override fun unhealthy(): Boolean {
                     val phase = real.status().phase
                     return phase == BydAmbientLightClient.Phase.FAILED || phase == BydAmbientLightClient.Phase.CLOSED
                 }
-                override fun begin(seed: BydAmbientLightPolicy.Snapshot?) = real.begin(seed?.let {
+                override fun begin(seed: AmbientLampSnapshot?) = real.begin(seed?.let {
                     BydAmbientLightClient.State(it.frontColor, it.backColor, it.frontBrightness, it.backBrightness, it.area)
-                }).thenApply { BydAmbientLightPolicy.Snapshot(it.frontColor, it.backColor, it.frontBrightness, it.backBrightness, it.area) }
-                override fun apply(desired: Triple<Int, Int, Int>) = real.apply(desired.first, desired.second, desired.third).thenApply { Unit }
+                }).thenApply { AmbientLampSnapshot(it.frontColor, it.backColor, it.frontBrightness, it.backBrightness, it.area) }
+                override fun apply(area: Int, color: Int, brightness: Int) =
+                    real.apply(area, color, brightness).thenApply { Unit }
                 override fun stop() = real.stop().thenApply { Unit }
                 // stop's future completes only after closeTransport, including its failure path.
                 override fun close() = real.close()
+                }
             }
         },
         dispatch = { executor.execute(it) },
@@ -156,6 +160,9 @@ object AmbientMusicController {
 
     /** Checks existing authorization and lamp readback only; never asks for ADB or writes a lamp. */
     fun checkSupport(context: Context): java.util.concurrent.CompletableFuture<Boolean> {
+        (context.applicationContext as? VehicleIntegrationProvider)
+            ?.ambientLightingProvider(context.applicationContext)
+            ?.let { return it.checkSupport(context.applicationContext) }
         val result = java.util.concurrent.CompletableFuture<Boolean>()
         executor.execute {
             if (lampSession.isReady()) {

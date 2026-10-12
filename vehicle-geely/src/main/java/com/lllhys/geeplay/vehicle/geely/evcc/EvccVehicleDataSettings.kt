@@ -9,6 +9,8 @@ object EvccVehicleDataSettings {
     private const val KEY_VEHICLE_SPEED_ENABLED = "vehicle_speed_enabled"
     private const val KEY_LOW_CHARGE_PERCENT = "low_charge_percent"
     private const val KEY_CHARGING_CONNECTORS = "charging_connectors"
+    private const val KEY_VIDEO_WHILE_PARKED = "video_while_parked"
+    private const val KEY_TYRE_TELEMETRY = "tyre_telemetry"
 
     const val DEFAULT_LOW_CHARGE_PERCENT = 20
     val lowChargePresets = listOf(10, 15, 20, 25, 30)
@@ -32,7 +34,26 @@ object EvccVehicleDataSettings {
     }
 
     fun anyEnabled(context: Context): Boolean =
-        vehicleStatusEnabled(context) || vehicleSpeedEnabled(context)
+        vehicleStatusEnabled(context) || vehicleSpeedEnabled(context) ||
+            videoWhileParkedEnabled(context) || tyreTelemetryEnabled(context)
+
+    fun videoWhileParkedEnabled(context: Context): Boolean =
+        preferences(context).getBoolean(KEY_VIDEO_WHILE_PARKED, false)
+
+    fun saveVideoWhileParkedEnabled(context: Context, enabled: Boolean) {
+        check(preferences(context).edit().putBoolean(KEY_VIDEO_WHILE_PARKED, enabled).commit()) {
+            "Could not persist EVCC parked-video setting"
+        }
+    }
+
+    fun tyreTelemetryEnabled(context: Context): Boolean =
+        preferences(context).getBoolean(KEY_TYRE_TELEMETRY, false)
+
+    fun saveTyreTelemetryEnabled(context: Context, enabled: Boolean) {
+        check(preferences(context).edit().putBoolean(KEY_TYRE_TELEMETRY, enabled).commit()) {
+            "Could not persist EVCC tyre-telemetry setting"
+        }
+    }
 
     fun lowChargePercent(context: Context): Int =
         preferences(context).getInt(KEY_LOW_CHARGE_PERCENT, DEFAULT_LOW_CHARGE_PERCENT).coerceIn(1, 50)

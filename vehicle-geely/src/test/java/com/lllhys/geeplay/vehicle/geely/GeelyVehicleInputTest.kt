@@ -9,6 +9,7 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.Parcel
 import android.os.Looper
+import android.view.KeyEvent
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.media.MediaOutputOwner
 import com.shilapi.xcertplay.vehicle.VehicleHostControls
@@ -51,7 +52,7 @@ class GeelyVehicleInputTest {
         assertEquals(OneOsWheelProtocol.INPUT_SERVICE_TYPE, manager.requestedType)
         assertSame(listener, input.listener)
         assertEquals("com.lllhys.geeplay", input.packageName)
-        assertArrayEquals(OneOsWheelProtocol.mediaKeys, input.keys)
+        assertArrayEquals(OneOsWheelProtocol.requestedKeys, input.keys)
         assertTrue(input.unregistered)
     }
 
@@ -118,7 +119,7 @@ class GeelyVehicleInputTest {
     }
 
     @Test
-    fun `runtime owns input only for local media outside calls`() {
+    fun `runtime keeps call keys active while blocking media during communication`() {
         GeelyMediaSettings.saveOwner(context, MediaOutputOwner.DIPLAY)
         GeelyInputSettings.saveProfile(context, GeelyInputProfile.ONE_OS)
         var created: RecordingAdapter? = null
@@ -138,7 +139,12 @@ class GeelyVehicleInputTest {
 
         controls.inCall = true
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
-        assertTrue(created!!.closed)
+        assertFalse(created!!.closed)
+        assertFalse(created!!.emit(GeelyInputEvent(OneOsWheelProtocol.KEY_NEXT, GeelyInputGesture.SHORT, "oneos")))
+        assertTrue(created!!.emit(GeelyInputEvent(KeyEvent.KEYCODE_CALL, GeelyInputGesture.SHORT, "oneos")))
+        assertTrue(created!!.emit(GeelyInputEvent(KeyEvent.KEYCODE_ENDCALL, GeelyInputGesture.SHORT, "oneos")))
+        assertEquals(1, controls.answers)
+        assertEquals(1, controls.ends)
         runtime.close()
         shadowOf(Looper.getMainLooper()).idle()
     }
@@ -277,10 +283,21 @@ class GeelyVehicleInputTest {
         val media = ArrayList<Int>()
         var siri = 0
         var inCall = false
+        var answers = 0
+        var ends = 0
+        var zooms = mutableListOf<Boolean>()
+        var knobs = mutableListOf<Triple<Int, Boolean, Boolean>>()
         override fun setClusterUiShown(shown: Boolean) = Unit
         override fun sendMediaButton(index: Int): Boolean { media += index; return true }
         override fun requestSiri(): Boolean { siri += 1; return true }
         override fun isCommunicationActive(): Boolean = inCall
+        override fun answerCall(): Boolean { answers += 1; return true }
+        override fun endCall(): Boolean { ends += 1; return true }
+        override fun zoomDashboardMap(zoomIn: Boolean): Boolean { zooms += zoomIn; return true }
+        override fun sendKnob(wheel: Int, select: Boolean, back: Boolean): Boolean {
+            knobs += Triple(wheel, select, back)
+            return true
+        }
     }
 
     private class RecordingManagerBinder(private val input: IBinder) : Binder() {

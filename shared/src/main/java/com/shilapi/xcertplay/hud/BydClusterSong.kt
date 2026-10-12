@@ -12,14 +12,14 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /** Dashboard song; [line] preserves title-only HUD text, [source] selects a note's music icon. */
-internal data class ClusterSong(val text: String, val playing: Boolean, val line: String = text, val source: Int? = null)
+data class ClusterSong(val text: String, val playing: Boolean, val line: String = text, val source: Int? = null)
 
 /**
  * The CarPlay song for the dashboard, from iAP2 NowPlayingUpdate (0x5001): title (1) and artist (12)
  * in MediaItemAttributes, playback status in PlaybackAttributes. Updates carry only what changed;
  * omitted fields retain their previous values, while an explicitly cleared title forgets the item.
  */
-internal class ClusterSongState {
+class ClusterSongState {
     private var title: String? = null
     private var artist: String? = null
     private var playing = false

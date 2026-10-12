@@ -3,6 +3,7 @@ package com.lllhys.geeplay
 import android.app.Application
 import android.content.Context
 import com.lllhys.geeplay.vehicle.geely.GeelyVehicleSessionHooks
+import com.lllhys.geeplay.vehicle.geely.GeelyBluetoothAudioConflictPolicy
 import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
 import com.shilapi.xcertplay.vehicle.VehicleSessionHooks
 import com.shilapi.xcertplay.media.LocalMediaAudioPolicy
@@ -18,15 +19,35 @@ import com.lllhys.geeplay.vehicle.geely.GeelyIntegrationDiagnostics
 import com.lllhys.geeplay.vehicle.geely.GeelyNavigationRecovery
 import com.lllhys.geeplay.vehicle.geely.GeelyProductSettings
 import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataAdapter
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataSettings
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccConnectionCore
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleControlGateway
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccAmbientLightingProvider
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleSystemActionPort
+import com.shilapi.xcertplay.media.AmbientLightingProvider
+import com.shilapi.xcertplay.vehicle.VehicleSystemActionPort
 import com.shilapi.xcertplay.vehicle.CarPlayVehicleDataAdapter
+import com.shilapi.xcertplay.vehicle.ClusterMapVisibilitySource
+import com.shilapi.xcertplay.vehicle.VehicleParkStateSource
+import com.shilapi.xcertplay.vehicle.VehicleTyreTelemetrySource
+import com.shilapi.xcertplay.vehicle.BluetoothAudioConflictPolicy
 
 class GeePlayApplication : Application(), VehicleIntegrationProvider {
     private lateinit var evccVehicleData: EvccVehicleDataAdapter
+    private lateinit var evccConnection: EvccConnectionCore
+    private lateinit var evccControl: EvccVehicleControlGateway
+    private lateinit var evccAmbientLighting: EvccAmbientLightingProvider
+    private lateinit var evccSystemActions: EvccVehicleSystemActionPort
 
     override fun onCreate() {
         super.onCreate()
-        evccVehicleData = EvccVehicleDataAdapter(this)
+        evccConnection = EvccConnectionCore(this)
+        evccVehicleData = EvccVehicleDataAdapter(this, evccConnection)
+        evccControl = EvccVehicleControlGateway(evccConnection)
+        evccAmbientLighting = EvccAmbientLightingProvider(evccControl)
+        evccSystemActions = EvccVehicleSystemActionPort(this, evccControl)
         evccVehicleData.prepare()
+        GeelyBluetoothAudioConflictPolicy.restoreOnAppOpen(this)
         GeelyNavigationRecovery.restoreOnAppOpen(this)
     }
 
@@ -34,9 +55,31 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         GeelyVehicleSessionHooks(
             context.applicationContext,
             onStatus = GeelyNavigationStatusStore::update,
+            bluetoothAudioConflict = bluetoothAudioConflictPolicy(context),
+            clusterMapVisibility = evccVehicleData.takeIf {
+                GeelyClusterDisplaySettings.enabled(context) ||
+                    GeelyClusterDisplaySettings.debugDisplayId(context) != null
+            },
+            instrumentMediaOutput = instrumentMediaOutput(context),
+            instrumentCallOutput = instrumentCallOutput(context),
         )
 
     override fun carPlayVehicleDataAdapter(context: Context): CarPlayVehicleDataAdapter = evccVehicleData
+
+    override fun vehicleParkStateSource(context: Context): VehicleParkStateSource? =
+        evccVehicleData.takeIf { EvccVehicleDataSettings.videoWhileParkedEnabled(context) }
+
+    override fun vehicleTyreTelemetrySource(context: Context): VehicleTyreTelemetrySource? =
+        evccVehicleData.takeIf { EvccVehicleDataSettings.tyreTelemetryEnabled(context) }
+
+    override fun clusterMapVisibilitySource(context: Context): ClusterMapVisibilitySource = evccVehicleData
+
+    override fun videoInCarEnabled(context: Context): Boolean =
+        EvccVehicleDataSettings.videoWhileParkedEnabled(context)
+
+    override fun ambientLightingProvider(context: Context): AmbientLightingProvider = evccAmbientLighting
+
+    override fun vehicleSystemActionPort(context: Context): VehicleSystemActionPort = evccSystemActions
 
     override fun mediaAudioPolicy(context: Context): LocalMediaAudioPolicy =
         when (GeelyMediaSettings.loadOwner(context)) {
@@ -77,10 +120,25 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         append(GeelyIntegrationDiagnostics.report(context))
         append('\n')
         append(evccVehicleData.diagnostics())
+        append('\n')
+        append(evccAmbientLighting.diagnostics())
+        append('\n')
+        append(evccSystemActions.diagnostics())
     }
+
+    internal fun bluetoothAudioConflictPolicy(context: Context): BluetoothAudioConflictPolicy =
+        if (GeelyMediaSettings.loadOwner(context) == MediaOutputOwner.DIPLAY &&
+            GeelyMediaSettings.bluetoothAutoAvoid(context)
+        ) {
+            GeelyBluetoothAudioConflictPolicy(context.applicationContext)
+        } else {
+            BluetoothAudioConflictPolicy.NONE
+        }
 
     override fun onTerminate() {
         if (::evccVehicleData.isInitialized) evccVehicleData.close()
+        if (::evccControl.isInitialized) evccControl.close()
+        if (::evccConnection.isInitialized) evccConnection.close()
         super.onTerminate()
     }
 

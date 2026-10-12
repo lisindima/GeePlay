@@ -23,7 +23,12 @@
     <string name="settings_geely_audio_description">Elige quién reproduce la música. El Bluetooth del vehículo conserva la música y sus controles, mientras GeePlay mantiene la navegación, Siri y las llamadas. Los cambios se aplican en la próxima conexión.</string>
     <string name="settings_geely_media_owner">Salida de música</string>
     <string name="settings_geely_media_owner_bluetooth">Bluetooth del vehículo</string>
-    <string name="settings_geely_media_owner_diplay">GeePlay</string>
+    <string name="settings_geely_media_owner_diplay">CarPlay</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">Evitar automáticamente el audio Bluetooth del vehículo (experimental)</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">Con música de CarPlay, desconecta temporalmente solo el perfil multimedia A2DP para evitar conflictos. Las llamadas y el emparejamiento siguen activos; se restaura al terminar CarPlay. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_bluetooth_media_confirm_title">¿Usar CarPlay para la música?</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay desconectará automáticamente el perfil multimedia Bluetooth durante CarPlay. No apaga Bluetooth ni corta llamadas y lo restaura al finalizar. Requiere permiso de dispositivos cercanos.</string>
+    <string name="settings_geely_bluetooth_media_confirm_action">Usar CarPlay y activar la prevención</string>
     <string name="settings_geely_input_title">Controles del volante de Geely (experimental)</string>
     <string name="settings_geely_input_description">Las teclas multimedia de OneOS y la emisión de voz de Flyme solo funcionan durante una sesión de CarPlay. El Bluetooth del vehículo desactiva la interceptación. Los cambios de entrada se aplican de inmediato.</string>
     <string name="settings_geely_input_profile">Plataforma de entrada</string>
@@ -60,6 +65,13 @@
     <string name="settings_geely_evcc_vehicle_status_description">Comparte el nivel de la batería de tracción, la autonomía restante y el estado de carga cuando EVCC proporciona una lectura verificada. Se aplica en la siguiente conexión.</string>
     <string name="settings_geely_evcc_vehicle_speed">Enviar velocidad al posicionamiento de CarPlay</string>
     <string name="settings_geely_evcc_vehicle_speed_description">Añade la velocidad y la marcha de EVCC a los datos de ubicación solicitados por el iPhone. También debe estar activada la ubicación. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_evcc_video_while_parked">Permitir vídeo solo con el vehículo estacionado (experimental)</string>
+    <string name="settings_geely_evcc_video_while_parked_description">Usa la marcha verificada por EVCC y bloquea la reproducción si falta o está obsoleta. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_evcc_video_confirm_title">¿Activar vídeo estacionado?</string>
+    <string name="settings_geely_evcc_video_confirm_message">El vídeo solo está disponible cuando EVCC indica P. Los datos desconocidos, obsoletos o desconectados bloquean la reproducción. Úsalo solo donde sea legal.</string>
+    <string name="settings_geely_evcc_tyre_telemetry">Mostrar presión y temperatura de neumáticos EVCC (experimental)</string>
+    <string name="settings_geely_evcc_tyre_telemetry_description">Descubre propiedades de solo lectura y muestra datos recientes de las cuatro ruedas en el panel lateral. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_evcc_tyre_confirm_message">GeePlay inspeccionará el directorio EVCC de solo lectura. Los datos no compatibles o con posición ambigua permanecerán ocultos.</string>
     <string name="settings_geely_evcc_low_charge_percent">Aviso de carga baja</string>
     <string name="settings_geely_evcc_charging_connectors">Conectores de carga</string>
     <string name="settings_geely_evcc_confirm_title">¿Activar los datos EVCC?</string>
@@ -67,4 +79,19 @@
     <string name="settings_geely_evcc_confirm_action">Activar</string>
     <string name="settings_geely_evcc_open_settings">Abrir autorización de EVCC</string>
     <string name="settings_geely_evcc_unavailable">El adaptador de datos EVCC no está disponible.</string>
+    <string name="settings_geely_evcc_system_actions_title">Acciones del sistema EVCC (experimental)</string>
+    <string name="settings_geely_evcc_system_actions_description">Solo acciones explícitas de una vez. Cada escritura requiere autorización Shell de EVCC y confirmación separada en el vehículo; GeePlay nunca las ejecuta automáticamente.</string>
+    <string name="settings_geely_evcc_grant_hotspot">Permitir ajustes del punto de acceso mediante EVCC</string>
+    <string name="settings_geely_evcc_grant_overlay">Permitir inicio superpuesto mediante EVCC</string>
+    <string name="settings_geely_evcc_allow_background">Permitir ejecución en segundo plano mediante EVCC</string>
+    <string name="settings_geely_evcc_allow_doze">Añadir GeePlay a la lista de reposo mediante EVCC</string>
+    <string name="settings_geely_evcc_system_confirm_title">¿Enviar esta acción a EVCC?</string>
+    <string name="settings_geely_evcc_system_confirm_message">EVCC requiere shell.exec y shell.system_write y pedirá otra confirmación en el vehículo. No se reintentará automáticamente.</string>
+    <string name="settings_geely_evcc_system_confirm_action">Continuar en EVCC</string>
+    <string name="settings_geely_evcc_ambient_title">Iluminación ambiental EVCC (experimental)</string>
+    <string name="settings_geely_evcc_ambient_enable">Seguir la música de CarPlay con la iluminación</string>
+    <string name="settings_geely_evcc_ambient_description">Usa solo un perfil EVCC de escritura validado en el vehículo, con validación, lectura posterior y restauración.</string>
+    <string name="settings_geely_evcc_ambient_unavailable">No hay un perfil ambiental de escritura validado para este firmware. Las escrituras permanecen desactivadas.</string>
+    <string name="settings_geely_evcc_ambient_confirm_title">¿Controlar la iluminación mediante EVCC?</string>
+    <string name="settings_geely_evcc_ambient_confirm_message">GeePlay guardará la iluminación actual, validará y leerá cada escritura y restaurará el estado original. Se requiere property.write de EVCC.</string>
 </resources>

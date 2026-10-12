@@ -131,6 +131,7 @@ object GeelyClusterDisplaySettings {
 object GeelyMediaSettings {
     private const val PREFERENCES = "geeplay_geely_media"
     private const val KEY_OWNER = "media_output_owner"
+    private const val KEY_BLUETOOTH_AUTO_AVOID = "bluetooth_media_auto_avoid"
 
     fun loadOwner(context: Context): MediaOutputOwner {
         val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
@@ -157,6 +158,30 @@ object GeelyMediaSettings {
                 .putString(KEY_OWNER, owner.name)
                 .commit(),
         ) { "Could not persist Geely media owner" }
+    }
+
+    fun bluetoothAutoAvoid(context: Context): Boolean =
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getBoolean(KEY_BLUETOOTH_AUTO_AVOID, false)
+
+    fun saveBluetoothAutoAvoid(context: Context, enabled: Boolean) {
+        check(
+            context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_BLUETOOTH_AUTO_AVOID, enabled)
+                .commit(),
+        ) { "Could not persist Geely Bluetooth media arbitration" }
+    }
+
+    /** The confirmed CarPlay choice and its required A2DP avoidance are committed together. */
+    fun saveCarPlayOwnerWithAutoAvoid(context: Context) {
+        check(
+            context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_OWNER, MediaOutputOwner.DIPLAY.name)
+                .putBoolean(KEY_BLUETOOTH_AUTO_AVOID, true)
+                .commit(),
+        ) { "Could not persist Geely CarPlay media arbitration" }
     }
 
     private const val LEGACY_PREFERENCES = "xcertplay_airplay"

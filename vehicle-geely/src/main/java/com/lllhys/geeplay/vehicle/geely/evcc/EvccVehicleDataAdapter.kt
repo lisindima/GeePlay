@@ -3,9 +3,11 @@ package com.lllhys.geeplay.vehicle.geely.evcc
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.lllhys.geeplay.vehicle.geely.GeelyClusterDisplaySettings
 import com.kooo.evcc.evccapi.EvccApiContract
 import com.kooo.evcc.evccapi.EvccApiInfo
 import com.kooo.evcc.evccapi.EvccOperationResult
+import com.kooo.evcc.evccapi.EvccPageRequest
 import com.kooo.evcc.evccapi.EvccPropertyDescriptor
 import com.kooo.evcc.evccapi.EvccPropertyRecord
 import com.kooo.evcc.evccapi.EvccPropertySelector
@@ -15,6 +17,10 @@ import com.kooo.evcc.evccapi.client.EvccApiClient
 import com.shilapi.xcertplay.transport.VehicleStatusProvider
 import com.shilapi.xcertplay.vehicle.CarPlayVehicleDataAdapter
 import com.shilapi.xcertplay.vehicle.CarPlayVehicleDataSession
+import com.shilapi.xcertplay.vehicle.ClusterMapVisibilitySource
+import com.shilapi.xcertplay.vehicle.VehicleParkStateSource
+import com.shilapi.xcertplay.vehicle.VehicleTyreTelemetrySnapshot
+import com.shilapi.xcertplay.vehicle.VehicleTyreTelemetrySource
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -43,8 +49,13 @@ enum class EvccVehicleDataState {
 class EvccVehicleDataAdapter internal constructor(
     context: Context,
     clientFactory: (Context, EvccApiClient.Listener) -> EvccClientPort,
-) : CarPlayVehicleDataAdapter {
+) : CarPlayVehicleDataAdapter, VehicleParkStateSource, VehicleTyreTelemetrySource, ClusterMapVisibilitySource {
     constructor(context: Context) : this(context, ::OfficialEvccClientPort)
+
+    constructor(context: Context, core: EvccConnectionCore) : this(
+        context,
+        { _, listener -> core.readPort(listener) },
+    )
 
     private val telemetry = EvccVehicleTelemetryStore()
     private val worker: ExecutorService = Executors.newSingleThreadExecutor { task ->
@@ -148,7 +159,6 @@ class EvccVehicleDataAdapter internal constructor(
         }
 
         override fun onSourceStateChanged(state: EvccSourceState, sequence: Long) {
-            if (state.source !in PROFILE_SOURCES) return
             executeWorker {
                 val changed = synchronized(stateLock) {
                     val previous = sourceStates[state.source]
@@ -206,6 +216,32 @@ class EvccVehicleDataAdapter internal constructor(
         if (closed.get()) return
         demandRegistry.replace(PREWARM_OWNER, preferenceSignals())
         reconcileDemand()
+    }
+
+    override fun parked(maxAgeMillis: Long): Boolean? {
+        requestRefresh(setOf(EvccLogicalSignal.GEAR))
+        return telemetry.parked(maxAgeMillis)
+    }
+
+    override fun start() {
+        if (closed.get() || !EvccVehicleDataSettings.tyreTelemetryEnabled(appContext)) return
+        demandRegistry.replace(TYRE_OWNER, TYRE_SIGNALS)
+        reconcileDemand()
+    }
+
+    override fun stop() {
+        demandRegistry.release(TYRE_OWNER)
+        reconcileDemand()
+    }
+
+    override fun snapshot(maxAgeMillis: Long): VehicleTyreTelemetrySnapshot? {
+        requestRefresh(TYRE_SIGNALS)
+        return telemetry.tyreTelemetry(maxAgeMillis)
+    }
+
+    override fun mapShownOnCluster(): Boolean? {
+        requestRefresh(setOf(EvccLogicalSignal.CLUSTER_MAP_VISIBLE))
+        return telemetry.clusterMapVisible(CLUSTER_VISIBILITY_MAX_AGE_MILLIS)
     }
 
     override fun createSession(): CarPlayVehicleDataSession {
@@ -366,9 +402,8 @@ class EvccVehicleDataAdapter internal constructor(
                 client.disconnect()
                 return
             }
-            val latestSourceStates = client.querySourceStates()
-                .filter { it.source in PROFILE_SOURCES }
-                .associateBy(EvccSourceState::source)
+            val dynamic = discoverDynamicProperties(demand)
+            val latestSourceStates = client.querySourceStates().associateBy(EvccSourceState::source)
             if (!current(expectedGeneration)) return
             synchronized(stateLock) { sourceStates = latestSourceStates }
             latestSourceStates.values.forEach { source ->
@@ -380,6 +415,8 @@ class EvccVehicleDataAdapter internal constructor(
             val next = EvccGeelyPropertyProfile.bindings
                 .filter { it.signal in demand }
                 .mapNotNull { resolve(it, availableSources) }
+                .plus(dynamic.filter { it.signal in demand })
+                .distinctBy(EvccResolvedProperty::signal)
             if (!current(expectedGeneration)) return
             val subscription = client.replaceSubscriptions(next.map(EvccResolvedProperty::selector))
             if (!subscription.isSuccess) {
@@ -410,6 +447,35 @@ class EvccVehicleDataAdapter internal constructor(
     private fun requestMotionRefresh() {
         synchronized(stateLock) { motionRefreshRequestCount += 1 }
         requestRefresh(MOTION_SIGNALS)
+    }
+
+    private fun discoverDynamicProperties(demand: Set<EvccLogicalSignal>): List<EvccResolvedProperty> {
+        if (demand.none { it in DYNAMIC_SIGNALS }) return emptyList()
+        val descriptors = LinkedHashMap<String, EvccPropertyDescriptor>()
+        DIRECTORY_QUERIES.forEach { query ->
+            var pageToken = ""
+            var snapshotToken = ""
+            var pages = 0
+            do {
+                val page = client.queryPropertyDirectory(
+                    EvccPageRequest(
+                        requestId = "geeplay-${query.lowercase(Locale.ROOT)}-$pages",
+                        pageToken = pageToken,
+                        query = query,
+                        limit = EvccApiContract.MAX_PAGE_SIZE,
+                        snapshotToken = snapshotToken,
+                    ),
+                )
+                if (page.status !in SUCCESS_STATUSES) break
+                if (snapshotToken.isEmpty()) snapshotToken = page.snapshotToken
+                page.items.mapNotNull(EvccPropertyRecord::descriptor).forEach { descriptor ->
+                    descriptors["${descriptor.source}:${descriptor.canonicalId}:${descriptor.areaId}"] = descriptor
+                }
+                pageToken = page.nextPageToken
+                pages += 1
+            } while (pageToken.isNotEmpty() && pages < MAX_DIRECTORY_PAGES)
+        }
+        return EvccDynamicPropertyDiscovery.resolve(descriptors.values)
     }
 
     private fun requestRefresh(signals: Set<EvccLogicalSignal>) {
@@ -498,13 +564,25 @@ class EvccVehicleDataAdapter internal constructor(
     private fun refreshReadyState() {
         val demand = demandRegistry.current()
         val batteryDemanded = demand.any { it in BATTERY_SIGNALS }
-        val motionDemanded = demand.any { it in MOTION_SIGNALS }
+        val speedDemanded = EvccLogicalSignal.VEHICLE_SPEED in demand
+        val gearDemanded = EvccLogicalSignal.GEAR in demand
+        val tyreDemanded = demand.any { it in TYRE_SIGNALS }
+        val clusterVisibilityDemanded = EvccLogicalSignal.CLUSTER_MAP_VISIBLE in demand
         val batteryReady = telemetry.vehicleStatus(EvccVehicleDataSettings.lowChargePercent(appContext)) != null
-        val motionReady = telemetry.motion(maxAgeMillis = Long.MAX_VALUE) != null
-        val complete = (!batteryDemanded || batteryReady) && (!motionDemanded || motionReady)
+        val readySignals = telemetry.readySignals()
+        val speedReady = EvccLogicalSignal.VEHICLE_SPEED in readySignals
+        val gearReady = EvccLogicalSignal.GEAR in readySignals
+        val tyreReady = telemetry.tyreTelemetry(Long.MAX_VALUE) != null
+        val clusterVisibilityReady = telemetry.clusterMapVisible(Long.MAX_VALUE) != null
+        val complete = (!batteryDemanded || batteryReady) &&
+            (!speedDemanded || speedReady) &&
+            (!gearDemanded || gearReady) &&
+            (!tyreDemanded || tyreReady) &&
+            (!clusterVisibilityDemanded || clusterVisibilityReady)
         updateState(
             if (complete && demand.isNotEmpty()) EvccVehicleDataState.READY else EvccVehicleDataState.DEGRADED,
-            "battery=$batteryReady motion=$motionReady",
+            "battery=$batteryReady speed=$speedReady gear=$gearReady tyre=$tyreReady " +
+                "clusterVisibility=$clusterVisibilityReady",
         )
     }
 
@@ -525,6 +603,10 @@ class EvccVehicleDataAdapter internal constructor(
     private fun preferenceSignals(): Set<EvccLogicalSignal> = buildSet {
         if (EvccVehicleDataSettings.vehicleStatusEnabled(appContext)) addAll(BATTERY_SIGNALS)
         if (EvccVehicleDataSettings.vehicleSpeedEnabled(appContext)) addAll(MOTION_SIGNALS)
+        if (EvccVehicleDataSettings.videoWhileParkedEnabled(appContext)) add(EvccLogicalSignal.GEAR)
+        if (GeelyClusterDisplaySettings.enabled(appContext) ||
+            GeelyClusterDisplaySettings.debugDisplayId(appContext) != null
+        ) add(EvccLogicalSignal.CLUSTER_MAP_VISIBLE)
     }
 
     private fun current(expectedGeneration: Long): Boolean =
@@ -570,10 +652,19 @@ class EvccVehicleDataAdapter internal constructor(
             EvccLogicalSignal.RANGE_GASOLINE_KM,
             EvccLogicalSignal.RANGE_EV_KM,
             EvccLogicalSignal.VEHICLE_SPEED,
+            EvccLogicalSignal.TYRE_PRESSURE_FRONT_LEFT,
+            EvccLogicalSignal.TYRE_PRESSURE_FRONT_RIGHT,
+            EvccLogicalSignal.TYRE_PRESSURE_REAR_LEFT,
+            EvccLogicalSignal.TYRE_PRESSURE_REAR_RIGHT,
+            EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_LEFT,
+            EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_RIGHT,
+            EvccLogicalSignal.TYRE_TEMPERATURE_REAR_LEFT,
+            EvccLogicalSignal.TYRE_TEMPERATURE_REAR_RIGHT,
             -> NUMBER_TYPES
 
             EvccLogicalSignal.CHARGING,
             EvccLogicalSignal.GEAR,
+            EvccLogicalSignal.CLUSTER_MAP_VISIBLE,
             -> STATE_TYPES
         }
     }
@@ -584,15 +675,13 @@ class EvccVehicleDataAdapter internal constructor(
         const val REQUIRED_API_MINOR = 2
         const val MAX_DETAIL_LENGTH = 160
         val PREWARM_OWNER = Any()
+        val TYRE_OWNER = Any()
         val SUCCESS_STATUSES = setOf(EvccApiContract.Status.OK, EvccApiContract.Status.AVAILABLE)
         val REQUIRED_PERMISSIONS = setOf(
             EvccApiContract.Permission.PROPERTY_DIRECTORY,
             EvccApiContract.Permission.PROPERTY_READ,
             EvccApiContract.Permission.PROPERTY_LISTEN,
         )
-        val PROFILE_SOURCES = EvccGeelyPropertyProfile.bindings
-            .flatMap { binding -> binding.candidates.map(EvccPropertyCandidate::source) }
-            .toSet()
         val BATTERY_SIGNALS = setOf(
             EvccLogicalSignal.BATTERY_SOC,
             EvccLogicalSignal.RANGE_TOTAL_KM,
@@ -601,6 +690,20 @@ class EvccVehicleDataAdapter internal constructor(
             EvccLogicalSignal.CHARGING,
         )
         val MOTION_SIGNALS = setOf(EvccLogicalSignal.VEHICLE_SPEED, EvccLogicalSignal.GEAR)
+        val TYRE_SIGNALS = setOf(
+            EvccLogicalSignal.TYRE_PRESSURE_FRONT_LEFT,
+            EvccLogicalSignal.TYRE_PRESSURE_FRONT_RIGHT,
+            EvccLogicalSignal.TYRE_PRESSURE_REAR_LEFT,
+            EvccLogicalSignal.TYRE_PRESSURE_REAR_RIGHT,
+            EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_LEFT,
+            EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_RIGHT,
+            EvccLogicalSignal.TYRE_TEMPERATURE_REAR_LEFT,
+            EvccLogicalSignal.TYRE_TEMPERATURE_REAR_RIGHT,
+        )
+        val DYNAMIC_SIGNALS = TYRE_SIGNALS + EvccLogicalSignal.CLUSTER_MAP_VISIBLE
+        val DIRECTORY_QUERIES = listOf("TIRE", "TYRE", "TPMS", "NAVI_MODE", "MAP_VISIBLE")
+        const val MAX_DIRECTORY_PAGES = 10
+        const val CLUSTER_VISIBILITY_MAX_AGE_MILLIS = 5_000L
         val NUMBER_TYPES = setOf("FLOAT", "DOUBLE", "INT", "INT32", "INT64", "LONG", "NUMBER")
         val STATE_TYPES = NUMBER_TYPES + setOf("BOOL", "BOOLEAN", "STRING")
         val TERMINAL_STATES = setOf(

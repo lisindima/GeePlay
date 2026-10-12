@@ -4,6 +4,8 @@ import android.content.Context
 import com.kooo.evcc.evccapi.EvccCapability
 import com.kooo.evcc.evccapi.EvccOperationResult
 import com.kooo.evcc.evccapi.EvccPropertyRecord
+import com.kooo.evcc.evccapi.EvccPageRequest
+import com.kooo.evcc.evccapi.EvccPropertyPage
 import com.kooo.evcc.evccapi.EvccPropertySelector
 import com.kooo.evcc.evccapi.EvccSourceState
 import com.kooo.evcc.evccapi.client.EvccApiClient
@@ -18,6 +20,7 @@ internal interface EvccClientPort : Closeable {
     fun querySourceStates(): List<EvccSourceState>
     fun resolveProperty(selector: EvccPropertySelector): EvccPropertyRecord
     fun readProperty(selector: EvccPropertySelector, forceRefresh: Boolean): EvccPropertyRecord
+    fun queryPropertyDirectory(request: EvccPageRequest): EvccPropertyPage
     fun replaceSubscriptions(selectors: List<EvccPropertySelector>): EvccOperationResult
 }
 
@@ -37,6 +40,9 @@ internal class OfficialEvccClientPort(
 
     override fun readProperty(selector: EvccPropertySelector, forceRefresh: Boolean): EvccPropertyRecord =
         delegate.readProperty(selector, forceRefresh)
+
+    override fun queryPropertyDirectory(request: EvccPageRequest): EvccPropertyPage =
+        delegate.queryPropertyDirectory(request)
 
     override fun replaceSubscriptions(selectors: List<EvccPropertySelector>): EvccOperationResult =
         delegate.replaceSubscriptions(selectors)

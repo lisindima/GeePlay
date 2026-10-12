@@ -13,6 +13,9 @@ import com.shilapi.xcertplay.transport.VehicleSpeedReading
 import com.shilapi.xcertplay.transport.VehicleSpeedSample
 import com.shilapi.xcertplay.transport.VehicleSpeedSource
 import com.shilapi.xcertplay.transport.VehicleStatusSnapshot
+import com.shilapi.xcertplay.vehicle.VehicleTyreReading
+import com.shilapi.xcertplay.vehicle.VehicleTyreTelemetrySnapshot
+import com.shilapi.xcertplay.vehicle.VehicleWheelPosition
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -28,6 +31,15 @@ internal enum class EvccLogicalSignal {
     CHARGING,
     VEHICLE_SPEED,
     GEAR,
+    TYRE_PRESSURE_FRONT_LEFT,
+    TYRE_PRESSURE_FRONT_RIGHT,
+    TYRE_PRESSURE_REAR_LEFT,
+    TYRE_PRESSURE_REAR_RIGHT,
+    TYRE_TEMPERATURE_FRONT_LEFT,
+    TYRE_TEMPERATURE_FRONT_RIGHT,
+    TYRE_TEMPERATURE_REAR_LEFT,
+    TYRE_TEMPERATURE_REAR_RIGHT,
+    CLUSTER_MAP_VISIBLE,
 }
 
 internal enum class EvccObservationOrigin {
@@ -42,6 +54,7 @@ internal data class EvccPropertyCandidate(
     val source: String,
     val areaId: Int = 0,
     val scale: Double = 1.0,
+    val offset: Double = 0.0,
     val gearValues: Map<Long, VehicleGear> = emptyMap(),
 )
 
@@ -150,6 +163,108 @@ internal object EvccGeelyPropertyProfile {
             ),
         ),
     )
+}
+
+/** Conservative runtime-directory matching for properties whose IDs vary by Geely firmware. */
+internal object EvccDynamicPropertyDiscovery {
+    fun resolve(descriptors: Iterable<EvccPropertyDescriptor>): List<EvccResolvedProperty> =
+        descriptors.mapNotNull(::resolve).distinctBy { Triple(it.signal, it.descriptor.source, it.descriptor.areaId) }
+
+    private fun resolve(descriptor: EvccPropertyDescriptor): EvccResolvedProperty? {
+        if (!readable(descriptor.access)) return null
+        val text = listOfNotNull(
+            descriptor.name,
+            descriptor.description,
+            descriptor.group,
+            descriptor.areaName,
+            descriptor.userNote,
+        ).plus(descriptor.aliases).joinToString(" ").uppercase(Locale.ROOT)
+        val tyreKind = when {
+            listOf("PRESSURE", "PRESS", "TPMS").any(text::contains) &&
+                listOf("TYRE", "TIRE", "WHEEL", "TPMS").any(text::contains) -> TyreKind.PRESSURE
+            listOf("TEMPERATURE", "TEMP").any(text::contains) &&
+                listOf("TYRE", "TIRE", "WHEEL", "TPMS").any(text::contains) -> TyreKind.TEMPERATURE
+            else -> null
+        }
+        val signal = if (tyreKind != null) {
+            tyreSignal(wheel(text, descriptor.areaId) ?: return null, tyreKind)
+        } else if (clusterMapVisibility(text)) {
+            EvccLogicalSignal.CLUSTER_MAP_VISIBLE
+        } else {
+            return null
+        }
+        val (scale, offset) = conversion(text, tyreKind)
+        val candidate = EvccPropertyCandidate(
+            id = descriptor.canonicalId,
+            source = descriptor.source,
+            areaId = descriptor.areaId,
+            scale = scale,
+            offset = offset,
+        )
+        return EvccResolvedProperty(
+            signal,
+            candidate,
+            EvccPropertySelector(
+                id = descriptor.canonicalId,
+                source = descriptor.source,
+                areaId = descriptor.areaId,
+                resolutionMode = EvccApiContract.ResolutionMode.STRICT_UNIQUE,
+            ),
+            descriptor,
+        )
+    }
+
+    private fun readable(access: String): Boolean = access.uppercase(Locale.ROOT).let {
+        it == "R" || it == "RW" || "READ" in it
+    }
+
+    private fun wheel(text: String, areaId: Int): VehicleWheelPosition? = when {
+        listOf("FRONT_LEFT", "LEFT_FRONT", "FRONT LEFT", "LEFT FRONT", "FL_TIRE", "FL_TYRE").any(text::contains) ->
+            VehicleWheelPosition.FRONT_LEFT
+        listOf("FRONT_RIGHT", "RIGHT_FRONT", "FRONT RIGHT", "RIGHT FRONT", "FR_TIRE", "FR_TYRE").any(text::contains) ->
+            VehicleWheelPosition.FRONT_RIGHT
+        listOf("REAR_LEFT", "LEFT_REAR", "REAR LEFT", "LEFT REAR", "RL_TIRE", "RL_TYRE").any(text::contains) ->
+            VehicleWheelPosition.REAR_LEFT
+        listOf("REAR_RIGHT", "RIGHT_REAR", "REAR RIGHT", "RIGHT REAR", "RR_TIRE", "RR_TYRE").any(text::contains) ->
+            VehicleWheelPosition.REAR_RIGHT
+        areaId == 1 -> VehicleWheelPosition.FRONT_LEFT
+        areaId == 2 -> VehicleWheelPosition.FRONT_RIGHT
+        areaId == 4 -> VehicleWheelPosition.REAR_LEFT
+        areaId == 8 -> VehicleWheelPosition.REAR_RIGHT
+        else -> null
+    }
+
+    private fun tyreSignal(position: VehicleWheelPosition, kind: TyreKind): EvccLogicalSignal = when (position to kind) {
+        VehicleWheelPosition.FRONT_LEFT to TyreKind.PRESSURE -> EvccLogicalSignal.TYRE_PRESSURE_FRONT_LEFT
+        VehicleWheelPosition.FRONT_RIGHT to TyreKind.PRESSURE -> EvccLogicalSignal.TYRE_PRESSURE_FRONT_RIGHT
+        VehicleWheelPosition.REAR_LEFT to TyreKind.PRESSURE -> EvccLogicalSignal.TYRE_PRESSURE_REAR_LEFT
+        VehicleWheelPosition.REAR_RIGHT to TyreKind.PRESSURE -> EvccLogicalSignal.TYRE_PRESSURE_REAR_RIGHT
+        VehicleWheelPosition.FRONT_LEFT to TyreKind.TEMPERATURE -> EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_LEFT
+        VehicleWheelPosition.FRONT_RIGHT to TyreKind.TEMPERATURE -> EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_RIGHT
+        VehicleWheelPosition.REAR_LEFT to TyreKind.TEMPERATURE -> EvccLogicalSignal.TYRE_TEMPERATURE_REAR_LEFT
+        VehicleWheelPosition.REAR_RIGHT to TyreKind.TEMPERATURE -> EvccLogicalSignal.TYRE_TEMPERATURE_REAR_RIGHT
+        else -> error("Unsupported tyre signal $position/$kind")
+    }
+
+    private fun conversion(text: String, kind: TyreKind?): Pair<Double, Double> = when (kind) {
+        TyreKind.PRESSURE -> when {
+            "PSI" in text -> 6.894_757 to 0.0
+            "BAR" in text -> 100.0 to 0.0
+            else -> 1.0 to 0.0
+        }
+        TyreKind.TEMPERATURE -> if ("FAHRENHEIT" in text || "°F" in text) {
+            (5.0 / 9.0) to (-32.0 * 5.0 / 9.0)
+        } else {
+            1.0 to 0.0
+        }
+        null -> 1.0 to 0.0
+    }
+
+    private fun clusterMapVisibility(text: String): Boolean =
+        listOf("CLUSTER", "INSTRUMENT", "IPK", "DIM").any(text::contains) &&
+            listOf("MAP_VISIBLE", "MAP SHOWN", "NAVIGATION_LAYOUT", "NAVI_MODE").any(text::contains)
+
+    private enum class TyreKind { PRESSURE, TEMPERATURE }
 }
 
 internal data class EvccMotionSnapshot(
@@ -288,6 +403,53 @@ internal class EvccVehicleTelemetryStore(
     }
 
     @Synchronized
+    fun parked(maxAgeMillis: Long): Boolean? {
+        val observation = values[EvccLogicalSignal.GEAR] ?: return null
+        if (elapsedRealtime() - observation.receivedAt > maxAgeMillis) return null
+        return when (gear(observation)) {
+            VehicleGear.PARK -> true
+            VehicleGear.REVERSE, VehicleGear.NEUTRAL, VehicleGear.DRIVE -> false
+            null -> null
+        }
+    }
+
+    @Synchronized
+    fun clusterMapVisible(maxAgeMillis: Long): Boolean? {
+        val observation = values[EvccLogicalSignal.CLUSTER_MAP_VISIBLE] ?: return null
+        if (elapsedRealtime() - observation.receivedAt > maxAgeMillis) return null
+        return state(observation)
+    }
+
+    @Synchronized
+    fun tyreTelemetry(maxAgeMillis: Long): VehicleTyreTelemetrySnapshot? {
+        val now = elapsedRealtime()
+        val wheels = buildMap<VehicleWheelPosition, VehicleTyreReading> {
+            TYRE_SIGNAL_PAIRS.forEach { (position, signals) ->
+                val pressure = this@EvccVehicleTelemetryStore.values[signals.first]
+                    ?.takeIf { now - it.receivedAt <= maxAgeMillis }
+                val temperature = this@EvccVehicleTelemetryStore.values[signals.second]
+                    ?.takeIf { now - it.receivedAt <= maxAgeMillis }
+                val pressureKpa = pressure?.let(::scaledNumber)?.takeIf { it.isFinite() && it in 0.0..1_500.0 }
+                val temperatureC = temperature?.let(::scaledNumber)?.takeIf { it.isFinite() && it in -80.0..200.0 }
+                if (pressureKpa != null || temperatureC != null) {
+                    put(
+                        position,
+                        VehicleTyreReading(
+                            pressureKpa = pressureKpa,
+                            temperatureC = temperatureC,
+                            observedAtElapsedMillis = maxOf(
+                                pressure?.receivedAt ?: 0L,
+                                temperature?.receivedAt ?: 0L,
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+        return wheels.takeIf { it.isNotEmpty() }?.let(::VehicleTyreTelemetrySnapshot)
+    }
+
+    @Synchronized
     fun readySignals(): Set<EvccLogicalSignal> = values.keys.toSet()
 
     @Synchronized
@@ -320,6 +482,9 @@ internal class EvccVehicleTelemetryStore(
             ?: value.rawValue?.trim()?.toDoubleOrNull()
             ?: value.displayValue.trim().substringBefore(' ').toDoubleOrNull()
     }
+
+    private fun scaledNumber(observation: Observation): Double? =
+        number(observation)?.let { it * observation.candidate.scale + observation.candidate.offset }
 
     private fun validRange(observation: Observation): Double? =
         number(observation)?.takeIf { it.isFinite() && it in 0.0..65_535.0 }
@@ -418,6 +583,16 @@ internal class EvccVehicleTelemetryStore(
         val ENUM_OPTION = Regex("^\\s*(?:(-?\\d+)\\s*[:=]\\s*(.+)|(.+?)\\s*[:=]\\s*(-?\\d+))\\s*$")
         val ON_TOKENS = setOf("ON", "ACTIVE", "CHARGING", "CONNECTED", "TRUE")
         val OFF_TOKENS = setOf("OFF", "INACTIVE", "STOPPED", "DISCONNECTED", "FALSE", "NOT")
+        val TYRE_SIGNAL_PAIRS = mapOf(
+            VehicleWheelPosition.FRONT_LEFT to
+                (EvccLogicalSignal.TYRE_PRESSURE_FRONT_LEFT to EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_LEFT),
+            VehicleWheelPosition.FRONT_RIGHT to
+                (EvccLogicalSignal.TYRE_PRESSURE_FRONT_RIGHT to EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_RIGHT),
+            VehicleWheelPosition.REAR_LEFT to
+                (EvccLogicalSignal.TYRE_PRESSURE_REAR_LEFT to EvccLogicalSignal.TYRE_TEMPERATURE_REAR_LEFT),
+            VehicleWheelPosition.REAR_RIGHT to
+                (EvccLogicalSignal.TYRE_PRESSURE_REAR_RIGHT to EvccLogicalSignal.TYRE_TEMPERATURE_REAR_RIGHT),
+        )
     }
 }
 
