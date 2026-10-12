@@ -1,6 +1,8 @@
 package com.lllhys.geeplay.vehicle.geely
 
 import android.content.Context
+import android.hardware.display.DisplayManager
+import android.view.Display
 import com.shilapi.xcertplay.media.MediaOutputOwner
 import com.shilapi.xcertplay.vehicle.VehicleSettingRow
 import com.shilapi.xcertplay.vehicle.VehicleSettingsPlacement
@@ -13,6 +15,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowDisplayManager
 
 @RunWith(RobolectricTestRunner::class)
 class GeelyVehicleSettingsControllerTest {
@@ -28,6 +32,7 @@ class GeelyVehicleSettingsControllerTest {
         GeelyInputSettings.saveProfile(context, GeelyInputProfile.DISABLED)
         EvccVehicleDataSettings.saveVehicleStatusEnabled(context, false)
         EvccVehicleDataSettings.saveVehicleSpeedEnabled(context, false)
+        GeelyClusterDisplaySettings.saveDebugDisplayId(context, null)
     }
 
     @Test
@@ -141,6 +146,39 @@ class GeelyVehicleSettingsControllerTest {
 
         assertTrue(EvccVehicleDataSettings.vehicleStatusEnabled(context))
         assertTrue(EvccVehicleDataSettings.vehicleSpeedEnabled(context))
+    }
+
+    @Test
+    fun `cluster debug target lists only a non default presentation display`() {
+        val manager = context.getSystemService(DisplayManager::class.java)
+        val displayId = ShadowDisplayManager.addDisplay("w2880dp-h1080dp-mdpi", 5)
+        shadowOf(manager.getDisplay(displayId)).apply {
+            setName("Geely debug cluster")
+            setFlags(Display.FLAG_PRESENTATION)
+        }
+        try {
+            val choice = GeelyVehicleSettingsController().cards(context)
+                .single { it.id == "geely_cluster_display" }
+                .rows.filterIsInstance<VehicleSettingRow.Choice>()
+                .single { it.id == "geely_cluster_debug_display" }
+
+            assertEquals(0, choice.selectedIndex)
+            assertTrue(choice.options.single { "$displayId" in it }.contains("2880×1080"))
+            assertTrue(choice.confirmations.containsKey(1))
+            choice.save(1)
+            assertEquals(displayId, GeelyClusterDisplaySettings.debugDisplayId(context))
+            assertEquals(
+                1,
+                GeelyVehicleSettingsController().cards(context)
+                    .single { it.id == "geely_cluster_display" }
+                    .rows.filterIsInstance<VehicleSettingRow.Choice>()
+                    .single { it.id == "geely_cluster_debug_display" }
+                    .selectedIndex,
+            )
+        } finally {
+            GeelyClusterDisplaySettings.saveDebugDisplayId(context, null)
+            ShadowDisplayManager.removeDisplay(displayId)
+        }
     }
 
     @Test

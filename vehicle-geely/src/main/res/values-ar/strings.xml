@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">عرض stream 111 على شاشة العدادات المعتمدة</string>
     <string name="settings_geely_cluster_display_description">متاح فقط لملف تعريف دقيق للبرنامج الثابت والشاشة تم التحقق منه في السيارة. يُطبّق التغيير عند الاتصال التالي.</string>
     <string name="settings_geely_cluster_display_unavailable">لا يوجد ملف شاشة مُتحقق منه للسيارة يطابق هذا البرنامج الثابت. يبقى العرض المباشر معطلاً؛ صدّر التشخيص لتسجيل قائمة الشاشات.</string>
+    <string name="settings_geely_cluster_debug_description">للتصحيح فقط. اختر مؤقتًا شاشة Android Presentation غير الافتراضية لتجاوز الملف المتحقق منه. يُطبق عند اتصال CarPlay التالي.</string>
+    <string name="settings_geely_cluster_debug_no_displays">لا توجد شاشة Android Presentation غير افتراضية متاحة حاليًا. أعد فتح الإعدادات بعد ظهور الشاشة المستهدفة.</string>
+    <string name="settings_geely_cluster_debug_target">شاشة التصحيح المستهدفة</string>
+    <string name="settings_geely_cluster_debug_disabled">معطل</string>
+    <string name="settings_geely_cluster_debug_confirm_title">العرض على هذه الشاشة؟</string>
+    <string name="settings_geely_cluster_debug_confirm_message">يتجاوز هذا ملف الشاشة المتحقق منه وقد يغطي محتوى العدادات الأصلي. استخدمه فقط أثناء التوقف. يُطبق عند اتصال CarPlay التالي.</string>
+    <string name="settings_geely_cluster_debug_confirm_action">استخدام الشاشة</string>
     <string name="settings_geely_diagnostics_title">تشخيص تكامل Geely</string>
     <string name="settings_geely_refresh">تحديث واجهات Geely وإعادة محاولة التنظيف</string>
     <string name="settings_geely_diagnostics_status">SDK الملاحة: %1$s\nبرنامج التشغيل: %2$s\nآخر فشل: %3$s</string>

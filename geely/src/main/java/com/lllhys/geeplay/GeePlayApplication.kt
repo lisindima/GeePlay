@@ -63,10 +63,10 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
     override fun diagnosticExportDirectoryName(context: Context): String = "GeePlay"
 
     override fun clusterDisplayPolicy(context: Context): VehicleClusterDisplayPolicy =
-        GeelyClusterDisplayPolicy(enabled = GeelyClusterDisplaySettings.enabled(context))
+        geelyClusterDisplayPolicy(context)
 
     override fun requiresClusterStream(context: Context): Boolean =
-        GeelyClusterDisplaySettings.enabled(context) && GeelyClusterDisplayPolicy().hasValidatedFirmware()
+        geelyClusterDisplayPolicy(context).select(GeelyClusterDisplaySettings.debugCandidates(context)) != null
 
     override fun updateReleasesUrl(context: Context): String =
         "https://api.github.com/repos/lllhys/GeePlay/releases?per_page=3"
@@ -81,4 +81,9 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         if (::evccVehicleData.isInitialized) evccVehicleData.close()
         super.onTerminate()
     }
+
+    private fun geelyClusterDisplayPolicy(context: Context) = GeelyClusterDisplayPolicy(
+        enabled = GeelyClusterDisplaySettings.enabled(context),
+        debugDisplayId = GeelyClusterDisplaySettings.debugDisplayId(context),
+    )
 }

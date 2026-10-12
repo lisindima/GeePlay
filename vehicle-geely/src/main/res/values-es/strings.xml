@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">Proyectar stream 111 en la pantalla validada</string>
     <string name="settings_geely_cluster_display_description">Solo está disponible para un perfil exacto de firmware y pantalla validado en el vehículo. El cambio se aplica en la próxima conexión.</string>
     <string name="settings_geely_cluster_display_unavailable">Ningún perfil de pantalla validado coincide con este firmware. La proyección directa sigue desactivada; exporta el diagnóstico para registrar las pantallas.</string>
+    <string name="settings_geely_cluster_debug_description">Solo para depuración. Selecciona temporalmente una pantalla Android Presentation no predeterminada para omitir el perfil validado. Se aplica en la próxima conexión de CarPlay.</string>
+    <string name="settings_geely_cluster_debug_no_displays">No hay ninguna pantalla Android Presentation no predeterminada disponible. Vuelve a abrir Ajustes cuando aparezca la pantalla de destino.</string>
+    <string name="settings_geely_cluster_debug_target">Pantalla de depuración</string>
+    <string name="settings_geely_cluster_debug_disabled">Desactivado</string>
+    <string name="settings_geely_cluster_debug_confirm_title">¿Proyectar en esta pantalla?</string>
+    <string name="settings_geely_cluster_debug_confirm_message">Esto omite el perfil validado y puede cubrir contenido original del cuadro. Úsalo solo con el vehículo estacionado. Se aplica en la próxima conexión de CarPlay.</string>
+    <string name="settings_geely_cluster_debug_confirm_action">Usar pantalla</string>
     <string name="settings_geely_diagnostics_title">Diagnóstico de integración de Geely</string>
     <string name="settings_geely_refresh">Actualizar interfaces Geely y reintentar la limpieza</string>
     <string name="settings_geely_diagnostics_status">SDK de navegación: %1$s\nControlador: %2$s\nÚltimo fallo: %3$s</string>

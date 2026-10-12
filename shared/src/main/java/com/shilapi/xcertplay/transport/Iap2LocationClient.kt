@@ -155,6 +155,7 @@ class Iap2LocationReporter(
     private var active = false
     private var sentLogged = false
     private var lastAttemptNanos = 0L
+    private var vehicleSpeedPacketsSent = 0
 
     /** Handles 0xFFFA/0xFFFC; returns false for any other message. */
     fun handle(frame: Iap2Frame, send: (Iap2Frame) -> Unit): Boolean = when (frame.messageId) {
@@ -169,6 +170,7 @@ class Iap2LocationReporter(
             onProgress("iap2 rx=0xfffc stop-location-information")
             active = false
             sentLogged = false
+            vehicleSpeedPacketsSent = 0
             provider?.stop()
             true
         }
@@ -190,6 +192,7 @@ class Iap2LocationReporter(
     private fun start(send: (Iap2Frame) -> Unit) {
         active = startProvider()
         sentLogged = false
+        vehicleSpeedPacketsSent = 0
         if (active) sendLatest(send)
     }
 
@@ -207,6 +210,12 @@ class Iap2LocationReporter(
         lastAttemptNanos = nanoTime()
         val sentence = provider?.latestNmea() ?: return
         send(Iap2LocationMessages.locationInformation(sentence))
+        if ("\$PASCD," in sentence) {
+            vehicleSpeedPacketsSent += 1
+            if (vehicleSpeedPacketsSent == 1 || vehicleSpeedPacketsSent % VEHICLE_SPEED_DIAGNOSTIC_INTERVAL == 0) {
+                onProgress("[DEBUG-a4f2] iap2 tx=0xfffb vehicle-speed packets=$vehicleSpeedPacketsSent")
+            }
+        }
         if (!sentLogged) {
             sentLogged = true
             onProgress("iap2 tx=0xfffb location-information")
@@ -215,6 +224,7 @@ class Iap2LocationReporter(
 
     private companion object {
         const val POLL_INTERVAL_MILLIS = 1_000L
+        const val VEHICLE_SPEED_DIAGNOSTIC_INTERVAL = 10
     }
 }
 

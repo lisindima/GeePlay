@@ -68,6 +68,10 @@ class EvccVehicleDataAdapter internal constructor(
     private var serviceVersion = "-"
     private var protocolVersion = "-"
     private var detail = "disabled"
+    private var motionEventCount = 0L
+    private var motionRefreshRequestCount = 0L
+    private var motionRefreshReadCount = 0L
+    private var lastMotionEvent = "-"
     private lateinit var client: EvccClientPort
 
     @Volatile
@@ -104,6 +108,10 @@ class EvccVehicleDataAdapter internal constructor(
                 grantedPermissions = sessionInfo.grantedPermissions.toSet()
                 resolved = emptyList()
                 sourceStates = emptyMap()
+                motionEventCount = 0L
+                motionRefreshRequestCount = 0L
+                motionRefreshReadCount = 0L
+                lastMotionEvent = "-"
             }
             telemetry.clear()
             if (apiInfo.apiMajor != REQUIRED_API_MAJOR || apiInfo.apiMinor < REQUIRED_API_MINOR) {
@@ -127,7 +135,13 @@ class EvccVehicleDataAdapter internal constructor(
         override fun onPropertyEvent(record: EvccPropertyRecord, sequence: Long, eventType: String) {
             executeWorker {
                 synchronized(stateLock) { resolved }.firstOrNull { it.matches(record) }?.let { binding ->
-                    telemetry.accept(binding, record)
+                    if (binding.signal in MOTION_SIGNALS) {
+                        synchronized(stateLock) {
+                            motionEventCount += 1
+                            lastMotionEvent = "${binding.signal}:$eventType#$sequence"
+                        }
+                    }
+                    telemetry.accept(binding, record, EvccObservationOrigin.PROPERTY_EVENT)
                     refreshReadyState()
                 }
             }
@@ -210,7 +224,11 @@ class EvccVehicleDataAdapter internal constructor(
             null
         }
         val speedSource = if (motionReady) {
-            EvccVehicleSpeedSource(telemetry, requestRefresh = ::requestMotionRefresh)
+            EvccVehicleSpeedSource(
+                telemetry,
+                requestRefresh = ::requestMotionRefresh,
+                onDiagnostic = { message -> Log.i(TAG, message) },
+            )
         } else {
             null
         }
@@ -266,13 +284,18 @@ class EvccVehicleDataAdapter internal constructor(
                 .joinToString(prefix = "[", postfix = "]") {
                     "${it.source}:${it.state}@${it.sourceGeneration}"
                 }
+            val speedSources = activeSpeedSources.joinToString(prefix = "[", postfix = "]") {
+                it.diagnostics()
+            }
             "state=$state service=$serviceVersion " +
                 "api=$protocolVersion contract=${EvccApiContract.CONTRACT_HASH} " +
                 "permissions=${grantedPermissions.sorted()} demand=${demand.map { it.name }.sorted()} " +
                 "sources=$sources resolved=${resolved.map { "${it.signal.name}:${it.selector.id}" }.sorted()} " +
-                "sessions=${activeSessionOwners.size} detail=$detail"
+                "sessions=${activeSessionOwners.size} motionEvents=$motionEventCount " +
+                "motionRefreshRequests=$motionRefreshRequestCount motionRefreshReads=$motionRefreshReadCount " +
+                "lastMotionEvent=$lastMotionEvent speedSources=$speedSources detail=$detail"
         }
-        return "EVCC vehicle data: installed=${evccInstalled()} $snapshot ready=$ready"
+        return "EVCC vehicle data: installed=${evccInstalled()} $snapshot ready=$ready ${telemetry.motionDiagnostics()}"
     }
 
     override fun close() {
@@ -370,7 +393,7 @@ class EvccVehicleDataAdapter internal constructor(
                 if (!current(expectedGeneration)) return
                 val record = client.readProperty(binding.selector, forceRefresh = false)
                 if (!current(expectedGeneration)) return
-                telemetry.accept(binding, record)
+                telemetry.accept(binding, record, EvccObservationOrigin.INITIAL_READ)
             }
             if (availableSources.isEmpty()) {
                 updateState(EvccVehicleDataState.DEGRADED, "vehicle property sources unavailable")
@@ -384,7 +407,10 @@ class EvccVehicleDataAdapter internal constructor(
         }
     }
 
-    private fun requestMotionRefresh() = requestRefresh(MOTION_SIGNALS)
+    private fun requestMotionRefresh() {
+        synchronized(stateLock) { motionRefreshRequestCount += 1 }
+        requestRefresh(MOTION_SIGNALS)
+    }
 
     private fun requestRefresh(signals: Set<EvccLogicalSignal>) {
         if (!requested.get() || closed.get()) return
@@ -416,9 +442,12 @@ class EvccVehicleDataAdapter internal constructor(
                 }
                 for (binding in currentBindings) {
                     if (!current(expectedGeneration)) break
+                    if (binding.signal in MOTION_SIGNALS) {
+                        synchronized(stateLock) { motionRefreshReadCount += 1 }
+                    }
                     val record = client.readProperty(binding.selector, forceRefresh = false)
                     if (!current(expectedGeneration)) break
-                    telemetry.accept(binding, record)
+                    telemetry.accept(binding, record, EvccObservationOrigin.REFRESH_READ)
                 }
                 if (current(expectedGeneration)) refreshReadyState()
             } catch (error: Throwable) {
@@ -537,6 +566,8 @@ class EvccVehicleDataAdapter internal constructor(
         val normalized = dataType.uppercase(Locale.ROOT)
         return normalized in when (signal) {
             EvccLogicalSignal.BATTERY_SOC,
+            EvccLogicalSignal.RANGE_TOTAL_KM,
+            EvccLogicalSignal.RANGE_GASOLINE_KM,
             EvccLogicalSignal.RANGE_EV_KM,
             EvccLogicalSignal.VEHICLE_SPEED,
             -> NUMBER_TYPES
@@ -564,6 +595,8 @@ class EvccVehicleDataAdapter internal constructor(
             .toSet()
         val BATTERY_SIGNALS = setOf(
             EvccLogicalSignal.BATTERY_SOC,
+            EvccLogicalSignal.RANGE_TOTAL_KM,
+            EvccLogicalSignal.RANGE_GASOLINE_KM,
             EvccLogicalSignal.RANGE_EV_KM,
             EvccLogicalSignal.CHARGING,
         )

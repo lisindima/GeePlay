@@ -53,28 +53,88 @@ object PascdEncoder {
 class VehicleSpeedLocationProvider(
     private val position: Iap2LocationProvider,
     private val speed: VehicleSpeedSource,
+    private val onDiagnostic: (String) -> Unit = {},
 ) : Iap2LocationProvider {
     @Volatile private var speedRequested = false
+    private var drainAttempts = 0
+    private var emptyDrains = 0
+    private var packets = 0
+    private var drainedSamples = 0
+    private var lastDrainHadReading: Boolean? = null
 
     override fun onRequested(components: Set<Int>) {
         speedRequested = Iap2LocationMessages.VEHICLE_SPEED_DATA in components
+        drainAttempts = 0
+        emptyDrains = 0
+        packets = 0
+        drainedSamples = 0
+        lastDrainHadReading = null
+        diagnose("wheel-speed request requested=$speedRequested components=${components.toSortedSet()}")
         position.onRequested(components)
     }
 
     override fun start(): Boolean {
-        val started = position.start()
+        val positionStarted = position.start()
         if (speedRequested) speed.start()
-        return started || speedRequested
+        val active = positionStarted || speedRequested
+        diagnose(
+            "wheel-speed provider start requested=$speedRequested " +
+                "positionStarted=$positionStarted active=$active",
+        )
+        return active
     }
 
     override fun stop() {
         speed.stop()
         position.stop()
+        diagnose(
+            "wheel-speed provider stop packets=$packets samples=$drainedSamples " +
+                "drainAttempts=$drainAttempts emptyDrains=$emptyDrains",
+        )
     }
 
     override fun latestNmea(): String? {
         val fix = position.latestNmea()
-        val pascd = if (speedRequested) speed.drain()?.let(PascdEncoder::encode) else null
+        val reading = if (speedRequested) speed.drain() else null
+        if (speedRequested) diagnoseDrain(reading)
+        val pascd = reading?.let(PascdEncoder::encode)
         return if (fix == null) pascd else fix + pascd.orEmpty()
+    }
+
+    private fun diagnoseDrain(reading: VehicleSpeedReading?) {
+        drainAttempts += 1
+        if (reading == null) {
+            emptyDrains += 1
+            if (lastDrainHadReading != false) {
+                diagnose(
+                    "wheel-speed drain=empty attempts=$drainAttempts packets=$packets " +
+                        "emptyDrains=$emptyDrains",
+                )
+            }
+            lastDrainHadReading = false
+            return
+        }
+        packets += 1
+        drainedSamples += reading.samples.size
+        if (lastDrainHadReading != true || packets == 1 || packets % DIAGNOSTIC_PACKET_INTERVAL == 0) {
+            val latestSpeed = reading.samples.lastOrNull()?.metersPerSecond
+            diagnose(
+                "wheel-speed drain=reading packets=$packets samples=${reading.samples.size} " +
+                    "totalSamples=$drainedSamples gear=${reading.gear.letter} " +
+                    "speedMps=${latestSpeed?.let { format("%.3f", it) } ?: "-"} " +
+                    "emptyDrains=$emptyDrains",
+            )
+        }
+        lastDrainHadReading = true
+    }
+
+    private fun diagnose(message: String) = onDiagnostic("$DEBUG_PREFIX $message")
+
+    private fun format(format: String, vararg arguments: Any): String =
+        String.format(Locale.US, format, *arguments)
+
+    private companion object {
+        const val DEBUG_PREFIX = "[DEBUG-a4f2]"
+        const val DIAGNOSTIC_PACKET_INTERVAL = 10
     }
 }

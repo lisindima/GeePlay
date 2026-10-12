@@ -15,6 +15,14 @@ class EvccGeelyPropertyProfileTest {
             candidates(bindings.getValue(EvccLogicalSignal.BATTERY_SOC)),
         )
         assertEquals(
+            listOf(EvccApiContract.Source.ADAPT_API to 1_050_624L),
+            candidates(bindings.getValue(EvccLogicalSignal.RANGE_TOTAL_KM)),
+        )
+        assertEquals(
+            listOf(EvccApiContract.Source.ADAPT_API to 1_054_720L),
+            candidates(bindings.getValue(EvccLogicalSignal.RANGE_GASOLINE_KM)),
+        )
+        assertEquals(
             listOf(EvccApiContract.Source.ADAPT_API to 1_054_976L),
             candidates(bindings.getValue(EvccLogicalSignal.RANGE_EV_KM)),
         )

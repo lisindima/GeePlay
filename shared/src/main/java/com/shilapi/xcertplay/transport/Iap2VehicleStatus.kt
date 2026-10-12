@@ -6,7 +6,22 @@ import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import kotlin.math.min
 import kotlin.math.roundToLong
 
-/** One reading of an electric vehicle's range and charge, as CarPlay's VehicleStatusUpdate carries it. */
+/** iAP2 VehicleInformation.EngineType wire values. The parameter repeats for multi-powertrain cars. */
+enum class VehicleEngineType(internal val wireValue: Int) {
+    GASOLINE(0),
+    DIESEL(1),
+    ELECTRIC(2),
+    CNG(3),
+}
+
+/** Range information for one declared [VehicleEngineType]. */
+data class VehiclePowertrainRange(
+    val rangeKm: Int,
+    val rangeWarning: Boolean? = null,
+    val maxRangeKm: Int? = null,
+)
+
+/** One vehicle reading, including generic and powertrain-specific ranges, for VehicleStatusUpdate. */
 data class VehicleStatusSnapshot(
     val rangeKm: Int,
     val rangeWarning: Boolean,
@@ -15,7 +30,14 @@ data class VehicleStatusSnapshot(
     val maxChargeWh: Long?,
     val maxRangeKm: Int,
     val charging: Boolean = false,
-)
+    /** Null keeps the legacy pure-EV mapping based on [rangeKm], [rangeWarning], and [maxRangeKm]. */
+    val powertrainRanges: Map<VehicleEngineType, VehiclePowertrainRange>? = null,
+) {
+    internal fun resolvedPowertrainRanges(): Map<VehicleEngineType, VehiclePowertrainRange> =
+        powertrainRanges?.takeIf { it.isNotEmpty() } ?: mapOf(
+            VehicleEngineType.ELECTRIC to VehiclePowertrainRange(rangeKm, rangeWarning, maxRangeKm),
+        )
+}
 
 /** Supplies the vehicle's status for CarPlay; null while no reading is available. */
 fun interface VehicleStatusProvider {
@@ -30,16 +52,22 @@ enum class EvChargingConnectors(internal vararg val wireValues: Int) {
 }
 
 /**
- * The identification to send: an electric vehicle is declared only while [provider] has a battery
- * reading, so the iPhone is never told about an EV that DiPlay cannot report (adb off or not
- * approved, or a car without these properties). Reads the provider's cached value; never blocks.
+ * The identification to send: vehicle status is declared only while [provider] has a reading, so
+ * the iPhone is never offered data that the accessory cannot report (ADB off, not approved, or
+ * unavailable properties). The powertrain set is frozen for this connection. Never blocks.
  */
 fun Iap2IdentificationConfig.withVehicleStatusFrom(provider: VehicleStatusProvider?): Iap2IdentificationConfig =
-    if (vehicleStatusEnabled && provider?.snapshot() == null) copy(vehicleStatusEnabled = false) else this
+    if (!vehicleStatusEnabled) {
+        this
+    } else {
+        provider?.snapshot()?.let { snapshot ->
+            copy(vehicleEngineTypes = snapshot.resolvedPowertrainRanges().keys)
+        } ?: copy(vehicleStatusEnabled = false)
+    }
 
 /**
- * iAP2 vehicle plane for an electric car: identification declares the vehicle (engine type,
- * charging connectors) and which status fields it reports; the phone then subscribes with
+ * iAP2 vehicle plane: identification declares the vehicle's engine types,
+ * charging connectors and which status fields it reports; the phone then subscribes with
  * StartVehicleStatusUpdates (0xA100) and the accessory answers with VehicleStatusUpdate (0xA101).
  * Parameter ids follow Apple's iAP2 message catalog.
  */
@@ -49,43 +77,72 @@ object Iap2VehicleStatus {
     const val STOP_VEHICLE_STATUS_UPDATES = 0xA102
     const val UPDATE_INTERVAL_MILLIS = 30_000L
 
-    private const val ENGINE_TYPE_ELECTRIC = 2
-
     /** IdentificationInformation params 20 (VehicleInformation) and 21 (VehicleStatus). */
-    fun Iap2BodyBuilder.electricVehicleComponents(name: String, connectors: EvChargingConnectors) {
+    fun Iap2BodyBuilder.vehicleComponents(
+        name: String,
+        engineTypes: Set<VehicleEngineType>,
+        connectors: EvChargingConnectors,
+    ) {
         group(20) {
             u16(0, 3) // Identifier
             string(1, name) // Name
-            u8(2, ENGINE_TYPE_ELECTRIC) // EngineType
+            engineTypes.sortedBy(VehicleEngineType::wireValue).forEach { u8(2, it.wireValue) } // EngineType
             string(6, name) // DisplayName
             string(8, name) // MapsDisplayName
-            for (connector in connectors.wireValues) u8(11, connector) // SupportedChargingConnectors
+            if (VehicleEngineType.ELECTRIC in engineTypes) {
+                for (connector in connectors.wireValues) u8(11, connector) // SupportedChargingConnectors
+            }
         }
         group(21) {
             u16(0, 4) // Identifier
             string(1, name) // Name
             void(3) // Range
             void(6) // RangeWarning
-            void(11) // RangeElectric
-            void(15) // RangeWarningElectric
-            void(21) // ElectricChargeInfo
-            void(30) // MaxRangeInfo
+            for (engineType in engineTypes.sortedBy(VehicleEngineType::wireValue)) {
+                POWERTRAIN_PARAMETERS.getValue(engineType).let { parameters ->
+                    void(parameters.range) // Range for this powertrain
+                    void(parameters.rangeWarning) // Low-range warning for this powertrain
+                    void(parameters.maxRange) // Maximum range for this powertrain
+                }
+            }
+            if (VehicleEngineType.ELECTRIC in engineTypes) void(21) // ElectricChargeInfo
         }
     }
 
     fun update(status: VehicleStatusSnapshot): Iap2Frame = Iap2Messages.buildRaw(VEHICLE_STATUS_UPDATE) {
+        val powertrainRanges = status.resolvedPowertrainRanges()
         u16(3, status.rangeKm.coerceIn(0, 0xffff)) // Range, km
         bool(6, status.rangeWarning) // RangeWarning
-        u16(11, status.rangeKm.coerceIn(0, 0xffff)) // RangeElectric, km
-        bool(15, status.rangeWarning) // RangeWarningElectric
-        // Unknown energy is omitted, never represented as an empty battery or a zero capacity.
-        if (status.currentChargeWh != null || status.maxChargeWh != null) u32(21, 0L) // MinBatteryCharge, Wh
-        status.currentChargeWh?.let { u32(22, it.coerceAtLeast(0)) } // CurrentBatteryCharge, Wh
-        status.maxChargeWh?.let { u32(23, it.coerceAtLeast(0)) } // MaxBatteryCharge, Wh
-        u32(24, (status.batteryPercent.coerceIn(0.0, 100.0) * 1000).roundToLong()) // DisplayedBatteryPercentage, % x 1000
-        bool(25, status.charging) // isCharging
-        u16(30, status.maxRangeKm.coerceIn(0, 0xffff)) // MaxRangeElectric, km
+        powertrainRanges
+            .toSortedMap(compareBy(VehicleEngineType::wireValue))
+            .forEach { (engineType, range) ->
+                val parameters = POWERTRAIN_PARAMETERS.getValue(engineType)
+                u16(parameters.range, range.rangeKm.coerceIn(0, 0xffff))
+                range.rangeWarning?.let { bool(parameters.rangeWarning, it) }
+                range.maxRangeKm?.let { u16(parameters.maxRange, it.coerceIn(0, 0xffff)) }
+            }
+        if (VehicleEngineType.ELECTRIC in powertrainRanges) {
+            // Unknown energy is omitted, never represented as an empty battery or a zero capacity.
+            if (status.currentChargeWh != null || status.maxChargeWh != null) u32(21, 0L) // MinBatteryCharge, Wh
+            status.currentChargeWh?.let { u32(22, it.coerceAtLeast(0)) } // CurrentBatteryCharge, Wh
+            status.maxChargeWh?.let { u32(23, it.coerceAtLeast(0)) } // MaxBatteryCharge, Wh
+            u32(24, (status.batteryPercent.coerceIn(0.0, 100.0) * 1000).roundToLong()) // DisplayedBatteryPercentage, % x 1000
+            bool(25, status.charging) // isCharging
+        }
     }
+
+    private data class PowertrainParameters(
+        val range: Int,
+        val rangeWarning: Int,
+        val maxRange: Int,
+    )
+
+    private val POWERTRAIN_PARAMETERS = mapOf(
+        VehicleEngineType.GASOLINE to PowertrainParameters(range = 9, rangeWarning = 13, maxRange = 31),
+        VehicleEngineType.DIESEL to PowertrainParameters(range = 10, rangeWarning = 14, maxRange = 32),
+        VehicleEngineType.ELECTRIC to PowertrainParameters(range = 11, rangeWarning = 15, maxRange = 30),
+        VehicleEngineType.CNG to PowertrainParameters(range = 12, rangeWarning = 16, maxRange = 33),
+    )
 }
 
 /** Serves the phone's vehicle-status subscription inside an iAP2 control loop. */
@@ -125,7 +182,10 @@ internal class Iap2VehicleStatusReporter(
         val status = provider?.snapshot() ?: return
         send(Iap2VehicleStatus.update(status))
         lastSentNanos = nanoTime()
-        onProgress("iap2 tx=0xa101 vehicle-status range=${status.rangeKm}km battery=${status.batteryPercent}% " +
-            "warning=${status.rangeWarning}")
+        val powertrainRanges = status.resolvedPowertrainRanges().entries
+            .sortedBy { it.key.wireValue }
+            .joinToString { "${it.key.name.lowercase()}=${it.value.rangeKm}km" }
+        onProgress("iap2 tx=0xa101 vehicle-status range=${status.rangeKm}km $powertrainRanges " +
+            "battery=${status.batteryPercent}% warning=${status.rangeWarning}")
     }
 }

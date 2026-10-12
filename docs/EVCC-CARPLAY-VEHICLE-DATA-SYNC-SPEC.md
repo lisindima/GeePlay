@@ -170,31 +170,41 @@ Android Manifest：
 | ---: | --- | --- |
 | 0 | `Identifier` | 每个组件稳定且在会话内唯一 |
 | 1 | `Name` | 非空、无 NUL |
-| 2 | `EngineType` | 首期为 Electric |
+| 2 | `EngineType` | 可重复枚举：Gasoline=0、Diesel=1、Electric=2、CNG=3；增程车发送 0 和 2 |
 | 6 | `DisplayName` | GeePlay/车型展示名 |
 | 8 | `MapsDisplayName` | Apple Maps 车辆名称 |
 | 11 | `SupportedChargingConnectors` | 来自显式车型配置，不从不可靠状态猜测 |
+
+`EngineType` 在线上是可重复的 `U8` 枚举，不是 bitmask。Apple `accessoryd` 的当前解析器
+只接受 `0..3`，把每个枚举分别加入数组，随后才在系统内部转换为 `1 << engineType` 的
+bitmask。数值与公开 iAP2 实现交叉核对后为 Gasoline=0、Diesel=1、Electric=2、CNG=3；
+正式 MFi 合规仍以有权限访问的最新版 iAP2 Accessory Interface Specification 为准。
 
 ### 6.4 iAP2 VehicleStatusUpdate
 
 iPhone 通过 `0xA100 StartVehicleStatusUpdates` 开始订阅，通过 `0xA102` 停止；GeePlay 使用 `0xA101` 发送状态。
 
-首期字段：
+当前字段：
 
 | 参数 ID | 字段 | 必需性 | 数据规则 |
 | ---: | --- | --- | --- |
 | 3 | `Range` | 必需 | km，限制在 `0..65535` |
-| 6 | `RangeWarning` | 必需 | 由 SOC 阈值计算 |
-| 11 | `RangeElectric` | 必需 | 与首期 `Range` 一致 |
-| 15 | `RangeWarningElectric` | 必需 | 与首期 `RangeWarning` 一致 |
+| 6 | `RangeWarning` | 必需 | 纯电车由 SOC 阈值计算；增程车不因动力电池低电误报综合续航不足 |
+| 9 | `RangeGasoline` | 增程车可选 | EVCC 独立燃油续航 |
+| 11 | `RangeElectric` | 必需 | EVCC 独立纯电续航 |
+| 13 | `RangeWarningGasoline` | 可选 | 只有可靠燃油低续航状态时发送 |
+| 15 | `RangeWarningElectric` | 必需 | 由 SOC 阈值计算 |
 | 21 | `MinBatteryCharge` | 可选组成员 | 仅在可靠能量数据存在时发送 |
 | 22 | `CurrentBatteryCharge` | 可选 | Wh，未知则省略 |
 | 23 | `MaxBatteryCharge` | 可选 | Wh，未知则省略 |
 | 24 | `DisplayedBatteryPercentage` | 必需 | `SOC × 1000`，SOC 限制在 `0..100` |
 | 25 | `isCharging` | 必需 | 必须使用已验证枚举映射 |
 | 30 | `MaxRangeElectric` | 必需 | 可靠额定值或有界估算 |
+| 31 | `MaxRangeGasoline` | 可选 | 只有可靠最大燃油续航时发送 |
 
-首期只有在 SOC、剩余续航和充电状态都有效时，才生成完整 `VehicleStatusSnapshot`。能量字段可单独缺失。
+只有在 SOC、纯电续航和充电状态都有效时，才生成 `VehicleStatusSnapshot`。综合续航和
+汽油续航存在时分别进入 `Range` 和 `RangeGasoline`；综合续航缺失时，可由汽油续航与
+纯电续航相加作为 fallback。能量字段可单独缺失。
 
 ### 6.5 iAP2 LocationInformation
 
@@ -412,6 +422,8 @@ replaceSubscriptions` 验证了以下 Profile。该车当时安装 EVCC 3.2.14 /
 | 逻辑信号 | 优先候选 | ID | 来源 | 真机证据 |
 | --- | --- | ---: | --- | --- |
 | `BATTERY_SOC` | `SENSOR_TYPE_EV_BATTERY_LEVEL` | `1051136` | `ADAPT_API` | `94 → 88`，与 AIDL SOC 一致 |
+| `RANGE_TOTAL_KM` | `SENSOR_TYPE_ENDURANCE_MILEAGE` | `1050624` | `ADAPT_API` | 增程车综合续航 `173 km` |
+| `RANGE_GASOLINE_KM` | `SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL` | `1054720` | `ADAPT_API` | 增程车汽油续航 `89 km` |
 | `RANGE_EV_KM` | `SENSOR_TYPE_ENDURANCE_MILEAGE_EV` | `1054976` | `ADAPT_API` | `84 → 78 km` |
 | `VEHICLE_SPEED` | `SENSOR_TYPE_CAR_SPEED` | `1048832` | `ADAPT_API` | 静止时 `0.0`，单位仍需行驶验证 |
 | `VEHICLE_SPEED` fallback | `SENSOR_TYPE_CAR_SPEED_FROM_IPK` | `1055232` | `ADAPT_API` | 静止时 `0.0` |
@@ -476,7 +488,7 @@ replaceSubscriptions` 验证了以下 Profile。该车当时安装 EVCC 3.2.14 /
 #### 最大续航
 
 - 优先使用经过验证的额定满电续航；
-- 无额定值且 SOC 大于安全阈值时，可使用 `rangeKm / (SOC / 100)` 估算；
+- 无额定值且 SOC 大于安全阈值时，可使用 `electricRangeKm / (SOC / 100)` 估算纯电最大续航；
 - 低 SOC 下保留最近一次高 SOC 的稳定估算；
 - 估算结果必须有上限，并在诊断中标明 derived。
 

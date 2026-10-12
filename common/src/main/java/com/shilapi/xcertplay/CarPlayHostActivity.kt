@@ -1039,6 +1039,13 @@ class CarPlayHostActivity : ComponentActivity() {
         if (DiLink51ClusterLayout.automatic(this)) detectedCluster.theme ?: DiLink51ClusterLayout.theme(this)
         else DiLink51ClusterLayout.theme(this)
 
+    private fun productNeedsClusterStream(): Boolean =
+        (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.requiresClusterStream(applicationContext) == true
+
+    private fun clusterOutputRequested(): Boolean =
+        AirPlayPersistence.loadClusterMapEnabled(this) || productNeedsClusterStream()
+
     private fun onAdbNaviMode(mode: com.shilapi.xcertplay.hud.BydClusterNaviMode?) {
         val previous = adbNaviMode
         if (mode == previous) return
@@ -1059,7 +1066,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val previous = detectedCluster
         if (state != previous) appendLog("Cluster map: detected theme=${state.theme} mapVisible=${state.mapVisible} smallWindow=${state.smallWindow}")
         detectedCluster = state
-        if (!AirPlayPersistence.loadClusterMapEnabled(this)) { dismissClusterPresentation(); return }
+        if (!clusterOutputRequested()) { dismissClusterPresentation(); return }
         ensureClusterPresentation()
         if (AirPlayPersistence.loadClusterSmallWindowMode(this) == CLUSTER_SMALL_WINDOW_AUTO &&
             adbNaviMode == null &&
@@ -1087,7 +1094,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun ensureClusterPresentation() {
-        if (!AirPlayPersistence.loadClusterMapEnabled(this)) {
+        if (!clusterOutputRequested()) {
             dismissClusterPresentation()
             return
         }
@@ -1246,7 +1253,7 @@ class CarPlayHostActivity : ComponentActivity() {
     // finish after the session has already asked for the virtual fallback stream.
     private val clusterDisplayListener = object : android.hardware.display.DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) {
-            if (isDestroyed || !AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)) return
+            if (isDestroyed || !clusterOutputRequested()) return
             val display = ClusterMapPresentation.findDisplay(this@CarPlayHostActivity, effectiveClusterTheme())
             if (display?.displayId != displayId) return
             appendLog("Cluster map: display ${display.name} appeared")
@@ -1263,9 +1270,7 @@ class CarPlayHostActivity : ComponentActivity() {
         adbClusterConfigured = false
         clusterStreamOnDisplay = false
         requestedSmallWindowForStream = null
-        val productNeedsClusterStream = (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
-            ?.requiresClusterStream(applicationContext) == true
-        if (!AirPlayPersistence.loadClusterMapEnabled(this) && !productNeedsClusterStream) return null
+        if (!clusterOutputRequested()) return null
         if (AdbClusterRouter.enabled(this) && ClusterActivityOutput.hasConfirmedRoute()) {
             adbClusterConfigured = true
             clusterStreamOnDisplay = true
@@ -4948,6 +4953,10 @@ class CarPlayHostActivity : ComponentActivity() {
                 config.identification.vehicleSpeedEnabled -> VehicleSpeedLocationProvider(
                     AndroidCarPlayLocationProvider(this),
                     vehicleData.speedSource!!,
+                    onDiagnostic = { message ->
+                        Log.i(TAG, message)
+                        appendLog(message)
+                    },
                 )
                 else -> AndroidCarPlayLocationProvider(this)
             }
@@ -5679,7 +5688,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun attachSurface(surface: Surface) {
         sink?.setSurface(SCREEN_TYPE_MAIN, surface)
-        if (AirPlayPersistence.loadClusterMapEnabled(this)) {
+        if (clusterOutputRequested()) {
             clusterSurface?.let { sink?.setSurface(SCREEN_TYPE_ALT, it) }
         } else {
             sink?.setSurface(SCREEN_TYPE_ALT, surface)

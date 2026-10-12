@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">将 stream 111 投射到已验证的仪表屏</string>
     <string name="settings_geely_cluster_display_description">仅对经过实车验证且与当前固件、显示屏精确匹配的 profile 开放；修改将在下次连接时生效。</string>
     <string name="settings_geely_cluster_display_unavailable">当前固件没有匹配的实车验证显示 profile。直投保持关闭；请导出诊断以记录显示屏清单。</string>
+    <string name="settings_geely_cluster_debug_description">仅用于调试。可临时选择非默认 Android Presentation 显示屏并绕过实车验证 profile；下次连接 CarPlay 时生效。</string>
+    <string name="settings_geely_cluster_debug_no_displays">当前没有可用的非默认 Android Presentation 显示屏。目标屏出现后请重新打开设置。</string>
+    <string name="settings_geely_cluster_debug_target">调试目标显示屏</string>
+    <string name="settings_geely_cluster_debug_disabled">关闭</string>
+    <string name="settings_geely_cluster_debug_confirm_title">投射到这个显示屏？</string>
+    <string name="settings_geely_cluster_debug_confirm_message">这会绕过实车验证显示 profile，并可能覆盖原车仪表内容。仅在停车时使用；下次连接 CarPlay 时生效。</string>
+    <string name="settings_geely_cluster_debug_confirm_action">使用此显示屏</string>
     <string name="settings_geely_diagnostics_title">吉利集成诊断</string>
     <string name="settings_geely_refresh">刷新吉利接口并重试清理</string>
     <string name="settings_geely_diagnostics_status">导航 SDK：%1$s\nDriver：%2$s\n最近失败：%3$s</string>

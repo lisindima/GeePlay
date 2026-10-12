@@ -13,6 +13,7 @@ import com.kooo.evcc.evccapi.EvccSessionInfo
 import com.kooo.evcc.evccapi.EvccSourceState
 import com.kooo.evcc.evccapi.EvccValue
 import com.kooo.evcc.evccapi.client.EvccApiClient
+import com.shilapi.xcertplay.transport.VehicleEngineType
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -52,6 +53,12 @@ class EvccVehicleDataAdapterTest {
             waitUntil { "state=READY" in adapter.diagnostics() }
             val session = adapter.createSession()
             assertNotNull(session.statusProvider)
+            val status = requireNotNull(session.statusProvider?.snapshot())
+            assertEquals(373, status.rangeKm)
+            assertEquals(
+                setOf(VehicleEngineType.GASOLINE, VehicleEngineType.ELECTRIC),
+                status.powertrainRanges?.keys,
+            )
 
             EvccVehicleDataSettings.saveVehicleStatusEnabled(context, false)
             adapter.prepare()
@@ -153,6 +160,8 @@ class EvccVehicleDataAdapterTest {
 
         private fun value(id: Long): EvccValue = when (id) {
             1_051_136L -> EvccValue.ofDouble(50.0)
+            1_050_624L -> EvccValue.ofDouble(373.0)
+            1_054_720L -> EvccValue.ofDouble(173.0)
             1_054_976L -> EvccValue.ofDouble(200.0)
             605_225_728L -> EvccValue.ofLong(0)
             else -> error("Unexpected property $id")

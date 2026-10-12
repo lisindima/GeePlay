@@ -24,6 +24,13 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
         val clusterPolicy = GeelyClusterDisplayPolicy()
         val clusterAvailable = clusterPolicy.hasValidatedFirmware()
         val clusterEnabled = GeelyClusterDisplaySettings.enabled(context)
+        val clusterDebugDisplays = GeelyClusterDisplaySettings.debugCandidates(context)
+        val clusterDebugDisplayId = GeelyClusterDisplaySettings.debugDisplayId(context)
+        val clusterDebugSelectedIndex = clusterDebugDisplays
+            .indexOfFirst { it.displayId == clusterDebugDisplayId }
+            .takeIf { it >= 0 }
+            ?.plus(1)
+            ?: 0
         val status = GeelyNavigationStatusStore.snapshot()
         val evccAdapter = (context.applicationContext as? VehicleIntegrationProvider)
             ?.carPlayVehicleDataAdapter(context) as? EvccVehicleDataAdapter
@@ -273,14 +280,14 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                 id = "geely_cluster_display",
                 placement = VehicleSettingsPlacement.ADVANCED,
                 title = context.getString(R.string.settings_geely_cluster_display_title),
-                rows = listOf(
-                    VehicleSettingRow.Information(
+                rows = buildList {
+                    add(VehicleSettingRow.Information(
                         context.getString(
                             if (clusterAvailable) R.string.settings_geely_cluster_display_description
                             else R.string.settings_geely_cluster_display_unavailable,
                         ),
-                    ),
-                    VehicleSettingRow.Toggle(
+                    ))
+                    add(VehicleSettingRow.Toggle(
                         id = "geely_cluster_display_enabled",
                         title = context.getString(R.string.settings_geely_cluster_display_enable),
                         description = context.getString(R.string.settings_geely_cluster_display_description),
@@ -288,8 +295,46 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                         enabled = clusterAvailable,
                         effect = VehicleSettingEffect.NEXT_CONNECTION,
                         save = { enabled -> GeelyClusterDisplaySettings.saveEnabled(context, enabled) },
-                    ),
-                ),
+                    ))
+                    add(
+                        VehicleSettingRow.Information(
+                            context.getString(
+                                if (clusterDebugDisplays.isEmpty()) {
+                                    R.string.settings_geely_cluster_debug_no_displays
+                                } else {
+                                    R.string.settings_geely_cluster_debug_description
+                                },
+                            ),
+                        ),
+                    )
+                    val debugConfirmation = VehicleSettingConfirmation(
+                        title = context.getString(R.string.settings_geely_cluster_debug_confirm_title),
+                        message = context.getString(R.string.settings_geely_cluster_debug_confirm_message),
+                        positiveLabel = context.getString(R.string.settings_geely_cluster_debug_confirm_action),
+                    )
+                    add(
+                        VehicleSettingRow.Choice(
+                            id = "geely_cluster_debug_display",
+                            title = context.getString(R.string.settings_geely_cluster_debug_target),
+                            options = listOf(context.getString(R.string.settings_geely_cluster_debug_disabled)) +
+                                clusterDebugDisplays.map { display ->
+                                    "${display.displayId} · ${display.name} · ${display.width}×${display.height}"
+                                },
+                            selectedIndex = clusterDebugSelectedIndex,
+                            enabled = clusterDebugDisplays.isNotEmpty() || clusterDebugDisplayId != null,
+                            effect = VehicleSettingEffect.NEXT_CONNECTION,
+                            confirmations = clusterDebugDisplays.indices.associate { index ->
+                                index + 1 to debugConfirmation
+                            },
+                            save = { index ->
+                                GeelyClusterDisplaySettings.saveDebugDisplayId(
+                                    context,
+                                    clusterDebugDisplays.getOrNull(index - 1)?.displayId,
+                                )
+                            },
+                        ),
+                    )
+                },
             ),
             VehicleSettingsCard(
                 id = "geely_diagnostics",

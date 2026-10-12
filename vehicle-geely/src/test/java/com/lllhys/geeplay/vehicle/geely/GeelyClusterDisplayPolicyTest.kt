@@ -53,4 +53,21 @@ class GeelyClusterDisplayPolicyTest {
                 .select(listOf(candidate)),
         )
     }
+
+    @Test
+    fun `explicit debug display bypasses profile but still requires a presentation display`() {
+        val candidate = VehicleDisplayCandidate(11, "Debug cluster", 2880, 1080, Display.FLAG_PRESENTATION)
+        val policy = GeelyClusterDisplayPolicy(
+            fingerprint = "unvalidated",
+            profiles = emptyList(),
+            enabled = false,
+            debugDisplayId = 11,
+        )
+
+        assertEquals(11, policy.select(listOf(candidate))?.displayId)
+        assertEquals("debug-display-11", policy.select(listOf(candidate))?.profileId)
+        assertNull(policy.select(listOf(candidate.copy(flags = 0))))
+        assertNull(policy.select(listOf(candidate.copy(displayId = Display.DEFAULT_DISPLAY))))
+        assertNull(policy.select(emptyList()))
+    }
 }

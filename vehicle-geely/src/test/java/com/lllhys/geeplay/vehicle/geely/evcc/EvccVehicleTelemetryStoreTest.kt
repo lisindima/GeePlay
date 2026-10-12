@@ -6,6 +6,7 @@ import com.kooo.evcc.evccapi.EvccPropertyRecord
 import com.kooo.evcc.evccapi.EvccPropertySelector
 import com.kooo.evcc.evccapi.EvccValue
 import com.shilapi.xcertplay.transport.VehicleGear
+import com.shilapi.xcertplay.transport.VehicleEngineType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -36,6 +37,42 @@ class EvccVehicleTelemetryStoreTest {
         assertFalse(snapshot.rangeWarning)
         assertNull(snapshot.currentChargeWh)
         assertNull(snapshot.maxChargeWh)
+    }
+
+    @Test
+    fun `range extender keeps total gasoline and electric ranges distinct`() {
+        accept(EvccLogicalSignal.BATTERY_SOC, 1_051_136L, EvccValue.ofDouble(51.0))
+        accept(EvccLogicalSignal.RANGE_TOTAL_KM, 1_050_624L, EvccValue.ofDouble(173.0))
+        accept(EvccLogicalSignal.RANGE_GASOLINE_KM, 1_054_720L, EvccValue.ofDouble(89.0))
+        accept(EvccLogicalSignal.RANGE_EV_KM, 1_054_976L, EvccValue.ofDouble(84.0))
+        accept(EvccLogicalSignal.CHARGING, 605_225_728L, EvccValue.ofLong(0))
+
+        val snapshot = store.vehicleStatus(lowChargePercent = 20)!!
+        val powertrains = requireNotNull(snapshot.powertrainRanges)
+
+        assertEquals(173, snapshot.rangeKm)
+        assertFalse(snapshot.rangeWarning)
+        assertEquals(setOf(VehicleEngineType.GASOLINE, VehicleEngineType.ELECTRIC), powertrains.keys)
+        assertEquals(89, powertrains.getValue(VehicleEngineType.GASOLINE).rangeKm)
+        assertEquals(84, powertrains.getValue(VehicleEngineType.ELECTRIC).rangeKm)
+        assertEquals(false, powertrains.getValue(VehicleEngineType.ELECTRIC).rangeWarning)
+        assertEquals(165, powertrains.getValue(VehicleEngineType.ELECTRIC).maxRangeKm)
+    }
+
+    @Test
+    fun `range extender falls back to summing fuel and electric range when total is unavailable`() {
+        accept(EvccLogicalSignal.BATTERY_SOC, 1_051_136L, EvccValue.ofDouble(20.0))
+        accept(EvccLogicalSignal.RANGE_GASOLINE_KM, 1_054_720L, EvccValue.ofDouble(89.0))
+        accept(EvccLogicalSignal.RANGE_EV_KM, 1_054_976L, EvccValue.ofDouble(84.0))
+        accept(EvccLogicalSignal.CHARGING, 605_225_728L, EvccValue.ofLong(0))
+
+        val snapshot = store.vehicleStatus(lowChargePercent = 20)!!
+
+        assertEquals(173, snapshot.rangeKm)
+        assertFalse(snapshot.rangeWarning)
+        assertEquals(true, snapshot.powertrainRanges
+            ?.getValue(VehicleEngineType.ELECTRIC)
+            ?.rangeWarning)
     }
 
     @Test
@@ -172,6 +209,37 @@ class EvccVehicleTelemetryStoreTest {
         assertNull(store.motion())
     }
 
+    @Test
+    fun `motion diagnostics expose origin converted value and cache age`() {
+        accept(
+            EvccLogicalSignal.VEHICLE_SPEED,
+            1_048_832L,
+            EvccValue.ofDouble(36.0),
+            scale = 1.0 / 3.6,
+            source = EvccApiContract.Source.ADAPT_API,
+            origin = EvccObservationOrigin.PROPERTY_EVENT,
+        )
+        accept(
+            EvccLogicalSignal.GEAR,
+            289_408_000L,
+            EvccValue.ofLong(8),
+            source = EvccApiContract.Source.CAPI,
+            gearValues = mapOf(8L to VehicleGear.DRIVE),
+            origin = EvccObservationOrigin.REFRESH_READ,
+        )
+        now += 250
+
+        val diagnostics = store.motionDiagnostics()
+
+        assertTrue("raw=36.000" in diagnostics)
+        assertTrue("mps=10.000" in diagnostics)
+        assertTrue("origin=PROPERTY_EVENT" in diagnostics)
+        assertTrue("raw=8" in diagnostics)
+        assertTrue("gear=D" in diagnostics)
+        assertTrue("origin=REFRESH_READ" in diagnostics)
+        assertEquals(2, "ageMs=250".toRegex().findAll(diagnostics).count())
+    }
+
     private fun accept(
         signal: EvccLogicalSignal,
         id: Long,
@@ -182,6 +250,7 @@ class EvccVehicleTelemetryStoreTest {
         source: String = EvccApiContract.Source.ADAPT_API,
         gearValues: Map<Long, VehicleGear> = emptyMap(),
         recordStatus: String = EvccApiContract.Status.AVAILABLE,
+        origin: EvccObservationOrigin = EvccObservationOrigin.UNSPECIFIED,
     ) {
         val descriptor = EvccPropertyDescriptor(
             source = source,
@@ -211,6 +280,7 @@ class EvccVehicleTelemetryStoreTest {
                     value = value,
                     status = recordStatus,
                 ),
+                origin,
             ),
         )
     }

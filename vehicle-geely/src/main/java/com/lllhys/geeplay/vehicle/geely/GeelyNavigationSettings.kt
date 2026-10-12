@@ -1,7 +1,11 @@
 package com.lllhys.geeplay.vehicle.geely
 
 import android.content.Context
+import android.graphics.Point
+import android.hardware.display.DisplayManager
+import android.view.Display
 import com.shilapi.xcertplay.media.MediaOutputOwner
+import com.shilapi.xcertplay.vehicle.VehicleDisplayCandidate
 
 enum class GeelyNavigationBackend {
     AUTO,
@@ -75,6 +79,7 @@ object GeelyNavigationSettings {
 object GeelyClusterDisplaySettings {
     private const val PREFERENCES = "geeplay_geely_display"
     private const val KEY_ENABLED = "geely_cluster_display_enabled"
+    private const val KEY_DEBUG_DISPLAY_ID = "geely_cluster_debug_display_id"
 
     fun enabled(context: Context): Boolean = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         .getBoolean(KEY_ENABLED, false)
@@ -87,6 +92,40 @@ object GeelyClusterDisplaySettings {
                 .commit(),
         ) { "Could not persist Geely cluster display setting" }
     }
+
+    fun debugDisplayId(context: Context): Int? =
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .getInt(KEY_DEBUG_DISPLAY_ID, NO_DISPLAY)
+            .takeIf { it != NO_DISPLAY }
+
+    fun saveDebugDisplayId(context: Context, displayId: Int?) {
+        require(displayId == null || displayId != Display.DEFAULT_DISPLAY) {
+            "The default display cannot be used as a cluster debug target"
+        }
+        val editor = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit()
+        if (displayId == null) editor.remove(KEY_DEBUG_DISPLAY_ID) else editor.putInt(KEY_DEBUG_DISPLAY_ID, displayId)
+        check(editor.commit()) { "Could not persist Geely cluster debug display" }
+    }
+
+    /** Non-default public Presentation displays are the only targets safe enough for explicit debugging. */
+    fun debugCandidates(context: Context): List<VehicleDisplayCandidate> =
+        context.getSystemService(DisplayManager::class.java)
+            ?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+            .orEmpty()
+            .filter { display ->
+                display.isValid && display.displayId != Display.DEFAULT_DISPLAY &&
+                    display.flags and Display.FLAG_PRESENTATION != 0
+            }
+            .map { display ->
+                val size = Point().also {
+                    @Suppress("DEPRECATION")
+                    display.getRealSize(it)
+                }
+                VehicleDisplayCandidate(display.displayId, display.name, size.x, size.y, display.flags)
+            }
+            .sortedBy(VehicleDisplayCandidate::displayId)
+
+    private const val NO_DISPLAY = -1
 }
 
 object GeelyMediaSettings {

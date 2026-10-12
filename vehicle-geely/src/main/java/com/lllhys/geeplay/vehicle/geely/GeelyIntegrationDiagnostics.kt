@@ -99,7 +99,11 @@ object GeelyIntegrationDiagnostics {
         val input = GeelyInputDiagnostics.snapshot()
         appendLine("geelyInput profile=${GeelyInputSettings.loadProfile(context)} status=$inputStatus bind=${input.bindAttempts} register=${input.registrations} unregister=${input.unregisterAttempts} death=${input.binderDeaths} quarantine=${input.quarantines} active=${input.registered}")
         val displays = context.getSystemService(DisplayManager::class.java)?.displays.orEmpty()
-        val displayPolicy = GeelyClusterDisplayPolicy(enabled = GeelyClusterDisplaySettings.enabled(context))
+        val debugDisplayId = GeelyClusterDisplaySettings.debugDisplayId(context)
+        val displayPolicy = GeelyClusterDisplayPolicy(
+            enabled = GeelyClusterDisplaySettings.enabled(context),
+            debugDisplayId = debugDisplayId,
+        )
         val candidates = displays.map { display ->
             val size = android.graphics.Point().also {
                 @Suppress("DEPRECATION")
@@ -107,8 +111,10 @@ object GeelyIntegrationDiagnostics {
             }
             VehicleDisplayCandidate(display.displayId, display.name, size.x, size.y, display.flags)
         }
-        val selectedDisplay = displayPolicy.select(candidates)
+        val selectedDisplay = displayPolicy.select(GeelyClusterDisplaySettings.debugCandidates(context))
         val selectionReason = when {
+            debugDisplayId != null && selectedDisplay != null -> "explicit_debug_override"
+            debugDisplayId != null -> "debug_display_missing_or_unsafe"
             !GeelyClusterDisplaySettings.enabled(context) -> "disabled"
             !displayPolicy.hasValidatedFirmware() -> "no_validated_firmware"
             selectedDisplay == null -> "display_mismatch_or_ambiguous"
@@ -117,6 +123,7 @@ object GeelyIntegrationDiagnostics {
         appendLine(
             "geelyDisplays fingerprint=${Build.FINGERPRINT} " +
                 "enabled=${GeelyClusterDisplaySettings.enabled(context)} " +
+                "debugDisplayId=${debugDisplayId ?: "none"} " +
                 "validatedFirmware=${GeelyClusterDisplayPolicy().hasValidatedFirmware()} " +
                 "validatedProfiles=${GeelyClusterDisplayPolicy.VALIDATED_PROFILES.size} " +
                 "selectedProfile=${selectedDisplay?.profileId ?: "none"} reason=$selectionReason " +

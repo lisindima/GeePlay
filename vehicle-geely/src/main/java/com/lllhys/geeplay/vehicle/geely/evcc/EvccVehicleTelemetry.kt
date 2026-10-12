@@ -7,6 +7,8 @@ import com.kooo.evcc.evccapi.EvccPropertyRecord
 import com.kooo.evcc.evccapi.EvccPropertySelector
 import com.kooo.evcc.evccapi.EvccValue
 import com.shilapi.xcertplay.transport.VehicleGear
+import com.shilapi.xcertplay.transport.VehicleEngineType
+import com.shilapi.xcertplay.transport.VehiclePowertrainRange
 import com.shilapi.xcertplay.transport.VehicleSpeedReading
 import com.shilapi.xcertplay.transport.VehicleSpeedSample
 import com.shilapi.xcertplay.transport.VehicleSpeedSource
@@ -15,14 +17,24 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 internal enum class EvccLogicalSignal {
     BATTERY_SOC,
+    RANGE_TOTAL_KM,
+    RANGE_GASOLINE_KM,
     RANGE_EV_KM,
     CHARGING,
     VEHICLE_SPEED,
     GEAR,
+}
+
+internal enum class EvccObservationOrigin {
+    UNSPECIFIED,
+    INITIAL_READ,
+    PROPERTY_EVENT,
+    REFRESH_READ,
 }
 
 internal data class EvccPropertyCandidate(
@@ -74,6 +86,24 @@ internal object EvccGeelyPropertyProfile {
                     id = 1_051_136L,
                     source = EvccApiContract.Source.ADAPT_API,
                 ), // SENSOR_TYPE_EV_BATTERY_LEVEL; G636/EVCC 3.2.14: 94 -> 88
+            ),
+        ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.RANGE_TOTAL_KM,
+            listOf(
+                EvccPropertyCandidate(
+                    id = 1_050_624L,
+                    source = EvccApiContract.Source.ADAPT_API,
+                ), // SENSOR_TYPE_ENDURANCE_MILEAGE; G636 range extender: 173 km total
+            ),
+        ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.RANGE_GASOLINE_KM,
+            listOf(
+                EvccPropertyCandidate(
+                    id = 1_054_720L,
+                    source = EvccApiContract.Source.ADAPT_API,
+                ), // SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL; G636 range extender: 89 km
             ),
         ),
         EvccPropertyBinding(
@@ -136,12 +166,17 @@ internal class EvccVehicleTelemetryStore(
         val descriptor: EvccPropertyDescriptor,
         val candidate: EvccPropertyCandidate,
         val receivedAt: Long,
+        val origin: EvccObservationOrigin,
     )
 
     private val values = LinkedHashMap<EvccLogicalSignal, Observation>()
 
     @Synchronized
-    fun accept(binding: EvccResolvedProperty, record: EvccPropertyRecord): Boolean {
+    fun accept(
+        binding: EvccResolvedProperty,
+        record: EvccPropertyRecord,
+        origin: EvccObservationOrigin = EvccObservationOrigin.UNSPECIFIED,
+    ): Boolean {
         val value = record.value
         if (record.status !in RECORD_SUCCESS_STATUSES ||
             value == null || !value.initialized || value.status != EvccApiContract.Status.AVAILABLE
@@ -153,6 +188,7 @@ internal class EvccVehicleTelemetryStore(
             record.descriptor ?: binding.descriptor,
             binding.candidate,
             elapsedRealtime(),
+            origin,
         )
         return true
     }
@@ -178,31 +214,62 @@ internal class EvccVehicleTelemetryStore(
     @Synchronized
     fun vehicleStatus(lowChargePercent: Int): VehicleStatusSnapshot? {
         val socObservation = values[EvccLogicalSignal.BATTERY_SOC] ?: return null
-        val rangeObservation = values[EvccLogicalSignal.RANGE_EV_KM] ?: return null
+        val electricRangeObservation = values[EvccLogicalSignal.RANGE_EV_KM] ?: return null
         val chargingObservation = values[EvccLogicalSignal.CHARGING] ?: return null
-        if (!compatibleSourceGenerations(listOf(socObservation, rangeObservation, chargingObservation))) {
+        val totalRangeObservation = values[EvccLogicalSignal.RANGE_TOTAL_KM]
+        val gasolineRangeObservation = values[EvccLogicalSignal.RANGE_GASOLINE_KM]
+        if (!compatibleSourceGenerations(
+                listOfNotNull(
+                    socObservation,
+                    electricRangeObservation,
+                    chargingObservation,
+                    totalRangeObservation,
+                    gasolineRangeObservation,
+                ),
+            )
+        ) {
             return null
         }
         val soc = number(socObservation)?.takeIf { it.isFinite() && it in 0.0..100.0 }
             ?: return null
-        val range = number(rangeObservation)?.takeIf { it.isFinite() && it in 0.0..65_535.0 }
+        val electricRange = validRange(electricRangeObservation)
             ?: return null
+        val gasolineRange = gasolineRangeObservation?.let(::validRange)
+        val totalRange = totalRangeObservation?.let(::validRange)
         val charging = state(chargingObservation) ?: return null
-        val rangeKm = range.roundToInt()
+        val electricRangeKm = electricRange.roundToInt()
+        val gasolineRangeKm = gasolineRange?.roundToInt()
+        val rangeKm = totalRange?.roundToInt()
+            ?: gasolineRange?.let { (it + electricRange).roundToInt().coerceAtMost(65_535) }
+            ?: electricRangeKm
         val fraction = soc / 100.0
-        val maxRangeKm = if (fraction > 0.05) {
-            (range / fraction).roundToInt().coerceIn(rangeKm, 65_535)
+        val maxElectricRangeKm = if (fraction > 0.05) {
+            (electricRange / fraction).roundToInt().coerceIn(electricRangeKm, 65_535)
         } else {
-            rangeKm
+            electricRangeKm
+        }
+        val electricRangeWarning = soc <= lowChargePercent.coerceIn(1, 50)
+        val powertrainRanges = buildMap {
+            gasolineRangeKm?.let { put(VehicleEngineType.GASOLINE, VehiclePowertrainRange(it)) }
+            put(
+                VehicleEngineType.ELECTRIC,
+                VehiclePowertrainRange(
+                    rangeKm = electricRangeKm,
+                    rangeWarning = electricRangeWarning,
+                    maxRangeKm = maxElectricRangeKm,
+                ),
+            )
         }
         return VehicleStatusSnapshot(
             rangeKm = rangeKm,
-            rangeWarning = soc <= lowChargePercent.coerceIn(1, 50),
+            // A low traction-battery SOC does not mean a range extender has low combined range.
+            rangeWarning = gasolineRangeKm == null && electricRangeWarning,
             batteryPercent = soc,
             currentChargeWh = null,
             maxChargeWh = null,
-            maxRangeKm = maxRangeKm,
+            maxRangeKm = maxElectricRangeKm,
             charging = charging,
+            powertrainRanges = powertrainRanges,
         )
     }
 
@@ -223,6 +290,29 @@ internal class EvccVehicleTelemetryStore(
     @Synchronized
     fun readySignals(): Set<EvccLogicalSignal> = values.keys.toSet()
 
+    @Synchronized
+    fun motionDiagnostics(): String {
+        val now = elapsedRealtime()
+        val speed = values[EvccLogicalSignal.VEHICLE_SPEED]
+        val gear = values[EvccLogicalSignal.GEAR]
+        val speedText = if (speed == null) {
+            "speed=missing"
+        } else {
+            val raw = number(speed)
+            val metersPerSecond = raw?.times(speed.candidate.scale)
+            "speed={raw=${raw?.let(::formatDecimal) ?: "-"} " +
+                "mps=${metersPerSecond?.let(::formatDecimal) ?: "-"} " +
+                "origin=${speed.origin} ageMs=${(now - speed.receivedAt).coerceAtLeast(0)}}"
+        }
+        val gearText = if (gear == null) {
+            "gear=missing"
+        } else {
+            "gear={raw=${rawText(gear)} gear=${gear(gear)?.letter ?: '-'} " +
+                "origin=${gear.origin} ageMs=${(now - gear.receivedAt).coerceAtLeast(0)}}"
+        }
+        return "cache $speedText $gearText"
+    }
+
     private fun number(observation: Observation): Double? = observation.value.let { value ->
         value.doubleValue
             ?: value.longValue?.toDouble()
@@ -230,6 +320,19 @@ internal class EvccVehicleTelemetryStore(
             ?: value.rawValue?.trim()?.toDoubleOrNull()
             ?: value.displayValue.trim().substringBefore(' ').toDoubleOrNull()
     }
+
+    private fun validRange(observation: Observation): Double? =
+        number(observation)?.takeIf { it.isFinite() && it in 0.0..65_535.0 }
+
+    private fun rawText(observation: Observation): String = observation.value.let { value ->
+        value.longValue?.toString()
+            ?: value.doubleValue?.let(::formatDecimal)
+            ?: value.stringValue?.trim()
+            ?: value.rawValue?.trim()
+            ?: value.displayValue.trim().ifEmpty { "-" }
+    }
+
+    private fun formatDecimal(value: Double): String = String.format(Locale.US, "%.3f", value)
 
     private fun state(observation: Observation): Boolean? {
         observation.value.booleanValue?.let { return it }
@@ -323,6 +426,7 @@ internal class EvccVehicleSpeedSource(
     private val telemetry: EvccVehicleTelemetryStore,
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val requestRefresh: () -> Unit = {},
+    private val onDiagnostic: (String) -> Unit = {},
 ) : VehicleSpeedSource {
     private val lock = Any()
     private val samples = ArrayList<VehicleSpeedSample>()
@@ -330,67 +434,169 @@ internal class EvccVehicleSpeedSource(
     private var gear: VehicleGear? = null
     private var sampleCount = 0
     private var generation = 0L
+    private var refreshRequests = 0L
+    private var validSamples = 0L
+    private var missingSamples = 0L
+    private var drains = 0L
+    private var emptyDrains = 0L
+    private var speedChanges = 0L
+    private var lastSpeed: Double? = null
+    private var lastGear: VehicleGear? = null
+    private var lastMoving: Boolean? = null
+    private var lastMotionAvailable: Boolean? = null
+    private var lastDrainHadSamples: Boolean? = null
+    private var lastSampleAt: Long? = null
 
-    override fun start() = synchronized(lock) {
-        if (executor != null) return@synchronized
-        samples.clear()
-        gear = null
-        sampleCount = 0
-        val currentGeneration = ++generation
-        executor = Executors.newSingleThreadScheduledExecutor { task ->
-            Thread(task, "geeplay-evcc-speed").apply { isDaemon = true }
-        }.also {
-            it.scheduleWithFixedDelay(
-                { sample(currentGeneration) },
-                0,
-                SAMPLE_MILLIS,
-                TimeUnit.MILLISECONDS,
-            )
+    override fun start() {
+        val started = synchronized(lock) {
+            if (executor != null) return@synchronized false
+            samples.clear()
+            gear = null
+            sampleCount = 0
+            refreshRequests = 0
+            validSamples = 0
+            missingSamples = 0
+            drains = 0
+            emptyDrains = 0
+            speedChanges = 0
+            lastSpeed = null
+            lastGear = null
+            lastMoving = null
+            lastMotionAvailable = null
+            lastDrainHadSamples = null
+            lastSampleAt = null
+            val currentGeneration = ++generation
+            executor = Executors.newSingleThreadScheduledExecutor { task ->
+                Thread(task, "geeplay-evcc-speed").apply { isDaemon = true }
+            }.also {
+                it.scheduleWithFixedDelay(
+                    { sample(currentGeneration) },
+                    0,
+                    SAMPLE_MILLIS,
+                    TimeUnit.MILLISECONDS,
+                )
+            }
+            true
         }
+        if (started) diagnose("speed-source start")
     }
 
     override fun stop() {
-        val running = synchronized(lock) {
-            executor.also {
-                executor = null
-                generation += 1
-                samples.clear()
-                gear = null
-            }
+        val stopped = synchronized(lock) {
+            val running = executor ?: return@synchronized null
+            val summary = diagnosticsLocked(elapsedRealtime())
+            executor = null
+            generation += 1
+            samples.clear()
+            gear = null
+            running to summary
         }
-        running?.shutdownNow()
+        stopped?.first?.shutdownNow()
+        stopped?.let { diagnose("speed-source stop ${it.second}") }
     }
 
-    override fun drain(): VehicleSpeedReading? = synchronized(lock) {
-        val currentGear = gear ?: return@synchronized null
-        if (samples.isEmpty()) return@synchronized null
-        VehicleSpeedReading(currentGear, samples.toList()).also { samples.clear() }
+    override fun drain(): VehicleSpeedReading? {
+        var diagnostic: String? = null
+        val reading = synchronized(lock) {
+            val currentGear = gear
+            if (currentGear == null || samples.isEmpty()) {
+                emptyDrains += 1
+                if (lastDrainHadSamples != false) {
+                    diagnostic = "speed-source drain=empty ${diagnosticsLocked(elapsedRealtime())}"
+                }
+                lastDrainHadSamples = false
+                null
+            } else {
+                drains += 1
+                val result = VehicleSpeedReading(currentGear, samples.toList())
+                samples.clear()
+                if (lastDrainHadSamples != true || drains == 1L || drains % DIAGNOSTIC_DRAIN_INTERVAL == 0L) {
+                    diagnostic = "speed-source drain=reading count=$drains samples=${result.samples.size} " +
+                        diagnosticsLocked(elapsedRealtime())
+                }
+                lastDrainHadSamples = true
+                result
+            }
+        }
+        diagnostic?.let(::diagnose)
+        return reading
     }
 
     fun invalidate() = synchronized(lock) {
         samples.clear()
         gear = null
+        lastMotionAvailable = false
+        lastDrainHadSamples = null
     }
+
+    fun diagnostics(): String = synchronized(lock) { diagnosticsLocked(elapsedRealtime()) }
 
     private fun sample(expectedGeneration: Long) {
         val refresh = synchronized(lock) {
             if (executor == null || generation != expectedGeneration) return
-            sampleCount++ % REFRESH_EVERY_SAMPLES == 0
+            val shouldRefresh = sampleCount++ % REFRESH_EVERY_SAMPLES == 0
+            if (shouldRefresh) refreshRequests += 1
+            shouldRefresh
         }
         if (refresh) requestRefresh()
-        val current = telemetry.motion() ?: return
-        synchronized(lock) {
+        val current = telemetry.motion()
+        if (current == null) {
+            val diagnostic = synchronized(lock) {
+                if (executor == null || generation != expectedGeneration) return
+                missingSamples += 1
+                val shouldReport = lastMotionAvailable != false || missingSamples % DIAGNOSTIC_SAMPLE_INTERVAL == 0L
+                lastMotionAvailable = false
+                if (shouldReport) "speed-source sample=missing ${diagnosticsLocked(elapsedRealtime())}" else null
+            }
+            diagnostic?.let(::diagnose)
+            return
+        }
+        val timestamp = elapsedRealtime()
+        val diagnostic = synchronized(lock) {
             if (executor == null || generation != expectedGeneration) return
-            if (gear != null && gear != current.gear) samples.clear()
+            val previousGear = gear
+            val previousSpeed = lastSpeed
+            val previousMoving = lastMoving
+            if (previousGear != null && previousGear != current.gear) samples.clear()
             gear = current.gear
             if (samples.size == MAX_SAMPLES) samples.removeAt(0)
-            samples += VehicleSpeedSample(elapsedRealtime(), current.speedMetersPerSecond)
+            samples += VehicleSpeedSample(timestamp, current.speedMetersPerSecond)
+            validSamples += 1
+            if (previousSpeed != null && abs(previousSpeed - current.speedMetersPerSecond) >= SPEED_CHANGE_EPSILON_MPS) {
+                speedChanges += 1
+            }
+            val moving = current.speedMetersPerSecond >= MOVING_THRESHOLD_MPS
+            val shouldReport = lastMotionAvailable != true || previousGear != current.gear ||
+                previousMoving != null && previousMoving != moving ||
+                validSamples % DIAGNOSTIC_SAMPLE_INTERVAL == 0L
+            lastMotionAvailable = true
+            lastSpeed = current.speedMetersPerSecond
+            lastGear = current.gear
+            lastMoving = moving
+            lastSampleAt = timestamp
+            if (shouldReport) "speed-source sample=ready ${diagnosticsLocked(timestamp)}" else null
         }
+        diagnostic?.let(::diagnose)
     }
+
+    private fun diagnosticsLocked(now: Long): String {
+        val speedText = lastSpeed?.let { String.format(Locale.US, "%.3f", it) } ?: "-"
+        val age = lastSampleAt?.let { (now - it).coerceAtLeast(0) }?.toString() ?: "-"
+        return "started=${executor != null} refreshes=$refreshRequests validSamples=$validSamples " +
+            "missingSamples=$missingSamples queued=${samples.size} drains=$drains emptyDrains=$emptyDrains " +
+            "changes=$speedChanges lastSpeedMps=$speedText gear=${lastGear?.letter ?: '-'} sampleAgeMs=$age"
+    }
+
+    private fun diagnose(message: String) = onDiagnostic("$DEBUG_PREFIX $message")
 
     private companion object {
         const val SAMPLE_MILLIS = 250L
         const val MAX_SAMPLES = 40
         const val REFRESH_EVERY_SAMPLES = 4
+        const val DIAGNOSTIC_SAMPLE_INTERVAL = 20L
+        const val DIAGNOSTIC_DRAIN_INTERVAL = 10L
+        const val SPEED_CHANGE_EPSILON_MPS = 0.05
+        const val MOVING_THRESHOLD_MPS = 0.1
+        const val DEBUG_PREFIX = "[DEBUG-a4f2]"
     }
 }

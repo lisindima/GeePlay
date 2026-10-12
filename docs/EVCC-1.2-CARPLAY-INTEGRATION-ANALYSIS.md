@@ -171,7 +171,8 @@ Identification 使用：
 - 参数 20：`VehicleInformation`
 - 参数 21：`VehicleStatus`
 
-车辆被声明为电动车，并附带充电接口类型。iPhone 发送：
+纯电车声明一个 Electric `EngineType`；增程车重复参数 2，分别声明 Gasoline 和 Electric，
+并附带充电接口类型。iPhone 发送：
 
 ```text
 0xA100 StartVehicleStatusUpdates
@@ -191,19 +192,23 @@ iPhone 发送 `0xA102 StopVehicleStatusUpdates` 后停止。当前刷新周期�
 | ---: | --- | --- |
 | 3 | `Range` | `rangeKm` |
 | 6 | `RangeWarning` | `rangeWarning` |
-| 11 | `RangeElectric` | `rangeKm` |
-| 15 | `RangeWarningElectric` | `rangeWarning` |
+| 9 | `RangeGasoline` | 汽油续航（存在时） |
+| 11 | `RangeElectric` | 纯电续航 |
+| 13 | `RangeWarningGasoline` | 汽油低续航状态（已知时） |
+| 15 | `RangeWarningElectric` | 电池低续航状态 |
 | 21 | `MinBatteryCharge` | 有电量数据时发送 0 |
 | 22 | `CurrentBatteryCharge` | `currentChargeWh`，可省略 |
 | 23 | `MaxBatteryCharge` | `maxChargeWh`，可省略 |
 | 24 | `DisplayedBatteryPercentage` | `batteryPercent * 1000` |
 | 25 | `isCharging` | `charging` |
 | 30 | `MaxRangeElectric` | `maxRangeKm` |
+| 31 | `MaxRangeGasoline` | 最大汽油续航（已知时） |
 
 静态 VehicleInformation 还包含：
 
 - 车辆名称和显示名称；
-- `EngineType = electric`；
+- `EngineType` 是可重复枚举：`Gasoline=0`、`Diesel=1`、`Electric=2`、`CNG=3`；
+- G636 增程车型同时声明 `Gasoline=0` 和 `Electric=2`，不把两者按 bitmask 合并为一个值；
 - `CCS2/Type2`、`GB/T` 或 `CCS1/J1772` 充电接口声明。
 
 ### 4.2 LocationInformation
@@ -297,6 +302,8 @@ GeePlay 已经能将 Geely OneOS/Flyme 输入转给 CarPlay：
 | --- | --- | --- |
 | SOC | `ADAPT_API:1051136 / SENSOR_TYPE_EV_BATTERY_LEVEL` | `94 → 88` |
 | SOC 交叉验证 | `VEHICLE_AIDL:561024570 / paegyhvbattsoc` | 与主值一致 |
+| 综合续航 | `ADAPT_API:1050624 / SENSOR_TYPE_ENDURANCE_MILEAGE` | `173 km` |
+| 汽油续航 | `ADAPT_API:1054720 / SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL` | `89 km` |
 | EV 续航 | `ADAPT_API:1054976 / SENSOR_TYPE_ENDURANCE_MILEAGE_EV` | `84 → 78 km` |
 | 车速 | `ADAPT_API:1048832 / SENSOR_TYPE_CAR_SPEED` | 静止时 `0.0` |
 | 车速备选 | `ADAPT_API:1055232 / SENSOR_TYPE_CAR_SPEED_FROM_IPK` | 静止时 `0.0` |

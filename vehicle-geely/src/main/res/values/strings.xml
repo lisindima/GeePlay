@@ -39,6 +39,13 @@
     <string name="settings_geely_cluster_display_enable">Project stream 111 to the validated instrument display</string>
     <string name="settings_geely_cluster_display_description">Available only for an exact, vehicle-validated firmware and display profile. Changes apply on the next connection.</string>
     <string name="settings_geely_cluster_display_unavailable">No vehicle-validated display profile matches this firmware. Direct projection remains disabled; export diagnostics to capture the display inventory.</string>
+    <string name="settings_geely_cluster_debug_description">Debug only. Select a non-default Android Presentation display to bypass the validated profile temporarily. The choice applies on the next CarPlay connection.</string>
+    <string name="settings_geely_cluster_debug_no_displays">No non-default Android Presentation display is currently available. Reopen Settings after the target display appears.</string>
+    <string name="settings_geely_cluster_debug_target">Debug target display</string>
+    <string name="settings_geely_cluster_debug_disabled">Disabled</string>
+    <string name="settings_geely_cluster_debug_confirm_title">Project to this display?</string>
+    <string name="settings_geely_cluster_debug_confirm_message">This bypasses the vehicle-validated display profile and may cover original instrument content. Use only while parked. It applies on the next CarPlay connection.</string>
+    <string name="settings_geely_cluster_debug_confirm_action">Use display</string>
     <string name="settings_geely_diagnostics_title">Geely integration diagnostics</string>
     <string name="settings_geely_refresh">Refresh Geely interfaces and retry cleanup</string>
     <string name="settings_geely_diagnostics_status">Navigation SDK: %1$s\nDriver: %2$s\nLast failure: %3$s</string>
