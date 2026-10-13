@@ -1,65 +1,117 @@
-# DiPlay
+# GeePlay
 
-**CarPlay for compatible BYD Android head units.** Wired and wireless, with the familiar DiAuto interface. Independent app: `com.shihab.diplay`.
+**CarPlay for supported Geely/ECARX Android head units.** GeePlay is a Geely-focused downstream product built on [DiPlay](https://github.com/shihabal3amri/DiPlay), with an independent application package: `com.lllhys.geeplay`.
 
-> **BYD support scope:** These projects focus on BYD cars. They may work on other brands, but other brands are unsupported and there are no plans to add support or fix brand-specific incompatibilities.
+> **Product scope:** GeePlay currently targets the ECARX G636 head unit on Android 11. Other Geely, Lynk & Co and ECARX systems require their own firmware evidence. BYD/DiLink-only controls from DiPlay stay hidden or disabled in GeePlay.
 
-[Download & website](https://shihabal3amri.github.io/DiPlay/) · [Release](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.18) · [Report a problem](https://github.com/shihabal3amri/DiPlay/issues/new/choose)
+[Releases](https://github.com/lllhys/GeePlay/releases) · [Chinese README](README.zh-CN.md) · [Capability alignment](CAPABILITY-ALIGNMENT.md) · [Report a problem](https://github.com/lllhys/GeePlay/issues/new)
 
-![DiPlay home](site/assets/home.png)
+## 0.2.18-geely.4 — development preview
 
-## 0.2.18 — public preview
+Install GeePlay on the **car head unit**, not the iPhone. The validated target is the Geely/ECARX G636 (`ecarx`, Android 11). Core wired and wireless CarPlay comes from the DiPlay transport stack. Geely-specific integrations live behind product interfaces and fail closed when the required firmware API, permission or EVCC property is unavailable.
 
-Install on the **car**, not the iPhone. No jailbreak, dongle, Mac, account or authentication server is required for use. Core CarPlay does not require ADB; optional dashboard, battery, wheel-speed and parked-video features do. Your head unit must permit APK installation. The APK supports Android 7.1+ (API 25); Android 7.1–8.1 support is not yet confirmed on a vehicle. Wireless supports Wi-Fi Direct, the car’s existing hotspot or Existing Wi-Fi / Same LAN. Android 7.1–9 Wi-Fi Direct uses a firmware-dependent legacy path with generated group credentials and unverified requested frequency; see [Android 9 Wi-Fi Direct](docs/ANDROID9_WIFI_DIRECT.md). Android 10+ verifies its negotiated group frequency.
+- Wired and wireless CarPlay with the DiPlay connection, display, audio and recovery stack.
+- Geely branding, update channel and settings boundaries in a separate `:geely` application.
+- EVCC 1.2 vehicle telemetry for battery, range, charging state, wheel speed and gear.
+- Geely navigation, input, media and cluster adapters isolated in `:vehicle-geely`.
+- Local diagnostic reports and a bounded `VEHICLE-DATA` trace from EVCC input through iAP2 output.
+- Separate installation from DiPlay and DiAuto. Run only one projection app at a time.
 
-- Wired USB and wireless CarPlay with local authentication.
-- BYD HUD navigation with arrows, distance and street names on verified firmware.
-- Car hotspot support, improved audio buffering and saved receive diagnostics.
-- Automatic address discovery, fixed-channel Wi-Fi fallbacks and successful-configuration memory.
-- Icon/text size, resolution and frame rate; applying a display change reconnects CarPlay.
-- Local diagnostic export. Reports are sent only if you choose to share them.
-- Separate installation alongside DiAuto. Run one projection app at a time.
+This is **not an Apple-, Geely- or ECARX-certified product**. CarPlay authentication assets are not stored in this repository. Source builds omit runtime identity assets unless the builder supplies them explicitly. Compatibility can change with iOS, EVCC or head-unit firmware updates.
 
-This is **not an Apple-certified product**. The APK bundles an experimental accessory identity recovered from public Carlinkit firmware, not a newly provisioned MFi identity for DiPlay. A bundled private key is extractable. Acceptance after future iOS updates, reliability across head units and suitability of that identity for general distribution are unresolved. This release invites community testing; it is not a guarantee of universal compatibility.
+### Verified on the G636
 
-Earlier releases were tested on the development DiLink5.1 car: live windshield guidance and street names work, Car hotspot now starts CarPlay, and Wi-Fi Direct performance is substantially improved. Audio underrun recovery is improved in 0.2.15; remaining cutouts need current diagnostic reports. The 0.2.16 software Opus microphone fallback was accepted on a BOS Mini A1 head unit (Android 9) with an iPhone 12 on iOS 27. The floating-map test build was installed on the development DiLink 5.1 car; feedback led to the pinch corrections in 0.2.9. Earlier wheel-speed and video contributions were tested on a BYD Tang with DiLink 5.0 and an iPhone 15 Pro on iOS 27; wheel-speed dead reckoning in tunnels remains unverified. Broader head-unit and iOS compatibility is not guaranteed. The HUD firmware scope and cleanup limits are documented in [BYD navigation](docs/BYD_NAVIGATION.md).
+- GeePlay can be installed and upgraded without clearing its settings or pairing state.
+- CarPlay sessions run on the G636, and the bundled Opus path restores navigation prompts on firmware without a platform Opus decoder.
+- EVCC 3.3.0 / EvccApi 1.2 exposes the validated battery and range selectors.
+- `ADAPT_API:1048832` vehicle speed is already in metres per second; `1055232` is the fallback.
+- Gear uses `CAPI:0x21401A01` with `0=P, 1=N, 2=R, 3=D`, with `ADAPT_API:0x200200` as fallback.
+- The iPhone requests the `$PASCD` LocationInformation component and GeePlay sends it over the active iAP2 tunnel.
+- Diagnostic reports save locally under **Downloads/GeePlay** and are never uploaded automatically.
 
-## What’s new in 0.2.18
+### Evidence-gated or experimental
 
-- Wired CarPlay no longer drops every few minutes when a USB read finishes just as DiPlay stops waiting for it, and it now starts on Android 7.1 head units, on head units whose USB audio driver held the iPhone, and without a VPN dialog when network ADB is approved.
-- Fewer short music dropouts, and the connection screen shows the real stage and failure in every app language.
-- On head units whose Android Bluetooth cannot reach the iPhone, wireless CarPlay stops with a clear message and suggests USB.
-- The wheel's next and previous keys change CarPlay tracks on the CarPlay screen without the wheel-key service, Geely/Lynk `geely_fx11` head units get wheel media keys and Siri, and wheel keys stuck on "Allowed, starting…" recover by themselves.
-- Back up and restore settings from a phone through a QR code in **Settings → About**, and pick another installer, such as MT Manager, for updates.
-- New experimental, off-by-default options: Harman full screen, square corners, clearer navigation voice over USB, MediaTek low-latency decoding, a media-key audio focus opt-out, car phone audio for calls, a cluster speedometer and FCE cluster guidance.
+- Geely DIM navigation publishing is implemented, but final cluster/HUD rendering remains firmware- and vendor-policy-dependent. Unsupported production paths stay off.
+- Cluster display selection is debug-only until a firmware profile is validated. GeePlay does not expose inherited BYD/FCE cluster controls as Geely features.
+- Tyre telemetry, ambient lighting, parked-video gating and privileged EVCC actions remain opt-in or evidence-gated where the exact vehicle contract is not confirmed.
+- GeePlay can prove that `$PASCD` reaches the iAP2 link; whether an iPhone uses it for dead reckoning in a particular tunnel or parking structure still requires physical validation.
+- Vehicle-specific Siri commands are an architecture proposal, not a promise that iOS exposes arbitrary vehicle controls to CarPlay.
 
-See [0.2.18 release notes](docs/RELEASE-NOTES-0.2.18.md) and [validation](docs/VALIDATION.md) for contribution links and remaining physical tests. General stutter, calls/Siri, decoder and model-specific reports still need current-device evidence. [0.2.17 notes](docs/RELEASE-NOTES-0.2.17.md) remain available as historical guidance.
+## What’s new in GeePlay 0.2.18-geely.4
 
-If a problem remains, reproduce it on **0.2.18**, then use **Settings → Diagnostics → Save diagnostic report**. Android 10+ normally saves to **Downloads/DiPlay**; Android 7.1–9 asks for storage access and saves there too. If unavailable, use **View report** or **Share** from the confirmation, which identifies external/private fallback storage. Review the `.txt` and add it to a matching [existing issue](https://github.com/shihabal3amri/DiPlay/issues), or [create one](https://github.com/shihabal3amri/DiPlay/issues/new/choose). Include vehicle/head-unit model, exact firmware and Android/DiLink, phone/iOS, connection backend, relevant settings, steps and failure time. Reports are shared only when you choose; never post your hotspot password.
+- Synced the product with DiPlay 0.2.18 connection, USB, VPN, settings, localization and media fixes while preserving the Geely product boundary.
+- Added a dedicated `:geely` app and `:vehicle-geely` adapter layer instead of adding Geely conditionals throughout the shared transport.
+- Added EVCC 1.2 read/control gateways, source-generation handling and connection-scoped vehicle-data demand.
+- Added REEV-aware iAP2 status reporting with separate gasoline and electric ranges.
+- Corrected G636 wheel speed units and dynamic P/R/N/D mapping after real-car traces.
+- Added bounded, redacted vehicle-data diagnostics covering EVCC raw values, normalization, `$PASCD` batches and actual iAP2 sends.
+- Added Geely navigation, input, Bluetooth-audio arbitration and debug validation surfaces, all with explicit evidence gates.
+
+The complete capability status, including features intentionally excluded from GeePlay, is maintained in [CAPABILITY-ALIGNMENT.md](CAPABILITY-ALIGNMENT.md). Upstream DiPlay release details remain available in [the preserved upstream README](docs/UPSTREAM-README.md) and [0.2.18 release notes](docs/RELEASE-NOTES-0.2.18.md).
+
+## Install, connect and report a problem
+
+Use a GeePlay APK built from the `:geely` module. Installing a DiPlay `:mobile` APK produces a different package and does not contain the Geely composition layer.
+
+1. Install or upgrade GeePlay on the head unit. Do not uninstall first if you want to retain settings.
+2. Supply the required local CarPlay authentication assets when building from source; the repository intentionally contains none.
+3. Install EVCC only when you want EVCC-backed vehicle telemetry or explicitly confirmed vehicle actions. Core projection does not depend on EVCC.
+4. Configure optional vehicle integrations while parked. Firmware-specific and privileged features default to disabled or fail closed.
+5. When reporting a problem, reproduce it and immediately use **Settings → Diagnostics → Save diagnostic report**. Review the text file before sharing it.
+
+Include the vehicle and head-unit model, full firmware, GeePlay and EVCC versions, iPhone/iOS version, USB or wireless mode, relevant settings, the failure time and exact reproduction steps. For EVCC/CarPlay data problems, capture the report within 15 minutes so the source and iAP2 timelines overlap.
+
+## Architecture
+
+| Module | Responsibility |
+| --- | --- |
+| `:geely` | GeePlay application identity and product composition |
+| `:vehicle-geely` | Geely/ECARX navigation, input, media, display and EVCC adapters |
+| `:common` | Shared Android host UI and lifecycle |
+| `:shared` | Brand-neutral CarPlay, iAP2, AirPlay, audio and vehicle interfaces |
+| `:evccapi-contract` / `:evccapi-client` | Vendored EVCC 1.2 contract and client |
+
+`main` follows the DiPlay upstream history. Active GeePlay integration lands on `geely/main`. Every upstream merge must keep [CAPABILITY-ALIGNMENT.md](CAPABILITY-ALIGNMENT.md) and a standalone checklist under [`docs/upstream-merge-checklists/`](docs/upstream-merge-checklists/) consistent with the resulting product.
 
 ## Documentation
 
-[Existing Wi-Fi / Same LAN](docs/EXISTING_WIFI.md) keeps the iPhone and head unit
-on an external router. See the guide for setup, build requirements and the
-BYD DiLink 4.0 / Android 10 clean-install validation result.
-
-- [Install and connect](docs/INSTALL.md)
-- [Compatibility and troubleshooting](docs/COMPATIBILITY.md)
-- [Smooth wireless CarPlay](docs/SMOOTH_WIRELESS.md)
+- [Capability alignment — single source of truth](CAPABILITY-ALIGNMENT.md)
+- [GeePlay implementation progress](docs/GEELY-IMPLEMENTATION-PROGRESS.md)
+- [GeePlay validation and real-car evidence](docs/GEELY-VALIDATION.md)
+- [Geely core architecture](docs/GEELY-CORE-FEATURES-SPEC.md)
+- [BYD-to-Geely capability assessment](docs/BYD-TO-GEELY-FEATURE-MIGRATION-ASSESSMENT.md)
+- [Unaligned-capability migration spec](docs/BYD-TO-GEELY-UNALIGNED-CAPABILITIES-MIGRATION-SPEC.md)
+- [EVCC 1.2 and CarPlay integration analysis](docs/EVCC-1.2-CARPLAY-INTEGRATION-ANALYSIS.md)
+- [EVCC → CarPlay vehicle-data sync spec](docs/EVCC-CARPLAY-VEHICLE-DATA-SYNC-SPEC.md)
+- [Siri-only vehicle-control analysis](docs/EVCC-1.2-SIRI-VEHICLE-CONTROL.md)
 - [Privacy and diagnostic reports](docs/PRIVACY.md)
-- [Build from source](docs/BUILD.md) — select `mobile` for the main DiPlay app; `maphost` is a map sample.
-- [Validation](docs/VALIDATION.md)
-- [Release notes](CHANGELOG.md)
-- [Credits and licenses](docs/THIRD_PARTY_NOTICES.md)
-
-The app is available in English, Arabic, Russian, Ukrainian, Spanish, Simplified Chinese, Traditional Chinese (Taiwan), and Japanese. The release website currently supports the first seven languages. Traditional Chinese uses Taiwan wording; the app also recognizes Hong Kong/Macao and explicit Hant selections without claiming separate regional translations. Choose the app language in Settings; on Android 13+, it stays synchronized with Android’s per-app language setting.
+- [Upstream DiPlay README](docs/UPSTREAM-README.md)
 
 ## Source and credits
 
-Based on [xcertplay](https://github.com/shilapi/xcertplay), GPL-3.0. The home/settings UI and website adapt [DiAuto](https://github.com/shihabal3amri/DiAuto), AGPL-3.0; that license is included in `docs/licenses`. Preserve those notices when distributing modifications. CarPlay and its icon belong to Apple Inc.; no Apple or BYD affiliation or endorsement is implied.
+GeePlay is derived from [DiPlay](https://github.com/shihabal3amri/DiPlay) and [xcertplay](https://github.com/shilapi/xcertplay) under GPL-3.0. The home/settings UI and website inherit work adapted from [DiAuto](https://github.com/shihabal3amri/DiAuto), whose AGPL-3.0 notice is retained under `docs/licenses`. EVCC contract sources are vendored with their source information and notices under `third_party/evccapi`.
 
-This repository starts with a clean public source snapshot. Local research, tester reports and release-signing secrets are excluded. The complete source corresponding to the APK is provided with every release; experimental runtime identity assets are described separately in the build instructions and notices.
+CarPlay and its marks belong to Apple Inc. Geely, Lynk & Co and ECARX marks belong to their respective owners. No affiliation or endorsement is implied.
 
-## Local release packaging
+## Build and verification
 
-The release APK intentionally contains the experimental accessory identity. The Git repository and source archive exclude all accessory and Android signing keys; tests generate synthetic identities at runtime. Source/CI builds omit runtime identity assets by default. Local release builds explicitly select an external asset directory. Publishing the APK makes its bundled identity extractable; building locally does not preserve that identity's confidentiality.
+Build the GeePlay debug APK:
+
+```sh
+./gradlew :geely:assembleDebug
+```
+
+Output:
+
+```text
+geely/build/outputs/apk/debug/geely-debug.apk
+```
+
+Run the GeePlay-specific checks:
+
+```sh
+./gradlew :vehicle-geely:testDebugUnitTest :vehicle-geely:lintDebug \
+  :geely:testDebugUnitTest :geely:lintDebug :geely:assembleDebug
+```
+
+The repository contains no accessory or Android signing private keys. Set `DIPLAY_AUTH_ASSETS_DIR` to an external runtime-asset directory only for a build that is authorized to use those assets. Publishing an APK makes any embedded runtime identity extractable.
