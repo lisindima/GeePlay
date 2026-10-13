@@ -37,14 +37,26 @@ class EvccGeelyPropertyProfileTest {
             ),
             candidates(bindings.getValue(EvccLogicalSignal.VEHICLE_SPEED)),
         )
-        val gear = bindings.getValue(EvccLogicalSignal.GEAR).candidates.single()
-        assertEquals(EvccApiContract.Source.CAPI, gear.source)
-        assertEquals(289_408_000L, gear.id)
-        assertEquals(VehicleGear.NEUTRAL, gear.gearValues[1L])
-        assertEquals(VehicleGear.REVERSE, gear.gearValues[2L])
-        assertEquals(VehicleGear.PARK, gear.gearValues[4L])
-        assertEquals(VehicleGear.DRIVE, gear.gearValues[8L])
-        assertEquals(VehicleGear.DRIVE, gear.gearValues[16_384L])
+        assertEquals(
+            listOf(1.0, 1.0),
+            bindings.getValue(EvccLogicalSignal.VEHICLE_SPEED).candidates.map(EvccPropertyCandidate::scale),
+        )
+        val gear = bindings.getValue(EvccLogicalSignal.GEAR).candidates
+        assertEquals(
+            listOf(
+                EvccApiContract.Source.CAPI to 0x21401A01L,
+                EvccApiContract.Source.ADAPT_API to 0x200200L,
+            ),
+            gear.map { it.source to it.id },
+        )
+        assertEquals(VehicleGear.PARK, gear[0].gearValues[0L])
+        assertEquals(VehicleGear.NEUTRAL, gear[0].gearValues[1L])
+        assertEquals(VehicleGear.REVERSE, gear[0].gearValues[2L])
+        assertEquals(VehicleGear.DRIVE, gear[0].gearValues[3L])
+        assertEquals(VehicleGear.PARK, gear[1].gearValues[0x200230L])
+        assertEquals(VehicleGear.NEUTRAL, gear[1].gearValues[0x200240L])
+        assertEquals(VehicleGear.REVERSE, gear[1].gearValues[0x200210L])
+        assertEquals(VehicleGear.DRIVE, gear[1].gearValues[0x200220L])
 
         assertEquals(
             listOf(EvccApiContract.Source.ADAPT_API to 5_243_136L),

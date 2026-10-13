@@ -84,13 +84,18 @@ internal data class EvccResolvedProperty(
 }
 
 internal object EvccGeelyPropertyProfile {
-    private val androidGearValues = buildMap {
-        put(1L, VehicleGear.NEUTRAL)
-        put(2L, VehicleGear.REVERSE)
-        put(4L, VehicleGear.PARK)
-        listOf(8L, 16L, 32L, 64L, 128L, 256L, 512L, 1_024L, 2_048L, 4_096L, 8_192L, 16_384L)
-            .forEach { put(it, VehicleGear.DRIVE) }
-    }
+    private val geelyGearLeverValues = mapOf(
+        0L to VehicleGear.PARK,
+        1L to VehicleGear.NEUTRAL,
+        2L to VehicleGear.REVERSE,
+        3L to VehicleGear.DRIVE,
+    )
+    private val adaptGearValues = mapOf(
+        0x200230L to VehicleGear.PARK,
+        0x200240L to VehicleGear.NEUTRAL,
+        0x200210L to VehicleGear.REVERSE,
+        0x200220L to VehicleGear.DRIVE,
+    )
 
     val bindings = listOf(
         EvccPropertyBinding(
@@ -144,23 +149,26 @@ internal object EvccGeelyPropertyProfile {
                 EvccPropertyCandidate(
                     id = 1_048_832L,
                     source = EvccApiContract.Source.ADAPT_API,
-                    scale = 1.0 / 3.6,
-                ), // SENSOR_TYPE_CAR_SPEED; unit conversion still requires a moving-vehicle test
+                ), // SENSOR_TYPE_CAR_SPEED; G636 moving trace confirmed meters per second
                 EvccPropertyCandidate(
                     id = 1_055_232L,
                     source = EvccApiContract.Source.ADAPT_API,
-                    scale = 1.0 / 3.6,
-                ), // SENSOR_TYPE_CAR_SPEED_FROM_IPK
+                ), // SENSOR_TYPE_CAR_SPEED_FROM_IPK; same EVCC speed unit contract
             ),
         ),
         EvccPropertyBinding(
             EvccLogicalSignal.GEAR,
             listOf(
                 EvccPropertyCandidate(
-                    id = 289_408_000L,
+                    id = 0x21401A01L,
                     source = EvccApiContract.Source.CAPI,
-                    gearValues = androidGearValues,
-                ), // Android VehiclePropertyIds.GEAR_SELECTION; G636 returned 4=PARK
+                    gearValues = geelyGearLeverValues,
+                ), // CLUSTER_GEAR_GEARLVRINDCN; G636 trace: 0=P, 1=N, 2=R, 3=D
+                EvccPropertyCandidate(
+                    id = 0x200200L,
+                    source = EvccApiContract.Source.ADAPT_API,
+                    gearValues = adaptGearValues,
+                ), // SENSOR_TYPE_GEAR; G636 trace mirrors the CAPI lever state
             ),
         ),
         EvccPropertyBinding(
@@ -507,13 +515,13 @@ internal class EvccVehicleTelemetryStore(
             else -> scaledNumber(observation)?.let(::formatDecimal)
         } ?: "-"
         val sourceObservedAt = observation.value.observedAt
-        val sourceAge = sourceObservedAt.takeIf { it > 0L }
-            ?.let { wallClockMillis() - it }
+        val sourceAge = sourceAge(sourceObservedAt)
         return "property signal=$signal source=${observation.descriptor.source} " +
             "id=${observation.descriptor.canonicalId} area=${observation.descriptor.areaId} " +
             "generation=${observation.descriptor.sourceGeneration} type=${observation.descriptor.dataType} " +
             "raw=$raw normalized=$normalized unit=${diagnosticUnit(signal)} " +
-            "sourceObservedAtMs=$sourceObservedAt sourceAgeMs=${sourceAge ?: "unknown"} " +
+            "sourceObservedAt=$sourceObservedAt sourceClock=${sourceAge?.domain ?: "unknown"} " +
+            "sourceAgeMs=${sourceAge?.ageMillis ?: "unknown"} " +
             "origin=${observation.origin} ageMs=${(elapsedRealtime() - observation.receivedAt).coerceAtLeast(0)}"
     }
 
@@ -570,6 +578,19 @@ internal class EvccVehicleTelemetryStore(
     private fun diagnosticValue(value: String): String = value
         .replace(Regex("[\\r\\n\\t ]+"), "_")
         .take(120)
+
+    private fun sourceAge(observedAt: Long): SourceAge? {
+        if (observedAt <= 0L) return null
+        val elapsedNow = elapsedRealtime()
+        val candidates = listOf(
+            SourceAge("wall-ms", wallClockMillis() - observedAt),
+            SourceAge("elapsed-ms", elapsedNow - observedAt),
+            SourceAge("elapsed-us", elapsedNow - observedAt / 1_000L),
+            SourceAge("elapsed-ns", elapsedNow - observedAt / 1_000_000L),
+        )
+        return candidates.minByOrNull { abs(it.ageMillis) }
+            ?.takeIf { abs(it.ageMillis) <= MAX_SOURCE_AGE_MILLIS }
+    }
 
     private fun diagnosticUnit(signal: EvccLogicalSignal): String = when (signal) {
         EvccLogicalSignal.BATTERY_SOC -> "percent"
@@ -674,6 +695,7 @@ internal class EvccVehicleTelemetryStore(
     private companion object {
         const val MOTION_MAX_AGE_MILLIS = 5_000L
         const val MAX_SPEED_METERS_PER_SECOND = 100.0
+        const val MAX_SOURCE_AGE_MILLIS = 7L * 24L * 60L * 60L * 1_000L
         val RECORD_SUCCESS_STATUSES = setOf(EvccApiContract.Status.OK, EvccApiContract.Status.AVAILABLE)
         val ENUM_OPTION = Regex("^\\s*(?:(-?\\d+)\\s*[:=]\\s*(.+)|(.+?)\\s*[:=]\\s*(-?\\d+))\\s*$")
         val ON_TOKENS = setOf("ON", "ACTIVE", "CHARGING", "CONNECTED", "TRUE")
@@ -689,6 +711,11 @@ internal class EvccVehicleTelemetryStore(
                 (EvccLogicalSignal.TYRE_PRESSURE_REAR_RIGHT to EvccLogicalSignal.TYRE_TEMPERATURE_REAR_RIGHT),
         )
     }
+
+    private data class SourceAge(
+        val domain: String,
+        val ageMillis: Long,
+    )
 }
 
 /** Samples the latest EVCC speed cache without performing Binder work on the iAP2 loop. */

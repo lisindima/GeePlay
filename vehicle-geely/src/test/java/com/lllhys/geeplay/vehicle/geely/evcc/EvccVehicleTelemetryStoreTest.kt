@@ -308,8 +308,24 @@ class EvccVehicleTelemetryStoreTest {
         assertTrue("unit=m/s" in diagnostic)
         assertTrue("origin=REFRESH_READ" in diagnostic)
         assertTrue("ageMs=125" in diagnostic)
-        assertTrue("sourceObservedAtMs=${wallNow - 80}" in diagnostic)
+        assertTrue("sourceObservedAt=${wallNow - 80}" in diagnostic)
+        assertTrue("sourceClock=wall-ms" in diagnostic)
         assertTrue("sourceAgeMs=80" in diagnostic)
+    }
+
+    @Test
+    fun `property diagnostics recognize EVCC monotonic nanosecond observations`() {
+        accept(
+            EvccLogicalSignal.VEHICLE_SPEED,
+            1_048_832L,
+            EvccValue.ofDouble(4.0, observedAt = (now - 125L) * 1_000_000L),
+            source = EvccApiContract.Source.ADAPT_API,
+        )
+
+        val diagnostic = store.propertyDiagnostic(EvccLogicalSignal.VEHICLE_SPEED)
+
+        assertTrue("sourceClock=elapsed-ns" in diagnostic)
+        assertTrue("sourceAgeMs=125" in diagnostic)
     }
 
     private fun accept(

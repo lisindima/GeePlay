@@ -72,7 +72,7 @@
 | # | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | ---: | --- | --- | --- | --- |
 | 8 | 电池 SOC/续航/充电状态 | ✅ 已对齐 | EVCC-read | `EvccVehicleDataAdapter`；G636 已验证 SOC `ADAPT_API:1051136`、续航 `ADAPT_API:1054976`、充电 `ADAPT_API:605225728` |
-| 9 | 车速 + P/R/N/D 挡位 | ✅ 已对齐 | EVCC-read | 车速 `ADAPT_API:1048832`（fallback `1055232`）、挡位 `CAPI:289408000`（`4=P`） |
+| 9 | 车速 + P/R/N/D 挡位 | ✅ 已对齐 | EVCC-read | 车速 `ADAPT_API:1048832`（fallback `1055232`），G636 实测单位为 m/s；挡位主来源 `CAPI:557849089`（`0=P, 1=N, 2=R, 3=D`），fallback `ADAPT_API:2097664` |
 | 10 | 仅驻车允许车内视频 | 🟡 部分对齐 | EVCC-read | 已实现 fail-closed `VehicleParkStateSource`、设置与通用 consumer；待 G636 P→D/R 实车（Spec §4） |
 | 11 | 胎压/胎温侧边栏 | 🟡 部分对齐 | EVCC-read | 已实现保守目录发现、轮位/单位映射、`VehicleTyreTelemetrySource` 与侧边栏；待 G636 descriptor 实证（Spec §5） |
 | 21 | 车辆属性发现 | ✅ 已对齐（发现层） | EVCC-read | `queryPropertyDirectory/resolve/read/subscribe` + source generation；生产用已验证 profile |
@@ -133,3 +133,4 @@
 | 2026-10-12 | `d9881b4a` 后工作区 | G636 真机确认导航 Opus 流因系统无 `audio/opus` decoder 而静音；恢复 DiPlay 发布包 bundled libopus，增加 Concentus fallback，真机确认 `type=101` 持续解码为 PCM 且导航声音恢复 |
 | 2026-10-13 | `d9881b4a` 后工作区 | #1 调整为「🟡部分对齐」：抓到工厂真实 0 基车道数组和 icon ID；GeePlay XUI 数组已到 DIM 但仪表不渲染；当时按工厂 `43/44` 时序新增 Debug-only EAS 探针，后续离线分析在下一条记录中纠正该时序假设 |
 | 2026-10-13 | `ec9d9479` 后工作区 | #1 离线纠正根因：真车已执行的 `43 → lanes → 44` 探针虽到达 NaviService，但 `43/44` 不参与 guiding source 选择，`mapForWidget` 因而仍为工厂 vendor `9`，lane `2009` 被过滤。探针改为不请求 vendor 9，并使用 `16 → 43 → lanes → clear → 44 → 17`；二次审计确认 `-100` 可通过 NaviService 状态机并生成 `RspLanesInfo`，但无法离线证明 G636 仪表消费者接受未知 vendor，故暂不安排真车投放 |
+| 2026-10-13 | `c3d0809f` → `a99dab1` | #9 G636 实车纠正：EVCC 车速原值已经是 m/s，不再重复除以 3.6；挡位改用动态验证的 `CAPI:0x21401A01`，并保留 `ADAPT_API:0x200200` fallback。合并时保留稳定 `VEHICLE-DATA` 分层诊断与胎压/胎温扩展。 |
