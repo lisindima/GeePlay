@@ -1724,6 +1724,7 @@ private class AudioRenderer(
     @Volatile private var running = true
     @Volatile private var started = false
     private var codec: MediaCodec? = null
+    private var opusDecoder: OpusPacketDecoder? = null
     private var track: AudioTrack? = null
     private var pcm = ByteArray(64 * 1024)
     private var playbackStarted = false
@@ -1807,7 +1808,7 @@ private class AudioRenderer(
                 "mediaChannel=$mediaChannel navigationChannel=$navigationChannel focus=$audioFocusEnabled") }
             when (format.codec) {
                 AudioCodecKind.AAC_LC -> configureCodec(MediaFormat.MIMETYPE_AUDIO_AAC)
-                AudioCodecKind.OPUS -> configureCodec(MediaFormat.MIMETYPE_AUDIO_OPUS)
+                AudioCodecKind.OPUS -> configureOpusDecoder()
                 AudioCodecKind.LPCM -> Unit
             }
             createTrack()
@@ -1884,6 +1885,34 @@ private class AudioRenderer(
             reportFailure(error)
             null
         }
+    }
+
+    private fun configureOpusDecoder() {
+        diagnosticStage = "decoder-create"
+        opusDecoder = OpusPacketDecoders.create(
+            format.sampleRate,
+            format.channels,
+            onError = { message, error ->
+                Log.w(TAG, message, error)
+                runCatching {
+                    report("Audio: $message error=${MediaFailureSummary.describe(error)}")
+                }
+            },
+        )
+        val decoder = opusDecoder
+        if (decoder != null) {
+            Log.i(TAG, "audio decoder configured mime=audio/opus name=${decoder.implementation}")
+            runCatching {
+                report(
+                    "Audio: decoder ready audioType=${format.audioType} codec=${format.codec} " +
+                        "name=${decoder.implementation}",
+                )
+            }
+            return
+        }
+        // Keep Android's decoder as a last compatibility path for ABIs that are not bundled and
+        // devices where the pure-Java fallback could not initialize.
+        configureCodec(MediaFormat.MIMETYPE_AUDIO_OPUS)
     }
 
     private fun createTrack() {
@@ -2156,7 +2185,37 @@ private class AudioRenderer(
                     }
                     return
                 }
-                feedCodec(accessUnit, timestampUs)
+                val bundledDecoder = opusDecoder
+                if (bundledDecoder == null) {
+                    feedCodec(accessUnit, timestampUs)
+                } else {
+                    inputQueued++
+                    val decodedBytes = runCatching { bundledDecoder.decode(accessUnit, pcm) }.getOrElse {
+                        if (inputDropped < MAX_REPORTED_OPUS_DECODE_FAILURES) {
+                            Log.w(TAG, "bundled Opus decode failed implementation=${bundledDecoder.implementation}", it)
+                            runCatching {
+                                report(
+                                    "Audio: bundled Opus decode failed implementation=${bundledDecoder.implementation} " +
+                                        "error=${MediaFailureSummary.describe(it)}",
+                                )
+                            }
+                        }
+                        -1
+                    }
+                    if (decodedBytes > 0) {
+                        outputBuffers++
+                        if (outputBuffers == 1 || outputBuffers % DECODED_BUFFER_LOG_INTERVAL == 0) {
+                            Log.i(
+                                TAG,
+                                "audio decoder output codec=${format.codec} implementation=${bundledDecoder.implementation} " +
+                                    "buffers=$outputBuffers bytes=$decodedBytes queued=$inputQueued dropped=$inputDropped",
+                            )
+                        }
+                        writePcm(pcm, 0, decodedBytes)
+                    } else if (decodedBytes < 0) {
+                        inputDropped++
+                    }
+                }
             }
         }
     }
@@ -2478,6 +2537,9 @@ private class AudioRenderer(
                 // Best effort.
             }
         }
+        val opusDecoder = opusDecoder
+        this.opusDecoder = null
+        runCatching { opusDecoder?.close() }
         val track = track
         this.track = null
         if (track != null) {
@@ -2503,6 +2565,7 @@ private class AudioRenderer(
         const val TAG = "xcertplay-usb"
         const val AAC_OBJECT_TYPE_LC = 2
         const val MIN_OPUS_PACKET_BYTES = 4
+        const val MAX_REPORTED_OPUS_DECODE_FAILURES = 3
         const val OPUS_CODEC_DELAY_NANOS = 6_500_000L
         const val OPUS_SEEK_PRE_ROLL_NANOS = 80_000_000L
         const val INPUT_TIMEOUT_US = 10_000L

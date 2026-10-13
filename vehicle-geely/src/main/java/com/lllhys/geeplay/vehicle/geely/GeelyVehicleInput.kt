@@ -55,15 +55,21 @@ enum class GeelyInputAction {
 
 object GeelyInputMapping {
     fun action(profile: GeelyInputProfile, event: GeelyInputEvent): GeelyInputAction? {
-        if (event.gesture != GeelyInputGesture.SHORT) return null
         return when (profile) {
             GeelyInputProfile.DISABLED -> null
             GeelyInputProfile.FLYME_VOICE ->
-                if (event.rawCode == 231 || event.rawCode == 200231) GeelyInputAction.SIRI else null
-            GeelyInputProfile.ONE_OS -> media(event.rawCode)
+                if (event.gesture == GeelyInputGesture.SHORT &&
+                    (event.rawCode == 231 || event.rawCode == GeelyDirectInputServiceAdapter.KEY_VOICE_ASSIST)
+                ) GeelyInputAction.SIRI else null
+            GeelyInputProfile.ONE_OS -> when {
+                event.rawCode == GeelyDirectInputServiceAdapter.KEY_VOICE_ASSIST &&
+                    event.gesture == GeelyInputGesture.LONG -> GeelyInputAction.SIRI
+                event.gesture == GeelyInputGesture.SHORT -> media(event.rawCode)
+                else -> null
+            }
             GeelyInputProfile.ECARX_XUI_DIAGNOSTIC,
             GeelyInputProfile.ONE_OS_2_DIAGNOSTIC,
-            -> action(event.rawCode)
+            -> if (event.gesture == GeelyInputGesture.SHORT) action(event.rawCode) else null
         }
     }
 
@@ -458,7 +464,11 @@ class GeelyInputRuntime(
     private val adapterFactory: (GeelyInputProfile, (GeelyInputEvent) -> Boolean, (String) -> Unit) -> GeelyInputAdapter? =
         { profile, event, status ->
             when (profile) {
-                GeelyInputProfile.ONE_OS -> OneOsWheelAdapter(context, event, status)
+                GeelyInputProfile.ONE_OS -> if (GeelyDirectInputServiceAdapter.available(context)) {
+                    GeelyDirectInputServiceAdapter(context, event, status)
+                } else {
+                    OneOsWheelAdapter(context, event, status)
+                }
                 GeelyInputProfile.FLYME_VOICE -> FlymeVoiceBroadcastAdapter(context, event, status)
                 else -> null
             }

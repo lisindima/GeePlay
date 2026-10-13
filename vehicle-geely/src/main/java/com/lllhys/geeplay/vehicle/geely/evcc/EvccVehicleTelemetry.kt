@@ -15,6 +15,7 @@ import com.shilapi.xcertplay.transport.VehicleSpeedSource
 import com.shilapi.xcertplay.transport.VehicleStatusSnapshot
 import com.shilapi.xcertplay.vehicle.VehicleTyreReading
 import com.shilapi.xcertplay.vehicle.VehicleTyreTelemetrySnapshot
+import com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics
 import com.shilapi.xcertplay.vehicle.VehicleWheelPosition
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -162,6 +163,46 @@ internal object EvccGeelyPropertyProfile {
                 ), // Android VehiclePropertyIds.GEAR_SELECTION; G636 returned 4=PARK
             ),
         ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.TYRE_PRESSURE_FRONT_LEFT,
+            listOf(EvccPropertyCandidate(5_243_136L, EvccApiContract.Source.ADAPT_API)),
+        ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.TYRE_PRESSURE_FRONT_RIGHT,
+            listOf(EvccPropertyCandidate(5_243_392L, EvccApiContract.Source.ADAPT_API)),
+        ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.TYRE_PRESSURE_REAR_LEFT,
+            listOf(EvccPropertyCandidate(5_243_648L, EvccApiContract.Source.ADAPT_API)),
+        ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.TYRE_PRESSURE_REAR_RIGHT,
+            listOf(EvccPropertyCandidate(5_243_904L, EvccApiContract.Source.ADAPT_API)),
+        ),
+        // G636/EVCC 3.3.0 exposes 77-80 while parked at ambient temperature: the source is °F.
+        EvccPropertyBinding(
+            EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_LEFT,
+            listOf(fahrenheitCandidate(5_244_160L)),
+        ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_RIGHT,
+            listOf(fahrenheitCandidate(5_244_416L)),
+        ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.TYRE_TEMPERATURE_REAR_LEFT,
+            listOf(fahrenheitCandidate(5_244_672L)),
+        ),
+        EvccPropertyBinding(
+            EvccLogicalSignal.TYRE_TEMPERATURE_REAR_RIGHT,
+            listOf(fahrenheitCandidate(5_244_928L)),
+        ),
+    )
+
+    private fun fahrenheitCandidate(id: Long) = EvccPropertyCandidate(
+        id = id,
+        source = EvccApiContract.Source.ADAPT_API,
+        scale = 5.0 / 9.0,
+        offset = -32.0 * 5.0 / 9.0,
     )
 }
 
@@ -275,6 +316,7 @@ internal data class EvccMotionSnapshot(
 /** Thread-safe conversion and cache; it has no Binder or lifecycle knowledge. */
 internal class EvccVehicleTelemetryStore(
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
+    private val wallClockMillis: () -> Long = System::currentTimeMillis,
 ) {
     private data class Observation(
         val value: EvccValue,
@@ -453,6 +495,32 @@ internal class EvccVehicleTelemetryStore(
     fun readySignals(): Set<EvccLogicalSignal> = values.keys.toSet()
 
     @Synchronized
+    fun propertyDiagnostic(signal: EvccLogicalSignal): String {
+        val observation = values[signal]
+            ?: return "property signal=$signal state=missing"
+        val raw = diagnosticValue(rawText(observation))
+        val normalized = when (signal) {
+            EvccLogicalSignal.GEAR -> gear(observation)?.letter?.toString()
+            EvccLogicalSignal.CHARGING,
+            EvccLogicalSignal.CLUSTER_MAP_VISIBLE,
+            -> state(observation)?.toString()
+            else -> scaledNumber(observation)?.let(::formatDecimal)
+        } ?: "-"
+        val sourceObservedAt = observation.value.observedAt
+        val sourceAge = sourceObservedAt.takeIf { it > 0L }
+            ?.let { wallClockMillis() - it }
+        return "property signal=$signal source=${observation.descriptor.source} " +
+            "id=${observation.descriptor.canonicalId} area=${observation.descriptor.areaId} " +
+            "generation=${observation.descriptor.sourceGeneration} type=${observation.descriptor.dataType} " +
+            "raw=$raw normalized=$normalized unit=${diagnosticUnit(signal)} " +
+            "sourceObservedAtMs=$sourceObservedAt sourceAgeMs=${sourceAge ?: "unknown"} " +
+            "origin=${observation.origin} ageMs=${(elapsedRealtime() - observation.receivedAt).coerceAtLeast(0)}"
+    }
+
+    @Synchronized
+    fun propertyDiagnostics(): List<String> = EvccLogicalSignal.entries.map(::propertyDiagnostic)
+
+    @Synchronized
     fun motionDiagnostics(): String {
         val now = elapsedRealtime()
         val speed = values[EvccLogicalSignal.VEHICLE_SPEED]
@@ -461,7 +529,7 @@ internal class EvccVehicleTelemetryStore(
             "speed=missing"
         } else {
             val raw = number(speed)
-            val metersPerSecond = raw?.times(speed.candidate.scale)
+            val metersPerSecond = scaledNumber(speed)
             "speed={raw=${raw?.let(::formatDecimal) ?: "-"} " +
                 "mps=${metersPerSecond?.let(::formatDecimal) ?: "-"} " +
                 "origin=${speed.origin} ageMs=${(now - speed.receivedAt).coerceAtLeast(0)}}"
@@ -498,6 +566,33 @@ internal class EvccVehicleTelemetryStore(
     }
 
     private fun formatDecimal(value: Double): String = String.format(Locale.US, "%.3f", value)
+
+    private fun diagnosticValue(value: String): String = value
+        .replace(Regex("[\\r\\n\\t ]+"), "_")
+        .take(120)
+
+    private fun diagnosticUnit(signal: EvccLogicalSignal): String = when (signal) {
+        EvccLogicalSignal.BATTERY_SOC -> "percent"
+        EvccLogicalSignal.RANGE_TOTAL_KM,
+        EvccLogicalSignal.RANGE_GASOLINE_KM,
+        EvccLogicalSignal.RANGE_EV_KM,
+        -> "km"
+        EvccLogicalSignal.VEHICLE_SPEED -> "m/s"
+        EvccLogicalSignal.GEAR -> "gear"
+        EvccLogicalSignal.CHARGING,
+        EvccLogicalSignal.CLUSTER_MAP_VISIBLE,
+        -> "boolean"
+        EvccLogicalSignal.TYRE_PRESSURE_FRONT_LEFT,
+        EvccLogicalSignal.TYRE_PRESSURE_FRONT_RIGHT,
+        EvccLogicalSignal.TYRE_PRESSURE_REAR_LEFT,
+        EvccLogicalSignal.TYRE_PRESSURE_REAR_RIGHT,
+        -> "kPa"
+        EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_LEFT,
+        EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_RIGHT,
+        EvccLogicalSignal.TYRE_TEMPERATURE_REAR_LEFT,
+        EvccLogicalSignal.TYRE_TEMPERATURE_REAR_RIGHT,
+        -> "C"
+    }
 
     private fun state(observation: Observation): Boolean? {
         observation.value.booleanValue?.let { return it }
@@ -762,16 +857,16 @@ internal class EvccVehicleSpeedSource(
             "changes=$speedChanges lastSpeedMps=$speedText gear=${lastGear?.letter ?: '-'} sampleAgeMs=$age"
     }
 
-    private fun diagnose(message: String) = onDiagnostic("$DEBUG_PREFIX $message")
+    private fun diagnose(message: String) =
+        onDiagnostic(VehicleDataDiagnostics.record("normalize-speed", message))
 
     private companion object {
         const val SAMPLE_MILLIS = 250L
         const val MAX_SAMPLES = 40
         const val REFRESH_EVERY_SAMPLES = 4
-        const val DIAGNOSTIC_SAMPLE_INTERVAL = 20L
+        const val DIAGNOSTIC_SAMPLE_INTERVAL = 4L
         const val DIAGNOSTIC_DRAIN_INTERVAL = 10L
         const val SPEED_CHANGE_EPSILON_MPS = 0.05
         const val MOVING_THRESHOLD_MPS = 0.1
-        const val DEBUG_PREFIX = "[DEBUG-a4f2]"
     }
 }

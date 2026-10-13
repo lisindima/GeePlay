@@ -136,6 +136,42 @@ class Iap2VehicleStatusTest {
         assertEquals(25_000, ByteBuffer.wrap(parameters.first(24)!!.payload).int)
     }
 
+    @Test
+    fun reporterDiagnosticsDescribeTheVehicleStatusActuallySentToCarPlay() {
+        val progress = mutableListOf<String>()
+        val sent = mutableListOf<com.shilapi.xcertplay.iap2.wire.Iap2Frame>()
+        val reporter = Iap2VehicleStatusReporter({ reading.copy(charging = true) }, progress::add)
+        val start = com.shilapi.xcertplay.iap2.message.Iap2Messages.buildRaw(
+            Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES,
+        ) {}
+
+        reporter.handle(start, sent::add)
+
+        assertEquals(1, sent.size)
+        assertTrue(
+            progress.any {
+                it.startsWith("VEHICLE-DATA ") && "stage=iap2-status-tx" in it &&
+                    "rangeKm=150" in it && "batteryPercent=25.000" in it &&
+                    "charging=true" in it && "electric=150km" in it
+            },
+        )
+    }
+
+    @Test
+    fun reporterDiagnosticsExplainWhenAnAdvertisedStatusCannotBeSent() {
+        val progress = mutableListOf<String>()
+        val sent = mutableListOf<com.shilapi.xcertplay.iap2.wire.Iap2Frame>()
+        val reporter = Iap2VehicleStatusReporter({ null }, progress::add)
+        val start = com.shilapi.xcertplay.iap2.message.Iap2Messages.buildRaw(
+            Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES,
+        ) {}
+
+        reporter.handle(start, sent::add)
+
+        assertTrue(sent.isEmpty())
+        assertTrue(progress.any { "stage=iap2-status-tx" in it && "snapshot=missing" in it })
+    }
+
     private fun connectors(choice: EvChargingConnectors): List<Int> {
         val config = identification(vehicleStatusEnabled = true).copy(chargingConnectors = choice)
         val vehicle = Iap2ParameterList.parse(parameters(config).first(20)!!.payload)

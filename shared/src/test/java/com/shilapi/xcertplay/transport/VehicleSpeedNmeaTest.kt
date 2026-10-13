@@ -86,9 +86,15 @@ class VehicleSpeedNmeaTest {
         assertTrue(diagnostics.any { "requested=false" in it && "components=[1, 2]" in it })
         assertTrue(diagnostics.any { "requested=true" in it && "components=[1, 2, 4]" in it })
         assertTrue(diagnostics.any { "drain=empty" in it })
-        assertTrue(diagnostics.any { "drain=reading" in it && "samples=1" in it && "speedMps=3.500" in it })
+        assertTrue(
+            diagnostics.any {
+                "stage=pascd" in it && "drain=reading" in it && "batch=1" in it &&
+                    "samples=1" in it && "firstMps=3.500" in it && "lastMps=3.500" in it &&
+                    "minMps=3.500" in it && "maxMps=3.500" in it
+            },
+        )
         assertTrue(diagnostics.any { "packets=1" in it && "emptyDrains=1" in it })
-        assertTrue(diagnostics.all { it.startsWith("[DEBUG-a4f2]") })
+        assertTrue(diagnostics.all { it.startsWith("VEHICLE-DATA ") })
     }
 
     @Test

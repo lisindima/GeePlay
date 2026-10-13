@@ -15,7 +15,11 @@ import org.junit.Test
 
 class EvccVehicleTelemetryStoreTest {
     private var now = 1_000L
-    private val store = EvccVehicleTelemetryStore { now }
+    private var wallNow = 1_700_000_000_000L
+    private val store = EvccVehicleTelemetryStore(
+        elapsedRealtime = { now },
+        wallClockMillis = { wallNow },
+    )
 
     @Test
     fun `complete battery state becomes a CarPlay vehicle snapshot`() {
@@ -278,6 +282,34 @@ class EvccVehicleTelemetryStoreTest {
         assertTrue("gear=D" in diagnostics)
         assertTrue("origin=REFRESH_READ" in diagnostics)
         assertEquals(2, "ageMs=250".toRegex().findAll(diagnostics).count())
+    }
+
+    @Test
+    fun `property diagnostics retain source identity raw normalized origin and age`() {
+        accept(
+            EvccLogicalSignal.VEHICLE_SPEED,
+            1_048_832L,
+            EvccValue.ofDouble(36.0, observedAt = wallNow - 80),
+            scale = 1.0 / 3.6,
+            sourceGeneration = 7,
+            source = EvccApiContract.Source.ADAPT_API,
+            origin = EvccObservationOrigin.REFRESH_READ,
+        )
+        now += 125
+
+        val diagnostic = store.propertyDiagnostic(EvccLogicalSignal.VEHICLE_SPEED)
+
+        assertTrue("signal=VEHICLE_SPEED" in diagnostic)
+        assertTrue("source=ADAPT_API" in diagnostic)
+        assertTrue("id=1048832" in diagnostic)
+        assertTrue("generation=7" in diagnostic)
+        assertTrue("raw=36.000" in diagnostic)
+        assertTrue("normalized=10.000" in diagnostic)
+        assertTrue("unit=m/s" in diagnostic)
+        assertTrue("origin=REFRESH_READ" in diagnostic)
+        assertTrue("ageMs=125" in diagnostic)
+        assertTrue("sourceObservedAtMs=${wallNow - 80}" in diagnostic)
+        assertTrue("sourceAgeMs=80" in diagnostic)
     }
 
     private fun accept(

@@ -3,6 +3,7 @@ package com.shilapi.xcertplay.transport
 import com.shilapi.xcertplay.iap2.body.Iap2BodyBuilder
 import com.shilapi.xcertplay.iap2.message.Iap2Messages
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
+import com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics
 import kotlin.math.min
 import kotlin.math.roundToLong
 
@@ -158,13 +159,23 @@ internal class Iap2VehicleStatusReporter(
     fun handle(frame: Iap2Frame, send: (Iap2Frame) -> Unit): Boolean = when (frame.messageId) {
         Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES -> {
             active = provider != null
-            onProgress("iap2 rx=0xa100 start-vehicle-status provider=${provider != null}")
+            onProgress(
+                VehicleDataDiagnostics.record(
+                    "iap2-status-rx",
+                    "messageId=0xa100 action=start provider=${provider != null}",
+                ),
+            )
             if (active) sendNow(send)
             true
         }
         Iap2VehicleStatus.STOP_VEHICLE_STATUS_UPDATES -> {
             active = false
-            onProgress("iap2 rx=0xa102 stop-vehicle-status")
+            onProgress(
+                VehicleDataDiagnostics.record(
+                    "iap2-status-rx",
+                    "messageId=0xa102 action=stop",
+                ),
+            )
             true
         }
         else -> false
@@ -179,13 +190,23 @@ internal class Iap2VehicleStatusReporter(
         if (active) min(remainingMillis, Iap2VehicleStatus.UPDATE_INTERVAL_MILLIS) else remainingMillis
 
     private fun sendNow(send: (Iap2Frame) -> Unit) {
-        val status = provider?.snapshot() ?: return
+        val status = provider?.snapshot()
+        if (status == null) {
+            onProgress(VehicleDataDiagnostics.record("iap2-status-tx", "snapshot=missing sent=false"))
+            return
+        }
         send(Iap2VehicleStatus.update(status))
         lastSentNanos = nanoTime()
         val powertrainRanges = status.resolvedPowertrainRanges().entries
             .sortedBy { it.key.wireValue }
             .joinToString { "${it.key.name.lowercase()}=${it.value.rangeKm}km" }
-        onProgress("iap2 tx=0xa101 vehicle-status range=${status.rangeKm}km $powertrainRanges " +
-            "battery=${status.batteryPercent}% warning=${status.rangeWarning}")
+        onProgress(
+            VehicleDataDiagnostics.record(
+                "iap2-status-tx",
+                "messageId=0xa101 sent=true rangeKm=${status.rangeKm} $powertrainRanges " +
+                    "batteryPercent=${String.format(java.util.Locale.US, "%.3f", status.batteryPercent)} " +
+                    "charging=${status.charging} rangeWarning=${status.rangeWarning}",
+            ),
+        )
     }
 }

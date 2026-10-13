@@ -23,6 +23,8 @@ class GeelyDimNavigationAdapter(
     },
     private val laneRenderer: GeelyLaneBitmapRenderer = GeelyLaneBitmapRenderer(),
     private val independentLaneRefresh: Boolean = false,
+    private val laneIconId: (AppleLane) -> Int = GeelyLaneIconMapper::iconId,
+    private val navigationDataSource: Int? = null,
 ) : GeelyNavigationDriver {
     private enum class ParameterKind { NUMBER, STRING, BOOLEAN }
 
@@ -46,6 +48,7 @@ class GeelyDimNavigationAdapter(
         val eta: Method,
         val road: Method,
         val updateLanes: Method?,
+        val notifyDataSource: Method?,
         val registerCallback: Method?,
         val unregisterCallback: Method?,
     )
@@ -184,12 +187,23 @@ class GeelyDimNavigationAdapter(
                 switchAttempted = true
                 guardedInvoke(dimMethods!!.switchPresentation, dim!!, 1, "", "", true)
                 navigationTouched = true
+                navigationDataSource?.let { source ->
+                    val method = methods.notifyDataSource
+                        ?: error("ECARX navigation data-source API unavailable")
+                    guardedInvoke(method, target, source)
+                }
                 guardedInvoke(methods.updateInformation, target, informationProxy!!)
                 guardedInvoke(methods.updateStatus, target, 1)
                 guardedInvoke(methods.started, target)
+                if (independentLaneRefresh && methods.updateLanes != null && information.lanes != null) {
+                    guardedInvoke(methods.updateLanes, target, information.lanes!!)
+                }
                 navigationActive = true
             } else {
                 guardedInvoke(methods.updateInformation, target, informationProxy!!)
+                if (independentLaneRefresh && methods.updateLanes != null && information.lanes != null) {
+                    guardedInvoke(methods.updateLanes, target, information.lanes!!)
+                }
             }
             listOf(
                 methods.destination to information.destination,
@@ -200,9 +214,6 @@ class GeelyDimNavigationAdapter(
                 guardedInvoke(method, target, value)
             }
             guardedInvoke(methods.road, target, information.road)
-            if (independentLaneRefresh && methods.updateLanes != null && information.lanes != null) {
-                guardedInvoke(methods.updateLanes, target, information.lanes!!)
-            }
             status(GeelyNavigationDriverState.ACTIVE, "navigation published")
             true
         } catch (error: Throwable) {
@@ -226,6 +237,49 @@ class GeelyDimNavigationAdapter(
         }
         status(if (closed) GeelyNavigationDriverState.CLOSED else GeelyNavigationDriverState.READY, "navigation cleared")
         return true
+    }
+
+    /** Debug/validation seam: overlays only lane data without taking or stopping navigation ownership. */
+    @Synchronized
+    fun publishLanesOnly(lanes: List<AppleLane>): Boolean {
+        if (closed || failed || !initialized || !mayExecute() || !consumeConnection(false)) return false
+        val target = navigation ?: return false
+        val methods = navigationMethods ?: return false
+        val update = methods.updateLanes ?: return false
+        return try {
+            checkConnection()
+            navigationDataSource?.let { source ->
+                val method = methods.notifyDataSource
+                    ?: error("ECARX navigation data-source API unavailable")
+                guardedInvoke(method, target, source)
+            }
+            val laneArray = buildLaneArray(lanes)
+            guardedInvoke(update, target, laneArray)
+            // G636's DIM service only mutates its pending protobuf in updateLaneInfo(); a following
+            // navigation status event flushes that snapshot to the instrument cluster.
+            guardedInvoke(methods.updateStatus, target, 1)
+            true
+        } catch (error: Throwable) {
+            fail("lane-only publish", error)
+            false
+        }
+    }
+
+    /** Clears only the lane overlay while leaving an OEM-owned navigation session running. */
+    @Synchronized
+    fun clearLanesOnly(): Boolean {
+        if (closed || failed || !initialized || !mayExecute() || !consumeConnection(false)) return false
+        val target = navigation ?: return false
+        val methods = navigationMethods ?: return false
+        val update = methods.updateLanes ?: return false
+        return runCatching {
+            guardedInvoke(update, target, emptyLaneArray() ?: return false)
+            guardedInvoke(methods.updateStatus, target, 1)
+            true
+        }.getOrElse {
+            status(GeelyNavigationDriverState.FAILED, "ECARX lane-only cleanup failed", unwrap(it))
+            false
+        }
     }
 
     @Synchronized
@@ -293,6 +347,7 @@ class GeelyDimNavigationAdapter(
                     eta = required(target, "updateETA", ParameterKind.NUMBER),
                     road = required(target, "updateNextGuidancePointName", ParameterKind.STRING),
                     updateLanes = laneType?.let { optionalInterface(target, "updateLaneInfo", ReflectArray.newInstance(it, 0).javaClass) },
+                    notifyDataSource = optional(target, "notifyDataSource", ParameterKind.NUMBER),
                     registerCallback = requiredInterface(target, "registerNavigationInteractionCallback", callbackType),
                     unregisterCallback = requiredInterface(target, "unregisterNavigationInteractionCallback", callbackType),
                 )
@@ -313,8 +368,12 @@ class GeelyDimNavigationAdapter(
     }
 
     private fun buildLaneArray(snapshot: AppleNavigationSnapshot): Any? {
-        val laneType = loadClass(LANE_INFORMATION)
         val lanes = if (config.laneGuidanceEnabled) snapshot.laneGuidance?.lanes.orEmpty() else emptyList()
+        return buildLaneArray(lanes)
+    }
+
+    private fun buildLaneArray(lanes: List<AppleLane>): Any {
+        val laneType = loadClass(LANE_INFORMATION)
         return ReflectArray.newInstance(laneType, lanes.size).also { array ->
             lanes.forEachIndexed { index, lane ->
                 ReflectArray.set(array, index, laneProxy(laneType, lane))
@@ -331,7 +390,7 @@ class GeelyDimNavigationAdapter(
         return proxy(type) { proxy, method, arguments ->
             objectMethod(proxy, method, arguments) ?: when (method.name) {
                 "getLaneBackIcon" -> bitmap
-                "getLaneBackIconId" -> number(method.returnType, 0)
+                "getLaneBackIconId" -> number(method.returnType, laneIconId(lane).toLong())
                 "getLaneNumber" -> number(method.returnType, (lane.position + config.laneNumberBase).toLong())
                 else -> defaultValue(method.returnType)
             }

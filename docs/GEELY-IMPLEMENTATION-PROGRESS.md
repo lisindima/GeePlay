@@ -15,8 +15,8 @@
 | 0 | 产品与架构骨架 | 软件与自动化完成 |
 | 1 | RouteGuidance 中立化 | 软件与自动化完成 |
 | 2 | Geely 基础导航 | 软件完成，待厂商权限与实车 |
-| 3 | Lane / junction | 软件完成，待真实帧与实车 |
-| 4 | 媒体 owner 和产品身份 | 软件完成，待实车音频 |
+| 3 | Lane / junction | 真实 OEM 数据已校准；旧 XUI 发布受固件限制，EAS 探针待实车 |
+| 4 | 媒体 owner 和产品身份 | 导航音频已在 G636 验证；媒体 owner/A2DP 仲裁仍待完整实车矩阵 |
 | 5 | OneOS/Flyme 输入 | 软件完成，待目标固件实车 |
 | 6 | 吉利物理仪表 | fail-closed 骨架完成，validated profile 为空 |
 | 产品边界 | AutoDisplay / 外部 MapEmbed | 已完整移除，不属于产品范围 |
@@ -94,6 +94,27 @@ BUILD SUCCESSFUL in 10m 24s
 - 输入 runtime 按活动 session、owner、profile 和通话状态 attach/detach。
 - Flyme 两个 action 只处理 action type 0，250 ms 去重；不可信 sender 路径默认关闭并带风险确认。
 - XUI/OneOS 2 维持 probe-only。
+
+### G636 Opus 导航音频回归修复
+
+- 真机抓取确认 iPhone 正常建立 `type=101`、`audioType=default`、`audioFormat=0x10000000` 的 Opus 导航流，UDP 接收与解密无丢包。
+- 修复前 G636 的 `MediaCodec.createDecoderByType("audio/opus")` 返回 `0xfffffffe`；AudioTrack 虽已建立，但没有 PCM 可写，因此导航静音。
+- 对照验证过的 DiPlay 0.2.13 发布产物发现其额外包含 `libdiplay_opus_jni.so`；该发布期打包输入不在 Git 历史中，因此新建 GeePlay application module 时未被继承。
+- GeePlay 恢复同一 bundled libopus JNI 后端，并以已随源码 vendored 的 Concentus decoder 作为缺失 ABI/加载失败时的 fallback。
+- 修复包在 G636 上使用 `bundled-libopus`，连续输出 48 kHz mono PCM；采样窗口内 `inputDropped=0`、`decoderUnavailablePackets=0`、`underruns=0`，用户确认导航声音恢复。
+
+### G636 车道信息真实链路与发布边界
+
+- 打开工厂地图隐藏的模拟导航后，抓到真实 `RspLanesInfo`。已确认 `laneIndex` 从 0 开始，样本包括 `[0,16, 1,0, 2,4]`、`[0,0, 1,0, 2,15, 3,15, 4,0, 5,0]` 和 `[0,1, 1,1, 2,15, 3,15, 4,3]`。
+- 工厂含义已校准：`0=直行`、`1=左转`、`3=右转`、`4=直行或右转`、`8=右掉头`、`15=推荐直行`、`16=推荐左转`。`GeelyLaneIconMapper` 将 CarPlay angle/highlight 转为该 OEM 编号，生产默认保持 0 基 lane number。
+- GeePlay 通过旧 XUI `updateLaneInfo()` 发送相同数组时，`DIMNaviInteractioncService` 明确记录了数组和 `sendData isOk=true`，但用户多轮确认仪表没有车道，故只能记为 `DELIVERED`，不能记为 `VEHICLE_CONFIRMED`。
+- 静态差分确认 G636 固件的 `EcarxNaviInteractionImpl.updateNaviStatus()` 仅取 service 后返回，实际为空操作；工厂地图的新链路是 EAS Map provider → NaviService `MapStateMachine` → `RspLanesInfo`，不是旧 XUI 状态调用。
+- 真车已运行旧版 Debug-only EAS 探针。NaviService 将 GeePlay 的实际包身份注册为 vendor `-100`，收到 `drive_way_size=3` 和 `16/0/4`，但日志始终为 `mapForWidget:9`，因此事件 `2009` 未转成 `RspLanesInfo`，仪表无车道；EAS `43` 后延时 500 ms 再走 XUI lane 的混合路径也失败。
+- 离线反编译精确确认：`43/44` 是 `ENLARGE_VIEW_OF_CROSSROAD_ON/OFF`，不改变 guiding source；`16/33` 才设置 guiding bit，`17/35` 才清除。`MapStateMachine` 只在 lane vendor 等于 `getMapForWidget()` 时发布事件 `1009`，再转换成协议 `3418 RspLanesInfo`。
+- `MapInstallMonitor` 对七个内置地图使用固定 vendor；普通第三方若声明启用的 `ecarx.intent.action.MAP_SERVICE`，会获得 `packageName.hashCode()` 动态 vendor。GeePlay 当前未声明该 provider service，不能把客户端请求的 `9` 当成身份；生产接入前还需验证完整 service contract，不能仅为取 vendor 而添加空壳 service。
+- Debug-only `eas-lane` 探针已删除 `setMapVendor(9)`，改为服务器分配身份，并按 `16 → 43 → lanes → clear → 44 → 17` 发布和清理。Robolectric 锁定 guide start 必须先于 lane、guide stop 必须晚于 clear。
+- 二次离线审计确认 EAS one-way Binder、serialized RxBus、MapManager 和同一 StateMachine Handler 都保持事件顺序；vendor `-100` 也能成为 `mapForWidget` 并产生 `3418 RspLanesInfo`。但现有 G636 离线包缺少仪表最终消费者实现，无法证明它接受未知 vendor；探针现已对 `-100` fail-closed，在合法 provider 身份或消费者规则明确前不会发布任何车辆输出，也不再让用户进行真车尝试。
+- 修正并增加未知 vendor 门禁后，focused test、AGENTS.md 基础命令和 GeePlay 命令均通过，`vehicle-geely/geely` lint 为 0 errors；Debug APK SHA-256 为 `ab437d98372cd17ba84b290d73edb5d81e3a4e0ee5c4e7336597fb621701b989`，当前未安装或操作车机。
 
 ### 物理仪表和诊断
 

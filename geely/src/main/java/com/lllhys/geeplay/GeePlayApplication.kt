@@ -31,6 +31,7 @@ import com.shilapi.xcertplay.vehicle.ClusterMapVisibilitySource
 import com.shilapi.xcertplay.vehicle.VehicleParkStateSource
 import com.shilapi.xcertplay.vehicle.VehicleTyreTelemetrySource
 import com.shilapi.xcertplay.vehicle.BluetoothAudioConflictPolicy
+import com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics
 
 class GeePlayApplication : Application(), VehicleIntegrationProvider {
     private lateinit var evccVehicleData: EvccVehicleDataAdapter
@@ -41,6 +42,8 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
 
     override fun onCreate() {
         super.onCreate()
+        VehicleDataDiagnostics.initialize(this)
+        VehicleDataDiagnostics.record("lifecycle", "product=GeePlay action=application-created")
         evccConnection = EvccConnectionCore(this)
         evccVehicleData = EvccVehicleDataAdapter(this, evccConnection)
         evccControl = EvccVehicleControlGateway(evccConnection)

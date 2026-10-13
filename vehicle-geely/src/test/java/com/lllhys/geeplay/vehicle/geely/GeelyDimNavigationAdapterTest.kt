@@ -39,6 +39,7 @@ class GeelyDimNavigationAdapterTest {
         assertEquals(2, dim.navigation.lastLanes.size)
         assertEquals(0, dim.navigation.lastLanes[0].number)
         assertEquals(0, dim.navigation.lastLanes[0].iconId)
+        assertEquals(33, dim.navigation.lastLanes[1].iconId)
         assertEquals(GeelyNavigationDriverState.ACTIVE, statuses.last().state)
 
         assertTrue(driver.clear())

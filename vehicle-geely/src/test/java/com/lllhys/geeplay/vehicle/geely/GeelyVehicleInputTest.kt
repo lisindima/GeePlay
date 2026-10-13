@@ -10,6 +10,8 @@ import android.os.IBinder
 import android.os.Parcel
 import android.os.Looper
 import android.view.KeyEvent
+import com.geely.lib.oneosapi.input.IInputListener
+import com.geely.lib.oneosapi.input.IInputManager
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.media.MediaOutputOwner
 import com.shilapi.xcertplay.vehicle.VehicleHostControls
@@ -95,6 +97,43 @@ class GeelyVehicleInputTest {
                 GeelyInputEvent(OneOsWheelProtocol.KEY_NEXT, GeelyInputGesture.LONG, "oneos"),
             ),
         )
+        assertEquals(
+            GeelyInputAction.SIRI,
+            GeelyInputMapping.action(
+                GeelyInputProfile.ONE_OS,
+                GeelyInputEvent(
+                    GeelyDirectInputServiceAdapter.KEY_VOICE_ASSIST,
+                    GeelyInputGesture.LONG,
+                    "geely_inputservice",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `G636 direct input registers media and voice keys then unregisters`() {
+        val binding = RecordingBindingContext(context)
+        val manager = RecordingDirectInputManager()
+        val events = ArrayList<GeelyInputEvent>()
+        val adapter = GeelyDirectInputServiceAdapter(
+            binding,
+            { events += it; true },
+            worker = ImmediateExecutor(),
+        )
+
+        adapter.start()
+        shadowOf(Looper.getMainLooper()).idle()
+        binding.connect(manager.asBinder())
+
+        assertEquals(binding.packageName, manager.packageName)
+        assertArrayEquals(GeelyDirectInputServiceAdapter.REQUESTED_KEYS, manager.keys)
+        manager.listener!!.onShortClick(OneOsWheelProtocol.KEY_NEXT, 0)
+        manager.listener!!.onLongPressTriggered(GeelyDirectInputServiceAdapter.KEY_VOICE_ASSIST, 0)
+        assertEquals(listOf(GeelyInputGesture.SHORT, GeelyInputGesture.LONG), events.map { it.gesture })
+
+        adapter.close()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(manager.unregistered)
     }
 
     @Test
@@ -347,6 +386,27 @@ class GeelyVehicleInputTest {
             reply?.writeNoException()
             return true
         }
+    }
+
+    private class RecordingDirectInputManager : IInputManager.Stub() {
+        var listener: IInputListener? = null
+        var packageName: String? = null
+        var keys: IntArray? = null
+        var unregistered = false
+
+        override fun interceptKeyCode(keyCode: Int, packageName: String?): Boolean = false
+        override fun releaseKeyCode(keyCode: Int, packageName: String?): Boolean = false
+        override fun registerListener(listener: IInputListener?, packageName: String?, keyCodes: IntArray?) {
+            this.listener = listener
+            this.packageName = packageName
+            keys = keyCodes
+        }
+        override fun unregisterListener(listener: IInputListener?, packageName: String?) {
+            assertSame(this.listener, listener)
+            assertEquals(this.packageName, packageName)
+            unregistered = true
+        }
+        override fun getControlIndex(): Int = 0
     }
 
     private class RecordingBindingContext(base: Context) : ContextWrapper(base) {

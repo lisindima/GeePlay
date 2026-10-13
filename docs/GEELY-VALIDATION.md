@@ -35,7 +35,8 @@
 | BYD 兼容 | state wrapper、cluster frame、glance/overlay、Bluetooth lifecycle | 通过 |
 | ECARX Driver | watched/direct、方法签名、dynamic proxy、typed lane array、publish/clear、OEM 拒绝 | fake SDK 通过 |
 | cleanup journal | 写前标记、清理确认、启动恢复、未确认时阻止新输出 | 通过 |
-| lane / junction renderer | Bitmap、icon ID 0、lane base、empty array、junction angle seam | fake SDK / Robolectric 通过 |
+| lane / junction renderer | Bitmap、工厂 icon ID 映射、0 基 lane、empty array、junction angle seam | fake SDK / Robolectric 通过 |
+| EAS lane Debug probe | 服务器分配 vendor、`-100` fail-closed、`16 → 43 → lanes → clear → 44 → 17`、unregister/release | Robolectric 通过；旧序列真车失败，修正序列暂不投放（未知 vendor 消费规则待明确） |
 | media owner | MEDIA 抑制、非 MEDIA 保留、MediaSession gate、Bluetooth retention | 通过 |
 | OneOS input | descriptor、transaction、key、owner/call/session gate、timeout、death、epoch、quarantine | 通过 |
 | Flyme voice | 两个 action、action type、250 ms 去重、风险确认 | 通过 |
@@ -54,7 +55,7 @@
 | strict RouteGuidance | strict UTF-8、容量边界、原子拒绝、route end | `SOFTWARE_VERIFIED` |
 | Lane capability | Identify 7/8、`0x5204` catalog/whitelist/parser | `SOFTWARE_VERIFIED`; `VEHICLE_PENDING` |
 | ECARX basic navigation | fake SDK publish/clear/recovery | `SOFTWARE_VERIFIED`; `AVAILABLE/DELIVERED/VEHICLE_CONFIRMED` 待实车 |
-| ECARX lane | typed array、Bitmap、empty clear、profile seam | `SOFTWARE_VERIFIED`; `VEHICLE_PENDING` |
+| ECARX lane | 0 基 typed array、工厂 icon ID、empty clear；旧 XUI 与 EAS 差分 | `SOFTWARE_VERIFIED`; XUI `DELIVERED`; EAS/仪表 `VEHICLE_PENDING` |
 | media owner | immutable policy、renderer/MediaSession/Bluetooth gates | `SOFTWARE_VERIFIED`; `VEHICLE_PENDING` |
 | OneOS/Flyme input | lifecycle、timeout/death/epoch/quarantine、risk gate | `SOFTWARE_VERIFIED`; `VEHICLE_PENDING` |
 | stream `111` local path | virtual config、decoder/mirror、local UI | `SOFTWARE_VERIFIED` |
@@ -369,7 +370,59 @@ Final branding-resource install: superseded by the installed geely.3 build
 
 因此当前只能确认软件门禁和安全降级；ECARX 导航、lane、媒体 owner、方向盘、junction 和物理仪表仍为 `VEHICLE_PENDING`。GeePlay 不使用 AutoDisplay 作为替代交付路径。
 
-### 9.4 G636 状态栏与 CarPlay 圆角调查
+### 9.4 G636 工厂车道与 GeePlay 对照证据（2026-10-13）
+
+工厂地图隐藏模拟导航被临时打开并在验证后恢复。到“爱力中心A座”的模拟导航产生了真实车道流：
+
+```text
+factory lanes: [0,16, 1,0, 2,4]
+factory lanes: [0,0, 1,0, 2,15, 3,15, 4,0, 5,0]
+factory lanes: [0,1, 1,1, 2,15, 3,15, 4,3]
+factory status: 43 before visible lane panel; 44 when hidden
+factory data source: 9
+```
+
+确认结论：
+
+- `laneIndex` 为 0 基；Bitmap 在 G636 AdapterService 下不会进入最终协议，真正生效的是 `laneIconId`。
+- 工厂基础 ID：`0` 直行、`1` 左转、`3` 右转、`4` 直行或右转、`8` 右掉头；推荐 ID 至少确认 `15` 直行、`16` 左转。
+- GeePlay 发送 `[0,16, 1,0, 2,4]` 后，`DIMNaviInteractioncService` 收到完全一致数组；完整导航探针也发送并收到 `[0,1, 1,15, 2,3]`。用户确认仪表仍无车道，因此“Binder 调用成功/DIM 收到”不等于仪表呈现。
+- 反编译车机实际 XUI/AdapterService 路径确认：`updateLaneInfo()` 会序列化 `laneNumber,laneIconId`；但 `EcarxNaviInteractionImpl.updateNaviStatus()` 是空操作。工厂地图观察到的 `43/44` 来自 EAS NaviService，不来自旧 XUI。
+- 旧版 Debug-only `eas-lane` 已在真车执行：服务端忽略客户端请求的 vendor `9`，按真实包身份注册 GeePlay 为 `-100`；`43`、三条 lane `16/0/4`、`44` 均到达 NaviService，但当时 `mapForWidget=9`，仪表无车道。随后执行的 `EAS 43 → 500 ms → XUI lane` 也无显示。
+- 离线反编译纠正了旧假设：`43/44` 只表示路口放大图开/关，不会建立导航所有权；`16/33` 才进入 guiding，`17/35` 才退出。lane 事件只有在自身 vendor 等于当前 `mapForWidget` 时，才会变成事件 `1009` 和协议 `3418 RspLanesInfo`。
+- `MapInstallMonitor` 允许正式内置包使用固定 vendor，也允许声明 `ecarx.intent.action.MAP_SERVICE` 的第三方 provider 使用包名 hash vendor。当前没有证据允许 GeePlay 用空壳 service 取得该身份，因此生产继续 fail-closed；修正后的探针不再设置 vendor `9`，仅使用服务端实际分配值。
+- 修正后的 Debug-only 探针序列为 `GUIDE_START(16) → CROSSROAD_ON(43) → lanes → empty clear → CROSSROAD_OFF(44) → GUIDE_STOP(17)`。自动化已通过；该序列尚未真车执行。
+- 二次离线审计确认这组调用经过同一 one-way Binder、serialized RxBus、MapManager dispatcher 和 StateMachine Handler，顺序不会越过；`-100` 在 NaviService 内部也可进入 guiding state、成为 `mapForWidget` 并生成 `3418 RspLanesInfo`。未闭环的是 G636 仪表最终消费者是否拒绝未知 vendor，该消费者不在当前工厂 Map、NaviService 近似包或 NaviWidget 包中。探针已增加 `-100` 硬拒绝测试：未知身份时不发任何 status/lane，仍执行 unregister/release。
+
+清理确认：工厂模拟导航系统设置恢复为未设置，Mock Location app-op 为 `deny`，测试导航 `published/cleared=true`、`cleanupPending=false`、Driver 最终 `CLOSED`。
+
+当前等级：lane parser/映射 `SOFTWARE_VERIFIED`；旧 XUI 到 DIM 为 `DELIVERED`；仪表显示与 EAS provider 权限仍为 `VEHICLE_PENDING`。
+
+离线静态证据来自以下候选包；其中 NaviService 是与车机日志同系列的本地近似版本，结论只采用同时被真车日志印证的控制条件：
+
+```text
+Factory Map 2.0.0 l7a1: 77732106354ca16ddc06658dda21cf29a12bf6851c5a0cfed995417d65c375c6
+NaviWidget 1.0.12 l7a1: abfdd054cc266291c24bab6bd74914a9e018a339383d898b20470c2c9a77787d
+XSFNaviService 26020302: 724137e1a44078433467232c886ee9d8c6d41f27f721b57b50307daabbd2d8fc
+```
+
+离线候选包门禁：
+
+```text
+Superseded debug APK: 0da5c0ef6686cdc40b0980076c0d2e251a144d1768ba3a51a37f745bfe962459
+Superseded vehicle result: 43/lanes/44 reached NaviService but did not render
+
+Corrected EAS lifecycle and unknown-vendor fail-closed tests: PASS
+Base AGENTS.md CI command: BUILD SUCCESSFUL in 4s
+GeePlay AGENTS.md command: BUILD SUCCESSFUL in 14s
+vehicle-geely/geely lint: 0 errors
+Corrected debug APK SHA-256: ab437d98372cd17ba84b290d73edb5d81e3a4e0ee5c4e7336597fb621701b989
+Install/vehicle result: not attempted; user is away from the vehicle
+```
+
+暂不安排下一次真车运行。先离线解决合法 provider 身份，或拿到 G636 仪表消费者对 `RspLanesInfo.mapVendor` 的接受规则；完成后才允许一次自动化验证，同时确认 `mapForWidget` 切换、`RspLanesInfo(protocol=3418)`、仪表可见和 `17`/empty clear。该结果未确认前不得接入生产。
+
+### 9.5 G636 状态栏与 CarPlay 圆角调查
 
 实车复现截图：`docs/images/geely-validation/g636-statusbar-black-repro.png`。
 
@@ -400,7 +453,7 @@ Install: pm install -r -t succeeded on G636; app data preserved
 
 G636 后续已覆盖安装该 geely.3 包；firstInstallTime、150% interface-size 偏好和应用数据均保留。其后的 host-root 背景同步与 BYD 菜单屏蔽源码改动已通过软件门禁，但尚未生成新的含认证实车包。
 
-### 9.5 BYD 设置屏蔽与 upstream checklist
+### 9.6 BYD 设置屏蔽与 upstream checklist
 
 | 验证项 | 结果 |
 | --- | --- |
@@ -419,4 +472,42 @@ Full CI: BUILD SUCCESSFUL in 3m 3s
 Tasks: 358 actionable, 64 executed, 294 up-to-date
 Tests: 2444 / failures 0 / errors 0 / skipped 1
 Lint: mobile/home/maphost/vehicle-geely/geely all 0 errors
+```
+
+### 9.7 G636 导航音频与 bundled Opus 解码
+
+2026-10-12 在同一 G636、同一 iPhone 和同一音频路由下复现 GeePlay 导航静音：
+
+- iPhone 正常建立 `type=101`、`audioType=default`、`audioFormat=0x10000000` 的 Opus 导航流；
+- UDP 包持续接收并成功解密，RTP 时钟约 16 kHz；
+- 导航 AudioTrack 成功建立并路由到 G636；
+- 失败点为 `MediaCodec.createDecoderByType("audio/opus")`，返回 `0xfffffffe`；后续包没有产生 PCM；
+- G636 的 codec registry 不提供可用的 `audio/opus` decoder。
+
+产物差异核对：验证过的 `DiPlay_0.2.13_Packed_ADSigned_20261006 (2).apk` 额外包含
+`libdiplay_opus_jni.so` 和 libopus 1.6.1 license，但这些文件不存在于 Git 历史。GeePlay 初建时只继承了源码，
+没有继承发布/加固阶段注入的 native decoder，这就是同源代码在两个安装包上表现不同的原因。
+
+修复后证据：
+
+```text
+audio decoder configured mime=audio/opus name=bundled-libopus
+audio first PCM type=101 bytes=1920
+audio playback started type=101
+inputDroppedTotal=0 decoderUnavailablePacketsTotal=0 outputBuffersTotal=757
+underruns=0 writeErrors=0
+```
+
+用户在车内确认导航声音恢复。native backend 缺失或自检失败时使用源码内置 Concentus decoder，避免再次出现
+“向 iPhone 宣告 Opus、运行时却无法解码”的静音状态。导入二进制的来源与 SHA-256 记录在
+`shared/src/main/jniLibs/README.md`，libopus license 随 APK 打包。
+
+```text
+Version: 0.2.18-geely.4-debug / versionCode 4
+APK SHA-256: 5e82811b3cc927026b9fcbf187b15f15459c264fb8d352f93cf7360c7b802430
+Full CI: BUILD SUCCESSFUL in 12s
+Tests: 2665 / failures 0 / errors 0 / skipped 1
+Packaged native decoder: arm64-v8a, armeabi-v7a, x86_64
+Authentication assets: repository 0; temporary build directory removed
+Install: pm install -r succeeded on G636; app data preserved
 ```

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name" translatable="false">GeePlay</string>
+    <string name="app_name">GeePlay</string>
     <string name="setup_error_auth">CarPlay authentication could not be loaded. Install the complete GeePlay build over this app. No uninstall or hotspot change is needed.</string>
     <string name="make_diplay_feel_right_for_your_car">Make GeePlay feel right for your car.</string>
     <string name="settings_language_summary">Choose a language for GeePlay</string>

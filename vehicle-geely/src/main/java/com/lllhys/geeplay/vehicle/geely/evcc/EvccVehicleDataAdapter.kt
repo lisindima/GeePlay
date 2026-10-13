@@ -2,6 +2,7 @@ package com.lllhys.geeplay.vehicle.geely.evcc
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.util.Log
 import com.lllhys.geeplay.vehicle.geely.GeelyClusterDisplaySettings
 import com.kooo.evcc.evccapi.EvccApiContract
@@ -18,6 +19,7 @@ import com.shilapi.xcertplay.transport.VehicleStatusProvider
 import com.shilapi.xcertplay.vehicle.CarPlayVehicleDataAdapter
 import com.shilapi.xcertplay.vehicle.CarPlayVehicleDataSession
 import com.shilapi.xcertplay.vehicle.ClusterMapVisibilitySource
+import com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics
 import com.shilapi.xcertplay.vehicle.VehicleParkStateSource
 import com.shilapi.xcertplay.vehicle.VehicleTyreTelemetrySnapshot
 import com.shilapi.xcertplay.vehicle.VehicleTyreTelemetrySource
@@ -83,6 +85,7 @@ class EvccVehicleDataAdapter internal constructor(
     private var motionRefreshRequestCount = 0L
     private var motionRefreshReadCount = 0L
     private var lastMotionEvent = "-"
+    private val propertyTraceStates = LinkedHashMap<EvccLogicalSignal, PropertyTraceState>()
     private lateinit var client: EvccClientPort
 
     @Volatile
@@ -123,8 +126,13 @@ class EvccVehicleDataAdapter internal constructor(
                 motionRefreshRequestCount = 0L
                 motionRefreshReadCount = 0L
                 lastMotionEvent = "-"
+                propertyTraceStates.clear()
             }
             telemetry.clear()
+            diagnose(
+                "evcc-session",
+                "ready service=$serviceVersion api=$protocolVersion permissions=${grantedPermissions.sorted()}",
+            )
             if (apiInfo.apiMajor != REQUIRED_API_MAJOR || apiInfo.apiMinor < REQUIRED_API_MINOR) {
                 updateState(EvccVehicleDataState.INCOMPATIBLE, "requires EvccApi 1.2")
                 client.disconnect()
@@ -152,7 +160,12 @@ class EvccVehicleDataAdapter internal constructor(
                             lastMotionEvent = "${binding.signal}:$eventType#$sequence"
                         }
                     }
-                    telemetry.accept(binding, record, EvccObservationOrigin.PROPERTY_EVENT)
+                    acceptTelemetry(
+                        binding,
+                        record,
+                        EvccObservationOrigin.PROPERTY_EVENT,
+                        "eventType=$eventType eventSequence=$sequence",
+                    )
                     refreshReadyState()
                 }
             }
@@ -209,6 +222,7 @@ class EvccVehicleDataAdapter internal constructor(
     }
 
     init {
+        VehicleDataDiagnostics.initialize(appContext)
         client = clientFactory(appContext, listener)
     }
 
@@ -268,6 +282,12 @@ class EvccVehicleDataAdapter internal constructor(
         } else {
             null
         }
+        diagnose(
+            "carplay-session",
+            "created statusProvider=${statusProvider != null} speedSource=${speedSource != null} " +
+                "statusEnabled=${EvccVehicleDataSettings.vehicleStatusEnabled(appContext)} " +
+                "speedEnabled=${EvccVehicleDataSettings.vehicleSpeedEnabled(appContext)}",
+        )
         val sessionSignals = buildSet {
             if (statusProvider != null) addAll(BATTERY_SIGNALS)
             if (speedSource != null) addAll(MOTION_SIGNALS)
@@ -331,7 +351,10 @@ class EvccVehicleDataAdapter internal constructor(
                 "motionRefreshRequests=$motionRefreshRequestCount motionRefreshReads=$motionRefreshReadCount " +
                 "lastMotionEvent=$lastMotionEvent speedSources=$speedSources detail=$detail"
         }
-        return "EVCC vehicle data: installed=${evccInstalled()} $snapshot ready=$ready ${telemetry.motionDiagnostics()}"
+        return buildString {
+            appendLine("EVCC vehicle data: installed=${evccInstalled()} $snapshot ready=$ready")
+            telemetry.propertyDiagnostics().forEach { appendLine("EVCC $it") }
+        }.trimEnd()
     }
 
     override fun close() {
@@ -425,12 +448,26 @@ class EvccVehicleDataAdapter internal constructor(
             }
             if (!current(expectedGeneration)) return
             synchronized(stateLock) { resolved = next }
+            next.forEach { binding ->
+                diagnose(
+                    "evcc-resolve",
+                    "signal=${binding.signal} source=${binding.descriptor.source} " +
+                        "id=${binding.descriptor.canonicalId} area=${binding.descriptor.areaId} " +
+                        "generation=${binding.descriptor.sourceGeneration} type=${binding.descriptor.dataType} " +
+                        "scale=${binding.candidate.scale} offset=${binding.candidate.offset}",
+                )
+            }
             telemetry.retainSignals(next.mapTo(linkedSetOf(), EvccResolvedProperty::signal))
             for (binding in next) {
                 if (!current(expectedGeneration)) return
                 val record = client.readProperty(binding.selector, forceRefresh = false)
                 if (!current(expectedGeneration)) return
-                telemetry.accept(binding, record, EvccObservationOrigin.INITIAL_READ)
+                acceptTelemetry(
+                    binding,
+                    record,
+                    EvccObservationOrigin.INITIAL_READ,
+                    "forceRefresh=false",
+                )
             }
             if (availableSources.isEmpty()) {
                 updateState(EvccVehicleDataState.DEGRADED, "vehicle property sources unavailable")
@@ -513,7 +550,12 @@ class EvccVehicleDataAdapter internal constructor(
                     }
                     val record = client.readProperty(binding.selector, forceRefresh = false)
                     if (!current(expectedGeneration)) break
-                    telemetry.accept(binding, record, EvccObservationOrigin.REFRESH_READ)
+                    acceptTelemetry(
+                        binding,
+                        record,
+                        EvccObservationOrigin.REFRESH_READ,
+                        "forceRefresh=false",
+                    )
                 }
                 if (current(expectedGeneration)) refreshReadyState()
             } catch (error: Throwable) {
@@ -594,6 +636,7 @@ class EvccVehicleDataAdapter internal constructor(
             resolved = emptyList()
             sourceStates = emptyMap()
             grantedPermissions = emptySet()
+            propertyTraceStates.clear()
         }
     }
 
@@ -636,7 +679,48 @@ class EvccVehicleDataAdapter internal constructor(
             detail = nextDetail.take(MAX_DETAIL_LENGTH)
             changed
         }
-        if (changed) Log.i(TAG, "state=$next detail=${nextDetail.take(MAX_DETAIL_LENGTH)}")
+        if (changed) diagnose("evcc-state", "state=$next detail=${nextDetail.take(MAX_DETAIL_LENGTH)}")
+    }
+
+    private fun acceptTelemetry(
+        binding: EvccResolvedProperty,
+        record: EvccPropertyRecord,
+        origin: EvccObservationOrigin,
+        eventDetail: String = "",
+    ) {
+        val cacheChanged = telemetry.accept(binding, record, origin)
+        val available = record.status in SUCCESS_STATUSES &&
+            record.value?.initialized == true && record.value?.status == EvccApiContract.Status.AVAILABLE
+        val property = telemetry.propertyDiagnostic(binding.signal)
+        val fingerprint = property.substringBeforeLast(" ageMs=", property)
+        val now = SystemClock.elapsedRealtime()
+        val shouldTrace = synchronized(stateLock) {
+            val previous = propertyTraceStates[binding.signal]
+            val minimumInterval = if (binding.signal == EvccLogicalSignal.VEHICLE_SPEED) {
+                MOTION_TRACE_INTERVAL_MILLIS
+            } else {
+                PROPERTY_HEARTBEAT_MILLIS
+            }
+            val changedValue = previous?.fingerprint != fingerprint
+            val trace = previous == null || !available ||
+                (binding.signal != EvccLogicalSignal.VEHICLE_SPEED && changedValue) ||
+                now - (previous?.recordedAtMillis ?: 0L) >= minimumInterval
+            if (trace) propertyTraceStates[binding.signal] = PropertyTraceState(now, fingerprint)
+            trace
+        }
+        if (shouldTrace) {
+            val event = eventDetail.takeIf(String::isNotBlank)?.let { "$it " }.orEmpty()
+            diagnose(
+                "evcc-property",
+                "origin=$origin available=$available cacheChanged=$cacheChanged " +
+                    "recordStatus=${record.status} valueStatus=${record.value?.status ?: "missing"} " +
+                    event + property,
+            )
+        }
+    }
+
+    private fun diagnose(stage: String, detail: String) {
+        Log.i(TAG, VehicleDataDiagnostics.record(stage, detail))
     }
 
     private fun EvccPropertyDescriptor.readable(): Boolean {
@@ -674,6 +758,8 @@ class EvccVehicleDataAdapter internal constructor(
         const val REQUIRED_API_MAJOR = 1
         const val REQUIRED_API_MINOR = 2
         const val MAX_DETAIL_LENGTH = 160
+        const val MOTION_TRACE_INTERVAL_MILLIS = 1_000L
+        const val PROPERTY_HEARTBEAT_MILLIS = 30_000L
         val PREWARM_OWNER = Any()
         val TYRE_OWNER = Any()
         val SUCCESS_STATUSES = setOf(EvccApiContract.Status.OK, EvccApiContract.Status.AVAILABLE)
@@ -711,4 +797,9 @@ class EvccVehicleDataAdapter internal constructor(
             EvccVehicleDataState.INCOMPATIBLE,
         )
     }
+
+    private data class PropertyTraceState(
+        val recordedAtMillis: Long,
+        val fingerprint: String,
+    )
 }

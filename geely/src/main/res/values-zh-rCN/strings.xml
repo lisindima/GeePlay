@@ -1,4 +1,5 @@
 <resources>
+    <string name="app_name">GeePlay</string>
     <string name="setup_error_auth">无法加载 CarPlay 认证。请在本应用之上覆盖安装完整的 GeePlay 构建。无需卸载或更改热点设置。</string>
     <string name="make_diplay_feel_right_for_your_car">按需调整 GeePlay 设置。</string>
     <string name="settings_language_summary">选择 GeePlay 的语言</string>

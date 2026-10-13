@@ -5526,6 +5526,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                         "connectWhenOpened=${DiPlayPreferences.autoConnect(appContext)}")
                     appendLine(WheelKeyService.report(appContext))
                     appendLine()
+                    appendLine("--- Vehicle data trace (current process) ---")
+                    com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics.report().lineSequence().forEach { line ->
+                        DiagnosticRedactor.redact(line)?.let { appendLine(it) }
+                    }
+                    appendLine()
                     (appContext as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
                         ?.diagnosticReport(appContext)
                         ?.takeIf { it.isNotBlank() }
@@ -5541,7 +5546,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     appendLine("--- Recent own-app process exits (Android 11+) ---")
                     appendLine(ProcessExitDiagnostics.report(appContext))
                     appendLine()
-                    for (name in SessionLogFile.REPORT_NAMES) {
+                    for (name in SessionLogFile.REPORT_NAMES +
+                        com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics.REPORT_NAMES
+                    ) {
                         val file = File(appContext.filesDir, "logs/$name")
                         if (file.isFile) {
                             appendLine("--- $name ---")

@@ -37,6 +37,7 @@ class GeePlayApplicationTest {
     fun `GeePlay product copy overrides visible DiPlay branding in every locale`() {
         val application = RuntimeEnvironment.getApplication() as GeePlayApplication
         val productCopy = intArrayOf(
+            HostR.string.app_name,
             HostR.string.setup_error_auth,
             HostR.string.make_diplay_feel_right_for_your_car,
             HostR.string.settings_language_summary,

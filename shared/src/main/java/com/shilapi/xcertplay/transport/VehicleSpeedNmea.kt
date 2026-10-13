@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.transport
 
+import com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics
 import java.util.Locale
 
 enum class VehicleGear(val letter: Char) { PARK('P'), REVERSE('R'), NEUTRAL('N'), DRIVE('D') }
@@ -117,24 +118,27 @@ class VehicleSpeedLocationProvider(
         packets += 1
         drainedSamples += reading.samples.size
         if (lastDrainHadReading != true || packets == 1 || packets % DIAGNOSTIC_PACKET_INTERVAL == 0) {
-            val latestSpeed = reading.samples.lastOrNull()?.metersPerSecond
+            val speeds = reading.samples.map(VehicleSpeedSample::metersPerSecond)
             diagnose(
-                "wheel-speed drain=reading packets=$packets samples=${reading.samples.size} " +
+                "wheel-speed drain=reading batch=$packets packets=$packets samples=${reading.samples.size} " +
                     "totalSamples=$drainedSamples gear=${reading.gear.letter} " +
-                    "speedMps=${latestSpeed?.let { format("%.3f", it) } ?: "-"} " +
+                    "firstMps=${speeds.firstOrNull()?.let { format("%.3f", it) } ?: "-"} " +
+                    "lastMps=${speeds.lastOrNull()?.let { format("%.3f", it) } ?: "-"} " +
+                    "minMps=${speeds.minOrNull()?.let { format("%.3f", it) } ?: "-"} " +
+                    "maxMps=${speeds.maxOrNull()?.let { format("%.3f", it) } ?: "-"} " +
                     "emptyDrains=$emptyDrains",
             )
         }
         lastDrainHadReading = true
     }
 
-    private fun diagnose(message: String) = onDiagnostic("$DEBUG_PREFIX $message")
+    private fun diagnose(message: String) =
+        onDiagnostic(VehicleDataDiagnostics.record("pascd", message))
 
     private fun format(format: String, vararg arguments: Any): String =
         String.format(Locale.US, format, *arguments)
 
     private companion object {
-        const val DEBUG_PREFIX = "[DEBUG-a4f2]"
-        const val DIAGNOSTIC_PACKET_INTERVAL = 10
+        const val DIAGNOSTIC_PACKET_INTERVAL = 1
     }
 }

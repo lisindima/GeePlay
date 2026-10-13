@@ -1,4 +1,5 @@
 <resources>
+    <string name="app_name">GeePlay</string>
     <string name="setup_error_auth">CarPlay認証を読み込めませんでした。このアプリに完全版GeePlayを上書きインストールしてください。アンインストールやホットスポット設定の変更は不要です。</string>
     <string name="make_diplay_feel_right_for_your_car">GeePlayを車に合わせて設定します。</string>
     <string name="settings_language_summary">GeePlayの言語を選択</string>

@@ -45,6 +45,16 @@ class EvccGeelyPropertyProfileTest {
         assertEquals(VehicleGear.PARK, gear.gearValues[4L])
         assertEquals(VehicleGear.DRIVE, gear.gearValues[8L])
         assertEquals(VehicleGear.DRIVE, gear.gearValues[16_384L])
+
+        assertEquals(
+            listOf(EvccApiContract.Source.ADAPT_API to 5_243_136L),
+            candidates(bindings.getValue(EvccLogicalSignal.TYRE_PRESSURE_FRONT_LEFT)),
+        )
+        val tyreTemperature = bindings.getValue(EvccLogicalSignal.TYRE_TEMPERATURE_FRONT_LEFT)
+            .candidates.single()
+        assertEquals(5_244_160L, tyreTemperature.id)
+        assertEquals(5.0 / 9.0, tyreTemperature.scale, 0.000_001)
+        assertEquals(-32.0 * 5.0 / 9.0, tyreTemperature.offset, 0.000_001)
     }
 
     private fun candidates(binding: EvccPropertyBinding): List<Pair<String, Long>> =

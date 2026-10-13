@@ -16,6 +16,7 @@ import com.kooo.evcc.evccapi.EvccSourceState
 import com.kooo.evcc.evccapi.EvccValue
 import com.kooo.evcc.evccapi.client.EvccApiClient
 import com.shilapi.xcertplay.transport.VehicleEngineType
+import com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -68,6 +69,13 @@ class EvccVehicleDataAdapterTest {
             adapter.prepare()
             assertEquals(0, fake.disconnectCount)
             assertTrue("BATTERY_SOC" in adapter.diagnostics())
+            assertTrue("property signal=BATTERY_SOC" in adapter.diagnostics())
+            assertTrue("id=1051136" in adapter.diagnostics())
+            assertTrue("raw=50.000" in adapter.diagnostics())
+            assertTrue("normalized=50.000" in adapter.diagnostics())
+            assertTrue("stage=evcc-property" in VehicleDataDiagnostics.report())
+            assertTrue("origin=INITIAL_READ" in VehicleDataDiagnostics.report())
+            assertTrue("forceRefresh=false" in VehicleDataDiagnostics.report())
 
             session.close()
             assertEquals(1, fake.disconnectCount)

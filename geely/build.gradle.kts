@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(project(":evccapi-client"))
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.17")
 }

@@ -114,10 +114,10 @@ class Iap2LocationReporterTest {
             link.tick { frame -> sent += frame }
         }
 
-        assertTrue(progress.any { "vehicle-speed packets=1" in it })
-        assertTrue(progress.any { "vehicle-speed packets=10" in it })
-        assertEquals(2, progress.count { "vehicle-speed packets=" in it })
-        assertTrue(progress.filter { "vehicle-speed packets=" in it }.all { it.startsWith("[DEBUG-a4f2]") })
+        assertTrue(progress.any { "stage=iap2-location-tx" in it && "vehicleSpeedPacket=1" in it })
+        assertTrue(progress.any { "stage=iap2-location-tx" in it && "vehicleSpeedPacket=10" in it })
+        assertEquals(10, progress.count { "vehicleSpeedPacket=" in it })
+        assertTrue(progress.filter { "vehicleSpeedPacket=" in it }.all { it.startsWith("VEHICLE-DATA ") })
     }
 
     private class FakeProvider : Iap2LocationProvider {

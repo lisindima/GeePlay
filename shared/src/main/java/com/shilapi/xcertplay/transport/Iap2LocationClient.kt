@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.transport
 
+import com.shilapi.xcertplay.vehicle.VehicleDataDiagnostics
 import com.shilapi.xcertplay.iap2.message.Iap2ControlMessages
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import java.util.Calendar
@@ -161,13 +162,24 @@ class Iap2LocationReporter(
     fun handle(frame: Iap2Frame, send: (Iap2Frame) -> Unit): Boolean = when (frame.messageId) {
         Iap2LocationMessages.START_LOCATION_INFORMATION -> {
             val components = Iap2LocationMessages.requestedComponents(frame)
-            onProgress("iap2 rx=0xfffa start-location-information components=$components")
+            onProgress(
+                VehicleDataDiagnostics.record(
+                    "iap2-location-rx",
+                    "messageId=0xfffa action=start components=$components vehicleSpeedRequested=" +
+                        (Iap2LocationMessages.VEHICLE_SPEED_DATA in components),
+                ),
+            )
             provider?.onRequested(components)
             start(send)
             true
         }
         Iap2LocationMessages.STOP_LOCATION_INFORMATION -> {
-            onProgress("iap2 rx=0xfffc stop-location-information")
+            onProgress(
+                VehicleDataDiagnostics.record(
+                    "iap2-location-rx",
+                    "messageId=0xfffc action=stop vehicleSpeedPackets=$vehicleSpeedPacketsSent",
+                ),
+            )
             active = false
             sentLogged = false
             vehicleSpeedPacketsSent = 0
@@ -212,9 +224,12 @@ class Iap2LocationReporter(
         send(Iap2LocationMessages.locationInformation(sentence))
         if ("\$PASCD," in sentence) {
             vehicleSpeedPacketsSent += 1
-            if (vehicleSpeedPacketsSent == 1 || vehicleSpeedPacketsSent % VEHICLE_SPEED_DIAGNOSTIC_INTERVAL == 0) {
-                onProgress("[DEBUG-a4f2] iap2 tx=0xfffb vehicle-speed packets=$vehicleSpeedPacketsSent")
-            }
+            onProgress(
+                VehicleDataDiagnostics.record(
+                    "iap2-location-tx",
+                    "messageId=0xfffb vehicleSpeedPacket=$vehicleSpeedPacketsSent payload=PASCD",
+                ),
+            )
         }
         if (!sentLogged) {
             sentLogged = true
@@ -224,7 +239,6 @@ class Iap2LocationReporter(
 
     private companion object {
         const val POLL_INTERVAL_MILLIS = 1_000L
-        const val VEHICLE_SPEED_DIAGNOSTIC_INTERVAL = 10
     }
 }
 

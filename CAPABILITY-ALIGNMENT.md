@@ -6,7 +6,7 @@
 
 - 维护分支：`geely/main`
 - 当前上游基线：`d9881b4a`（DiPlay `main`，2026-10-12 合并；见本次 upstream checklist）
-- 最近更新：2026-10-12
+- 最近更新：2026-10-13
 
 ## 相关文档
 
@@ -49,7 +49,7 @@
 | --- | --- | --- | --- |
 | 有线/无线连接、配对、USB/热点引导 | ⬛ 继承 | n/a | `CarPlayController`/`CarPlayHostActivity` 上游通用链路；`d9881b4a` 的 USBMUX、VPN scope、无效 RFCOMM、配置选择及恢复修复已继承 |
 | 视频解码与多 Surface、触控 | ⬛ 继承 | n/a | 上游 `MediaEngine`/stream 处理；`d9881b4a` 的 safe-area、尺寸、MTK 回退和解码等待修复已继承，Harman 专用全屏在 GeePlay 禁用 |
-| 音频媒体/导航流 | 🟡 部分对齐 | n/a（产品策略） | 媒体 owner 由 `GeelyMediaSettings`/`LocalMediaAudioPolicy` 决定；已继承 AAC drain、麦克风恢复/统计和可选 speech rate，默认值待实车音频 |
+| 音频媒体/导航流 | ✅ 已对齐 | android-std + bundled libopus | 媒体 owner 由 `GeelyMediaSettings`/`LocalMediaAudioPolicy` 决定；G636 已验证 AAC 媒体流和 Opus 导航流。GeePlay 恢复 DiPlay 发布包中的 `libdiplay_opus_jni.so`，native 不可用时回退已随源码提供的 Concentus 解码器 |
 | 设置备份/恢复 | ⬛ 继承 | n/a | `SettingsBackupServer`/`SettingsBackupCodec`；仅在 About 的备份页存活，导入使用 allowlist，覆盖后提示下次重连 |
 | 设置 IA、搜索与多语言 | ⬛ 继承 | n/a | About 已纳入设置层级，搜索监听清理与日语/阿拉伯语补全已继承；GeePlay compact/full/RTL 大字体截图由 `GeePlaySettingsScreenshotsTest` 生成 |
 | 产品身份（名称/图标/OEM label/更新源） | ✅ 已对齐 | n/a | `GeePlayApplication` 覆写 `VehicleIntegrationProvider`（`GEELY` 标签、独立更新源）；本次随上游 0.2.18 更新为 `0.2.18-geely.4` |
@@ -59,7 +59,7 @@
 
 | # | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | ---: | --- | --- | --- | --- |
-| 1 | 导航箭头/道路/距离/车道/路口到仪表 | ✅ 已对齐 | DIM | `GeelyVehicleSessionHooks`→`RouteGuidanceCoordinator`→`GeelyNavigationOutput`/`GeelyDimNavigationAdapter`；`d9881b4a` 的 NoRoute/handoff 超时语义已迁入品牌中立 `AppleRouteGuidanceStore`；待实车 |
+| 1 | 导航箭头/道路/距离/车道/路口到仪表 | 🟡 部分对齐 | DIM→EAS OEM-API | 基础 DIM 字段已接线；G636 实车确认旧 XUI 可把 0 基 `laneIndex/laneIconId` 送入 DIM，但仪表不渲染，且固件 `updateNaviStatus()` 为 no-op。离线已证明 `16/33` 才建立 guiding vendor、`43/44` 仅控制路口放大图；但 GeePlay 当前仍被 NaviService 标记为未知 vendor `-100`，现有离线包不含 G636 仪表最终消费者的 vendor 接受规则，因此生产与下一轮真车投放都保持关闭 |
 | 7 | 保持/不被原厂地图抢占仪表 | ✅ 已对齐（等价目标） | DIM | `GeelyNavigationDriver` 用 `notifyTurnByTurnStarted/Stopped` + cleanup journal 表达所有权，不禁用 OEM 包 |
 | 2 | 挡风 HUD 导航输出 | 📝 待实现 | DIM→OEM-API | 先验证 DIM 是否自动分发到 HUD；否则 `GeelyHudNavigationOutput`（Spec §10.1） |
 | 5 | CarPlay 仪表地图/私有 Display 路由 | 🧪 条件开放 | OEM-API/Display | `VehicleClusterDisplayPolicy` 已就位，`VALIDATED_PROFILES` 为空，仅 debug 选择；上游新增 cluster speedometer/music overlay 仍由被屏蔽的 `CLUSTER_MAP` 控制，未作为 Geely 生产能力开放（Spec §10.2） |
@@ -130,3 +130,6 @@
 | 2026-10-12 | `f16878e9` | #16 从「🚫不迁移」升级为「📝待实现」：G636 复现车机蓝牙/CarPlay 音频抢占；方案改为媒体 owner + 自动断 A2DP（Spec §11A），不迁移 BYD ADB 关 radio |
 | 2026-10-12 | `cf4ac2f2` 后工作区 | 完成未对齐 Spec 的软件接线：进程级 EVCC core/read/control、#6/#10/#11、#14/#15、#16、#17、#19/#20，以及 #12/#13 证据门禁；实车/descriptor/OEM API 未验证项保持 🟡/🧪 |
 | 2026-10-12 | `d9881b4a` | 合并 DiPlay main：继承连接/USB/VPN/解码/备份/本地化改进；NoRoute handoff 语义迁入 `AppleRouteGuidanceStore`；新增 #23，并对上游内嵌 Geely 输入、BYD Telecom、FCE/cluster 与 Harman 功能保持显式 GeePlay 边界 |
+| 2026-10-12 | `d9881b4a` 后工作区 | G636 真机确认导航 Opus 流因系统无 `audio/opus` decoder 而静音；恢复 DiPlay 发布包 bundled libopus，增加 Concentus fallback，真机确认 `type=101` 持续解码为 PCM 且导航声音恢复 |
+| 2026-10-13 | `d9881b4a` 后工作区 | #1 调整为「🟡部分对齐」：抓到工厂真实 0 基车道数组和 icon ID；GeePlay XUI 数组已到 DIM 但仪表不渲染；当时按工厂 `43/44` 时序新增 Debug-only EAS 探针，后续离线分析在下一条记录中纠正该时序假设 |
+| 2026-10-13 | `ec9d9479` 后工作区 | #1 离线纠正根因：真车已执行的 `43 → lanes → 44` 探针虽到达 NaviService，但 `43/44` 不参与 guiding source 选择，`mapForWidget` 因而仍为工厂 vendor `9`，lane `2009` 被过滤。探针改为不请求 vendor 9，并使用 `16 → 43 → lanes → clear → 44 → 17`；二次审计确认 `-100` 可通过 NaviService 状态机并生成 `RspLanesInfo`，但无法离线证明 G636 仪表消费者接受未知 vendor，故暂不安排真车投放 |
