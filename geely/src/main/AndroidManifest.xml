@@ -6,6 +6,7 @@
         <package android:name="com.geely.service.oneosapi" />
         <package android:name="com.geely.inputservice" />
         <package android:name="com.kooo.evcc" />
+        <package android:name="com.flyme.auto.localmusic.bluetooth" />
     </queries>
 
     <uses-permission android:name="com.permission.adnaviservice" />

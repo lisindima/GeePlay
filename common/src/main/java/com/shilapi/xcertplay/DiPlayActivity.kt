@@ -1976,6 +1976,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 AirPlayPersistence.saveLowLatencyDecoder(this, it)
                 markReconnectNeeded()
             }
+            toggle(card, getString(R.string.settings_media_fast_start_experimental),
+                getString(R.string.settings_media_fast_start_experimental_description),
+                AirPlayPersistence.loadExperimentalMediaFastStart(this)) {
+                AirPlayPersistence.saveExperimentalMediaFastStart(this, it)
+                markReconnectNeeded()
+            }
             toggle(card, getString(R.string.call_echo_cancellation), getString(R.string.call_echo_cancellation_description),
                 AirPlayPersistence.loadCallEchoCancellation(this)) {
                 AirPlayPersistence.saveCallEchoCancellation(this, it)
@@ -2037,10 +2043,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             mediaChannelControl(card)
             navigationChannelControl(card)
             val bufferPresets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
-            choice(card, getString(R.string.music_buffer), listOf(getString(R.string.s_300_ms_default), getString(R.string.s_500_ms), getString(R.string.s_1000_ms_most_stable)),
+            choice(card, getString(R.string.music_buffer), listOf(
+                getString(R.string.s_50_ms_experimental),
+                getString(R.string.s_100_ms_low_latency),
+                getString(R.string.s_300_ms_default),
+                getString(R.string.s_500_ms),
+                getString(R.string.s_1000_ms_most_stable),
+            ),
                 bufferPresets.indexOf(AirPlayPersistence.loadMediaBufferMillis(this)).coerceAtLeast(0)) {
                 AirPlayPersistence.saveMediaBufferMillis(this, bufferPresets[it])
+                markReconnectNeeded()
             }
+            card.addView(label(getString(R.string.music_buffer_reconnect_description), 14, MUTED))
         }
         filteredSection(content, SettingsSection.NAVIGATION_WHEEL,
             getString(R.string.settings_navigation_wheel_volume), R.drawable.ic_dp_audio) { card ->

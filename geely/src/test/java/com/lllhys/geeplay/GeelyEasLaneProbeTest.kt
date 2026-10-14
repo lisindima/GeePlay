@@ -64,4 +64,26 @@ class GeelyEasLaneProbeTest {
             MapAPI.registeredMapVendor = 31_415
         }
     }
+
+    @Test
+    fun `explicit debug override publishes with unknown vendor`() {
+        MapAPI.registeredMapVendor = -100
+        try {
+            val report = GeelyEasLaneProbe(RuntimeEnvironment.getApplication()).run(
+                lanes = listOf(0 to 16, 1 to 0, 2 to 4),
+                durationMillis = 0,
+                allowUnknownVendor = true,
+            )
+
+            val api = MapAPI.last!!
+            assertEquals(
+                listOf("status:16", "status:43", "lanes:true", "lanes:false", "status:44", "status:17"),
+                api.events,
+            )
+            assertTrue("registeredMapVendor=-100 allowUnknownVendor=true" in report)
+            assertTrue("result=DELIVERED" in report)
+        } finally {
+            MapAPI.registeredMapVendor = 31_415
+        }
+    }
 }

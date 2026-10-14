@@ -464,6 +464,7 @@ class CarPlayController(
         synchronized(this) {
             if (closed) return
         }
+        vehicleHooks.attachDiagnosticLogger(::debugLog)
         connectionDiagnostic("start transport=${config.transport}")
         if (!hasRequiredUsbService()) return
         videoListener?.let { listener ->
@@ -795,6 +796,20 @@ class CarPlayController(
         frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame,
     ) {
         if (closed) return
+        if (frame.messageId == com.shilapi.xcertplay.navigation.apple.AppleRouteGuidanceParser.ROUTE_GUIDANCE_UPDATE ||
+            frame.messageId == com.shilapi.xcertplay.navigation.apple.AppleRouteGuidanceParser.ROUTE_GUIDANCE_MANEUVER_UPDATE ||
+            frame.messageId == com.shilapi.xcertplay.navigation.apple.AppleRouteGuidanceParser.LANE_GUIDANCE_INFORMATION
+        ) {
+            debugLog(
+                "RGDIAG stage=RX source=${source.kind.name}:${source.id} " +
+                    "selected=${metadataSourceSelector.accepts(source)} sessionActive=${activeSession != null} " +
+                    "wirelessGeneration=${wirelessGeneration.get()} " +
+                    com.shilapi.xcertplay.navigation.apple.AppleRouteGuidanceParser.diagnosticSummary(
+                        frame.messageId,
+                        frame.payload,
+                    ),
+            )
+        }
         vehicleHooks.onControlFrame(source, frame)
         if (!metadataSourceSelector.accepts(source)) return
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)
@@ -824,6 +839,28 @@ class CarPlayController(
     }
 
     enum class InitialAlbumRefreshResult { SENT, FAILED, CLOSED, INACTIVE_SESSION, CANCELLED, CHANNEL_UNAVAILABLE }
+
+    /** Debug validation seam for replaying the route-guidance subscription on the active channel. */
+    fun refreshRouteGuidanceUpdates(): Boolean {
+        if (closed || activeSession == null) return false
+        val channel = (if (config.transport == CarPlayTransport.WIRELESS) wirelessTunnelChannel else csm)
+            ?: return false
+        return runCatching {
+            channel.send(
+                com.shilapi.xcertplay.iap2.message.Iap2ControlMessages.stopRouteGuidanceUpdates(),
+                250,
+            )
+            channel.send(
+                com.shilapi.xcertplay.iap2.message.Iap2ControlMessages.startRouteGuidanceUpdates(),
+                250,
+            )
+            debugLog("route-guidance recovery stop/start sent")
+            true
+        }.getOrElse { error ->
+            debugLog("route-guidance recovery subscription failed type=${error.javaClass.simpleName}")
+            false
+        }
+    }
 
     /** Existing metadata channel and worker; the caller owns the single-send budget. */
     fun refreshInitialNowPlaying(

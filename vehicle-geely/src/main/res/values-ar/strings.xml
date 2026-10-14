@@ -24,10 +24,13 @@
     <string name="settings_geely_media_owner">إخراج الموسيقى</string>
     <string name="settings_geely_media_owner_bluetooth">بلوتوث السيارة</string>
     <string name="settings_geely_media_owner_diplay">CarPlay</string>
-    <string name="settings_geely_bluetooth_media_auto_avoid">تجنب وسائط بلوتوث السيارة تلقائيًا (تجريبي)</string>
-    <string name="settings_geely_bluetooth_media_auto_avoid_description">عند تشغيل موسيقى CarPlay يفصل مؤقتًا ملف A2DP فقط لمنع تعارض التشغيل. تبقى المكالمات والاقتران متاحين ويُستعاد الملف بعد انتهاء CarPlay. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">تعطيل وسائط بلوتوث تلقائيًا عند بدء CarPlay (تجريبي)</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">عند بدء CarPlay يفصل ملف A2DP فقط لمنع تعارض التشغيل. تبقى المكالمات والاقتران متصلين. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_bluetooth_media_auto_restore">استعادة وسائط بلوتوث تلقائيًا بعد انتهاء CarPlay (تجريبي)</string>
+    <string name="settings_geely_bluetooth_media_auto_restore_description">بعد انتهاء CarPlay يطلب من تطبيق موسيقى بلوتوث النظام في G636 إعادة توصيل A2DP والعودة إلى مصدر بلوتوث السيارة؛ قد يستأنف تشغيل الموسيقى. إذا بقيت الوسائط متوقفة فاستخدم زر الاستعادة أدناه. اتركه متوقفًا لمنع موسيقى بلوتوث خارج CarPlay.</string>
+    <string name="settings_geely_bluetooth_media_open_settings">فتح بلوتوث السيارة لاستعادة الوسائط</string>
     <string name="settings_geely_bluetooth_media_confirm_title">استخدام CarPlay للموسيقى؟</string>
-    <string name="settings_geely_bluetooth_media_confirm_message">سيفصل GeePlay وسائط بلوتوث السيارة مؤقتًا أثناء CarPlay من دون إيقاف البلوتوث أو المكالمات، ويستعيدها بعد الانتهاء. يلزم إذن الأجهزة القريبة.</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">سيفصل GeePlay وسائط بلوتوث أثناء CarPlay من دون إيقاف البلوتوث أو قطع المكالمات. الاستعادة التلقائية إعداد منفصل ومتوقف افتراضيًا. يلزم إذن الأجهزة القريبة.</string>
     <string name="settings_geely_bluetooth_media_confirm_action">استخدام CarPlay وتفعيل التجنب</string>
     <string name="settings_geely_input_title">إدخال مقود Geely (تجريبي)</string>
     <string name="settings_geely_input_description">تعمل أزرار وسائط OneOS وبث صوت Flyme أثناء جلسة CarPlay النشطة فقط. يعطّل بلوتوث السيارة الاعتراض. تُطبّق تغييرات الإدخال فورًا.</string>
@@ -65,6 +68,10 @@
     <string name="settings_geely_evcc_vehicle_status_description">يشارك نسبة بطارية الدفع والمدى المتبقي وحالة الشحن عندما يوفر EVCC قراءة موثوقة. يُطبق عند الاتصال التالي.</string>
     <string name="settings_geely_evcc_vehicle_speed">إرسال سرعة المركبة إلى تحديد موقع CarPlay</string>
     <string name="settings_geely_evcc_vehicle_speed_description">يضيف سرعة العجلات والترس من EVCC إلى بيانات الموقع التي يطلبها iPhone. يجب تفعيل مشاركة الموقع أيضًا. يُطبق عند الاتصال التالي.</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling">معدل أخذ عينات سرعة العجلات (تجريبي)</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_description">يتحكم في عدد مرات أخذ GeePlay عينات من ذاكرة EVCC المؤقتة للسرعة في كل حزمة $PASCD. لا يفرض قراءة ناقل السيارة. يسري المعدل الأعلى عند الاتصال التالي ويستخدم قدرة معالجة أكبر.</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_standard">4 هرتز · 250 مللي ثانية (افتراضي)</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_fast">10 هرتز · 100 مللي ثانية</string>
     <string name="settings_geely_evcc_video_while_parked">السماح بالفيديو عند التوقف فقط (تجريبي)</string>
     <string name="settings_geely_evcc_video_while_parked_description">يستخدم ترس EVCC الموثق ويمنع التشغيل عند فقدان البيانات أو قدمها. يُطبق عند الاتصال التالي.</string>
     <string name="settings_geely_evcc_video_confirm_title">تفعيل فيديو التوقف؟</string>

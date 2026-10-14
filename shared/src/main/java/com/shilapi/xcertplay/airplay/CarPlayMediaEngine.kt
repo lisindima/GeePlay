@@ -26,6 +26,8 @@ interface MediaSink {
     fun setVideoRecoveryHandler(type: Int, handler: () -> Unit) {}
     fun setVideoDiagnosticHandler(type: Int, handler: (String) -> Unit) {}
     fun onScreenStreamActive(type: Int, active: Boolean) {}
+    /** The output format and ports are ready, before SETUP returns and before the iPhone can send RTP. */
+    fun onAudioPrepared(id: AudioStreamId, format: AudioFormat) {}
     fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {}
     fun onAudioRtp(id: AudioStreamId, format: AudioFormat, rtp: ByteArray, sample: Int) {}
     fun onAudioStopped(id: AudioStreamId) {}
@@ -231,6 +233,7 @@ class CarPlayMediaEngine(
         )
         streams[streamKey] = audio
         audioMeta[streamKey] = meta
+        sink.onAudioPrepared(streamId, format)
         return linkedMapOf(
             "type" to type,
             "dataPort" to dataPort,

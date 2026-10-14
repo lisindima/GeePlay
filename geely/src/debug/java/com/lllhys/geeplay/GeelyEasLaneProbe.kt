@@ -34,6 +34,7 @@ class GeelyEasLaneProbe(private val context: Context) {
     fun run(
         lanes: List<Pair<Int, Int>>,
         durationMillis: Long,
+        allowUnknownVendor: Boolean = false,
         onVisible: () -> Unit = {},
         onBeforeHidden: () -> Unit = {},
     ): String {
@@ -47,7 +48,7 @@ class GeelyEasLaneProbe(private val context: Context) {
         var failure: Throwable? = null
         try {
             session = openSession()
-            check(session.registeredMapVendor != UNKNOWN_MAP_VENDOR) {
+            check(allowUnknownVendor || session.registeredMapVendor != UNKNOWN_MAP_VENDOR) {
                 "NaviService registered GeePlay as unknown vendor $UNKNOWN_MAP_VENDOR; " +
                     "a supported provider identity is required before vehicle output"
             }
@@ -75,7 +76,10 @@ class GeelyEasLaneProbe(private val context: Context) {
         return buildString {
             appendLine("provider=${context.packageName} sdkSource=${session?.sdkSourcePackage ?: "none"}")
             appendLine("apiReady=${session != null} registered=${session != null} listenerReady=${session != null}")
-            appendLine("requestedMapVendor=unset registeredMapVendor=${session?.registeredMapVendor ?: -1}")
+            appendLine(
+                "requestedMapVendor=unset registeredMapVendor=${session?.registeredMapVendor ?: -1} " +
+                    "allowUnknownVendor=$allowUnknownVendor",
+            )
             appendLine(
                 "guideStarted=$guideStarted crossroadShown=$crossroadShown published=$published " +
                     "cleared=$cleared crossroadHidden=$crossroadHidden guideStopped=$guideStopped",

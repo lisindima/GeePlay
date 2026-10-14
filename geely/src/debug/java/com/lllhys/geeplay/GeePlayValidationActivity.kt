@@ -31,13 +31,19 @@ import com.lllhys.geeplay.vehicle.geely.GeelyInputDiagnostics
 import com.lllhys.geeplay.vehicle.geely.GeelyInputEvent
 import com.lllhys.geeplay.vehicle.geely.GeelyNavigationBackend
 import com.lllhys.geeplay.vehicle.geely.GeelyNavigationConfig
+import com.lllhys.geeplay.vehicle.geely.GeelyNavigationDriverState
 import com.lllhys.geeplay.vehicle.geely.GeelyNavigationDriverStatus
+import com.lllhys.geeplay.vehicle.geely.GeelyVehicleSessionHooks
+import com.shilapi.xcertplay.navigation.apple.AppleRouteGuidanceParser
 import com.shilapi.xcertplay.navigation.apple.AppleLane
 import com.shilapi.xcertplay.navigation.apple.AppleLaneGuidance
 import com.shilapi.xcertplay.navigation.apple.AppleLaneStatus
 import com.shilapi.xcertplay.navigation.apple.AppleManeuver
 import com.shilapi.xcertplay.navigation.apple.AppleNavigationSnapshot
 import com.shilapi.xcertplay.navigation.apple.AppleRouteState
+import com.shilapi.xcertplay.navigation.runtime.RouteGuidanceSource
+import com.shilapi.xcertplay.navigation.runtime.RouteGuidanceSourceKind
+import com.shilapi.xcertplay.vehicle.SourceCloseReason
 import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
@@ -59,7 +65,13 @@ class GeePlayValidationActivity : Activity() {
                     MODE_EVCC -> evccReport()
                     MODE_NAVIGATION -> navigationReport(durationMillis)
                     MODE_LANE -> laneReport(durationMillis)
-                    MODE_EAS_LANE -> easLaneReport(durationMillis)
+                    MODE_EAS_LANE -> easLaneReport(
+                        durationMillis,
+                        allowUnknownVendor = intent.getBooleanExtra(EXTRA_ALLOW_UNKNOWN_VENDOR, false),
+                        allowActiveSession = intent.getBooleanExtra(EXTRA_ALLOW_ACTIVE_SESSION, false),
+                    )
+                    MODE_ROUTE_REPLAY -> routeReplayReport(durationMillis)
+                    MODE_ROUTE_RESUBSCRIBE -> routeResubscribeReport()
                     MODE_LOCATION -> mockLocationReport()
                     MODE_LOCATION_CLEANUP -> mockLocationCleanupReport()
                     MODE_INPUT -> inputReport(durationMillis)
@@ -256,9 +268,13 @@ class GeePlayValidationActivity : Activity() {
         }
     }
 
-    private fun easLaneReport(durationMillis: Long): String {
+    private fun easLaneReport(
+        durationMillis: Long,
+        allowUnknownVendor: Boolean,
+        allowActiveSession: Boolean,
+    ): String {
         val sessionState = carPlaySessionState()
-        if (sessionState != "idle") {
+        if (sessionState != "idle" && !allowActiveSession) {
             return buildString {
                 appendLine(environment(MODE_EAS_LANE))
                 appendLine("result=REFUSED session=$sessionState reason=disconnect CarPlay before running the EAS lane probe")
@@ -267,10 +283,14 @@ class GeePlayValidationActivity : Activity() {
         val result = GeelyEasLaneProbe(applicationContext).run(
             lanes = listOf(0 to 16, 1 to 0, 2 to 4),
             durationMillis = durationMillis,
+            allowUnknownVendor = allowUnknownVendor,
         )
         return buildString {
             appendLine(environment(MODE_EAS_LANE))
-            appendLine("pattern=recommended-left,straight,straight-or-right laneBase=0 iconIds=16,0,4 durationMs=$durationMillis")
+            appendLine(
+                "pattern=recommended-left,straight,straight-or-right laneBase=0 iconIds=16,0,4 " +
+                    "durationMs=$durationMillis session=$sessionState allowActiveSession=$allowActiveSession",
+            )
             append(result)
         }
     }
@@ -286,6 +306,117 @@ class GeePlayValidationActivity : Activity() {
             else -> "idle"
         }
     }.getOrElse { "unknown" }
+
+    private fun routeResubscribeReport(): String {
+        val type = Class.forName("com.shilapi.xcertplay.CarPlayBackgroundSession")
+        val instance = type.getField("INSTANCE").get(null)
+        val snapshot = type.getMethod("snapshot").invoke(instance)
+            ?: return "${environment(MODE_ROUTE_RESUBSCRIBE)}\nresult=REFUSED reason=no-active-session"
+        val controller = snapshot.javaClass.getMethod("getController").invoke(snapshot)
+        val sent = controller.javaClass.getMethod("refreshRouteGuidanceUpdates").invoke(controller) as Boolean
+        return "${environment(MODE_ROUTE_RESUBSCRIBE)}\nresult=${if (sent) "SENT" else "FAILED"}"
+    }
+
+    private fun routeReplayReport(durationMillis: Long): String {
+        val sessionState = carPlaySessionState()
+        if (sessionState != "idle") {
+            return buildString {
+                appendLine(environment(MODE_ROUTE_REPLAY))
+                appendLine(
+                    "result=REFUSED session=$sessionState " +
+                        "reason=disconnect CarPlay before replaying synthetic RouteGuidance frames",
+                )
+            }
+        }
+
+        val statuses = CopyOnWriteArrayList<GeelyNavigationDriverStatus>()
+        val frameLog = CopyOnWriteArrayList<String>()
+        val hooks = GeelyVehicleSessionHooks(
+            applicationContext,
+            config = GeelyNavigationConfig(
+                enabled = true,
+                backend = GeelyNavigationBackend.AUTO,
+                laneGuidanceEnabled = true,
+                originalOneOsIcons = false,
+                laneNumberBase = 0,
+                semanticJunctionEnabled = false,
+            ),
+            onStatus = statuses::add,
+        )
+        val source = RouteGuidanceSource.create(RouteGuidanceSourceKind.WIRELESS_RUNTIME_TUNNEL)
+        val sessionToken = Any()
+        val phases = CarPlayRouteGuidanceReplay.phases()
+        val phaseMillis = (durationMillis / phases.size).coerceAtLeast(MIN_ROUTE_REPLAY_PHASE_MILLIS)
+        var opened = false
+        var sessionStarted = false
+        var completedPhases = 0
+        var replayFailure: Throwable? = null
+        try {
+            hooks.sourceOpened(source)
+            opened = true
+            hooks.carPlaySessionStarted(sessionToken) { carPlaySessionState() == "idle" }
+            sessionStarted = true
+            hooks.sourceReady(source)
+            phases.forEach { phase ->
+                check(carPlaySessionState() == "idle") { "real CarPlay session became active during replay" }
+                val activeBefore = statuses.count { it.state == GeelyNavigationDriverState.ACTIVE }
+                phase.frames.forEach { frame ->
+                    val summary = AppleRouteGuidanceParser.diagnosticSummary(frame.messageId, frame.payload)
+                    frameLog += "phase=${phase.name} $summary"
+                    Log.i(ROUTE_REPLAY_TAG, "phase=${phase.name} $summary")
+                    hooks.onControlFrame(source, frame)
+                }
+                check(awaitRouteReplayPublish(statuses, activeBefore)) {
+                    "DIM output did not publish phase ${phase.name} within ${ROUTE_REPLAY_PUBLISH_TIMEOUT_MILLIS}ms"
+                }
+                completedPhases += 1
+                Thread.sleep(phaseMillis)
+            }
+            hooks.onControlFrame(source, CarPlayRouteGuidanceReplay.routeEnded())
+            Thread.sleep(ROUTE_REPLAY_CLEANUP_MILLIS)
+        } catch (error: Throwable) {
+            replayFailure = error
+        } finally {
+            if (sessionStarted) hooks.carPlaySessionEnded(sessionToken, replacementExpected = false)
+            if (opened) hooks.sourceClosed(source, SourceCloseReason.CHANNEL_CLOSED)
+            hooks.close()
+            Thread.sleep(ROUTE_REPLAY_CLEANUP_MILLIS)
+        }
+        return buildString {
+            appendLine(environment(MODE_ROUTE_REPLAY))
+            appendLine(
+                "result=${if (replayFailure == null && completedPhases == phases.size) "COMPLETE" else "FAILED"} " +
+                    "session=$sessionState phases=$completedPhases/${phases.size} phaseMs=$phaseMillis",
+            )
+            phases.forEach { phase ->
+                appendLine("expected phase=${phase.name} oemLaneIconIds=${phase.expectedOemLaneIconIds}")
+            }
+            frameLog.forEach(::appendLine)
+            statuses.forEach { appendLine("status=${it.state} stage=${it.stage} failure=${it.failureType ?: "none"}") }
+            replayFailure?.let { appendLine("error=${it.javaClass.name}:${it.message}") }
+        }
+    }
+
+    private fun awaitRouteReplayPublish(
+        statuses: List<GeelyNavigationDriverStatus>,
+        activeBefore: Int,
+    ): Boolean {
+        val deadline = SystemClock.elapsedRealtime() + ROUTE_REPLAY_PUBLISH_TIMEOUT_MILLIS
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (statuses.count { it.state == GeelyNavigationDriverState.ACTIVE } > activeBefore) {
+                return true
+            }
+            if (statuses.any {
+                    it.state == GeelyNavigationDriverState.FAILED ||
+                        it.state == GeelyNavigationDriverState.CLEANUP_PENDING
+                }
+            ) {
+                return false
+            }
+            Thread.sleep(ROUTE_REPLAY_PUBLISH_POLL_MILLIS)
+        }
+        return false
+    }
 
     @Suppress("DEPRECATION")
     @SuppressLint("WrongConstant")
@@ -528,6 +659,8 @@ class GeePlayValidationActivity : Activity() {
     companion object {
         const val EXTRA_MODE = "mode"
         const val EXTRA_DURATION_MILLIS = "durationMillis"
+        const val EXTRA_ALLOW_UNKNOWN_VENDOR = "allowUnknownVendor"
+        const val EXTRA_ALLOW_ACTIVE_SESSION = "allowActiveSession"
         const val EXTRA_DISPLAY_ID = "displayId"
         const val EXTRA_BEARING_DEGREES = "bearingDegrees"
         const val EXTRA_STEP_METERS = "stepMeters"
@@ -538,6 +671,8 @@ class GeePlayValidationActivity : Activity() {
         const val MODE_NAVIGATION = "navigation"
         const val MODE_LANE = "lane"
         const val MODE_EAS_LANE = "eas-lane"
+        const val MODE_ROUTE_REPLAY = "route-replay"
+        const val MODE_ROUTE_RESUBSCRIBE = "route-resubscribe"
         const val MODE_LOCATION = "location"
         const val MODE_LOCATION_CLEANUP = "location-cleanup"
         const val MODE_INPUT = "input"
@@ -547,6 +682,11 @@ class GeePlayValidationActivity : Activity() {
         const val EVCC_CONNECT_TIMEOUT_SECONDS = 15L
         const val METERS_PER_LATITUDE_DEGREE = 111_320.0
         const val LOCATION_TAG = "GeePlayLocationProbe"
+        const val ROUTE_REPLAY_TAG = "GeePlayRouteReplay"
+        const val MIN_ROUTE_REPLAY_PHASE_MILLIS = 1_500L
+        const val ROUTE_REPLAY_PUBLISH_TIMEOUT_MILLIS = 10_000L
+        const val ROUTE_REPLAY_PUBLISH_POLL_MILLIS = 100L
+        const val ROUTE_REPLAY_CLEANUP_MILLIS = 750L
         val SUCCESS_STATUSES = setOf(EvccApiContract.Status.OK, EvccApiContract.Status.AVAILABLE)
         val DIRECTORY_QUERIES = listOf(
             "TIRE", "TYRE", "TPMS", "NAVI_MODE", "MAP_VISIBLE", "AMBIENT", "LIGHT",

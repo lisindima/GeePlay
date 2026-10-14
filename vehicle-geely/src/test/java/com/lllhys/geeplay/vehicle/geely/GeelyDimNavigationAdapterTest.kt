@@ -55,6 +55,70 @@ class GeelyDimNavigationAdapterTest {
     }
 
     @Test
+    fun `independent lanes are written before the navigation frame flush`() {
+        val driver = GeelyDimNavigationAdapter(
+            RuntimeEnvironment.getApplication(),
+            config(GeelyNavigationBackend.ECARX_FLYME, lanes = true),
+            independentLaneRefresh = true,
+        )
+
+        assertTrue(driver.start())
+        assertTrue(driver.publish(snapshot()))
+
+        val calls = DimInteraction.latest!!.navigation.calls
+        assertTrue(
+            "lane builder must be populated before updateNavigationInfo flushes it",
+            calls.indexOf("lanes") < calls.indexOf("info"),
+        )
+
+        assertTrue(driver.clear())
+        assertTrue(
+            "lane clear must also precede the final navigation frame",
+            calls.lastIndexOf("lanes") < calls.lastIndexOf("info"),
+        )
+        driver.close()
+    }
+
+    @Test
+    fun `independent lane refresh clears once then deduplicates empty arrays`() {
+        val driver = GeelyDimNavigationAdapter(
+            RuntimeEnvironment.getApplication(),
+            config(GeelyNavigationBackend.ECARX_FLYME, lanes = true),
+            independentLaneRefresh = true,
+        )
+
+        assertTrue(driver.start())
+        assertTrue(driver.publish(snapshot(lanes = null)))
+        assertTrue(driver.publish(snapshot(lanes = null)))
+
+        val calls = DimInteraction.latest!!.navigation.calls
+        assertEquals(1, calls.count { it == "lanes" })
+        driver.close()
+    }
+
+    @Test
+    fun `active navigation periodically reasserts status ownership`() {
+        var now = 0L
+        val driver = GeelyDimNavigationAdapter(
+            RuntimeEnvironment.getApplication(),
+            config(GeelyNavigationBackend.ECARX_FLYME, lanes = false),
+            elapsedRealtimeMillis = { now },
+            navigationStatusRefreshMillis = 5_000L,
+        )
+
+        assertTrue(driver.start())
+        assertTrue(driver.publish(snapshot(lanes = null)))
+        now = 4_999L
+        assertTrue(driver.publish(snapshot(lanes = null)))
+        now = 5_000L
+        assertTrue(driver.publish(snapshot(lanes = null)))
+
+        val calls = DimInteraction.latest!!.navigation.calls
+        assertEquals(2, calls.count { it == "status:1" })
+        driver.close()
+    }
+
+    @Test
     fun `direct OneOS mode skips watcher and preserves raw icon`() {
         val driver = GeelyDimNavigationAdapter(
             RuntimeEnvironment.getApplication(),

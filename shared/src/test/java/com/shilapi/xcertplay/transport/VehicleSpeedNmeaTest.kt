@@ -35,6 +35,20 @@ class VehicleSpeedNmeaTest {
     }
 
     @Test
+    fun encodesOneSecondOfTenHertzSamplesWithinOneCompactSentence() {
+        val reading = VehicleSpeedReading(
+            VehicleGear.DRIVE,
+            List(10) { index -> VehicleSpeedSample(10_000L + index * 100L, index.toDouble()) },
+        )
+
+        val sentence = requireNotNull(PascdEncoder.encode(reading))
+
+        assertTrue(",D,0,10," in sentence)
+        assertTrue(",0.90,9.000*" in sentence)
+        assertTrue(sentence.length < 256)
+    }
+
+    @Test
     fun addsSpeedOnlyWhenTheIphoneAsksForIt() {
         val speed = FakeSpeed()
         val provider = VehicleSpeedLocationProvider(FakePosition("\$GPGGA\r\n"), speed)

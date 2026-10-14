@@ -397,7 +397,9 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
                     string(1, "RouteGuidance")
                     // Without these limits the iPhone may omit road names from 0x5201/0x5202.
                     u16(2, 64) // MaxCurrentRoadNameLength
+                    u16(3, 64) // MaxDestinationNameLength
                     u16(4, 64) // MaxAfterManeuverRoadNameLength
+                    u16(5, 64) // MaxManeuverDescriptionLength
                     u16(6, 8) // MaxGuidanceManeuverStorageCapacity
                     u16(7, 64) // MaxLaneGuidanceDescriptionLength
                     u16(8, 8) // MaxLaneGuidanceStorageCapacity

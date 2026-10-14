@@ -256,6 +256,7 @@
     <string name="mfi_certificate_signing_target">شهادة MFi وهدف التوقيع</string>
     <string name="model">الطراز</string>
     <string name="music_buffer">ذاكرة الموسيقى</string>
+    <string name="music_buffer_reconnect_description">تسري تغييرات ذاكرة الموسيقى بعد إعادة توصيل CarPlay.</string>
     <string name="resolution_native">أصلي</string>
     <string name="navigation_on_hud_and_instrument_cluster">الملاحة على شاشة العرض الأمامية ولوحة العدادات</string>
     <string name="navigation_stream_type">نوع بث الملاحة</string>
@@ -323,7 +324,9 @@
     <string name="s_1_connect_a_computer_with_adb_installed_to_the_car_using">1. صِل حاسوباً عليه ADB مثبّت بالسيارة عبر اتصال USB أو التنقيط اللاسلكي الحالي. وافق على التنقيط في السيارة إن طُلب.\n\n2. نفّذ هذا الأمر في طرفية الحاسوب:</string>
     <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. افتح إعدادات نقطة اتصال السيارة، وشغّل نقطة الاتصال واختر 5 GHz إن توفر.\n2. انسخ الاسم وكلمة المرور أدناه كما هما تماماً.\n3. أبقِ نقطة اتصال السيارة مُشغّلة عند الاتصال. يرسل DiPlay البيانات عبر البلوتوث؛ وينضم iPhone تلقائياً.</string>
     <string name="s_2_pair_your_iphone">2 · اقرن iPhone الخاص بك</string>
-    <string name="s_300_ms_default">300 مللي ثانية · الافتراضي</string>
+    <string name="s_50_ms_experimental">50 مللي ثانية · تجريبي</string>
+    <string name="s_100_ms_low_latency">100 مللي ثانية · زمن انتقال منخفض</string>
+    <string name="s_300_ms_default">300 مللي ثانية · متوازن</string>
     <string name="s_30_fps_lighter_load">30 إطاراً/ث · حمل أخف</string>
     <string name="s_3_connect">3 · اتصل</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. اضغط «تحقق وفعّل» أدناه. يفعّل ذلك خريطة المجموعة واتباع السمة تلقائياً. ستعيد جلسة CarPlay النشطة الاتصال مرة واحدة. يمكنك بعد ذلك فصل الحاسوب.</string>
@@ -667,6 +670,8 @@
     <string name="settings_direct_video_output_description">يرسل صورة CarPlay مباشرة إلى مُركِّب شاشة الوحدة الرئيسية بدلًا من رسمها داخل نافذة DiPlay. قد يقلل التأخير بمقدار تحديث شاشة واحد تقريبًا. لا تنطبق تعديلات الصورة. يعيد الاتصال بـ CarPlay.</string>
     <string name="settings_low_latency_decoder">فك ترميز منخفض التأخير (تجريبي)</string>
     <string name="settings_low_latency_decoder_description">يطلب من أجهزة فك ترميز الفيديو من Qualcomm إخراج كل إطار فور فك ترميزه بدلًا من الاحتفاظ بالإطارات التالية، ويعرض كل إطار مفكوك من سلسلة معالجة مخصصة دون انتظار وصول الإطار التالي. قد يقلل التأخير بعشرات المللي ثانية. أوقفه إذا ظهرت تشوهات في الصورة أو تجمّدت. يُطبَّق عند الاتصال التالي.</string>
+    <string name="settings_media_fast_start_experimental">بدء الموسيقى السريع (تجريبي)</string>
+    <string name="settings_media_fast_start_experimental_description">يُجهّز إخراج AAC فور إعداد iPhone لتدفق موسيقى منخفض التأخير، ويطلب المازج السريع من Android ويبدأ بعد أول إطار مفكوك. قد يسبب نقرة أو تقطعًا في بعض الوحدات الرئيسية. يُطبَّق بعد إعادة توصيل CarPlay ويؤثر فقط في ذاكرة الموسيقى 50/100 مللي ثانية.</string>
     <string name="settings_fps_counter">عداد الإطارات في الثانية</string>
     <string name="settings_fps_counter_description">يعرض عدادًا في الزاوية العلوية اليمنى من CarPlay: الإطارات المعروضة في الثانية (أخضر من 50، أصفر من 30، أحمر أقل من ذلك)، والإطارات المستلمة من iPhone في الثانية، ووقت فك الترميز. تعرض الشاشة الثابتة إطارات قليلة لأن iPhone لا يرسل أي إطارات.</string>
     <string name="car_button_in_carplay">زر السيارة في CarPlay</string>

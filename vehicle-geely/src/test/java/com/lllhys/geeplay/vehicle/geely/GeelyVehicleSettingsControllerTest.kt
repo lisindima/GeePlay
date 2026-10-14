@@ -7,6 +7,7 @@ import com.shilapi.xcertplay.media.MediaOutputOwner
 import com.shilapi.xcertplay.vehicle.VehicleSettingRow
 import com.shilapi.xcertplay.vehicle.VehicleSettingsPlacement
 import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataSettings
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccWheelSpeedSampling
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -30,10 +31,12 @@ class GeelyVehicleSettingsControllerTest {
         )
         GeelyMediaSettings.saveOwner(context, MediaOutputOwner.OEM_BLUETOOTH)
         GeelyMediaSettings.saveBluetoothAutoAvoid(context, false)
+        GeelyMediaSettings.saveBluetoothAutoRestore(context, false)
         GeelyInputSettings.saveProfile(context, GeelyInputProfile.DISABLED)
         GeelyProductSettings.saveBlockLegacyBydMenus(context, true)
         EvccVehicleDataSettings.saveVehicleStatusEnabled(context, false)
         EvccVehicleDataSettings.saveVehicleSpeedEnabled(context, false)
+        EvccVehicleDataSettings.saveWheelSpeedSampling(context, EvccWheelSpeedSampling.STANDARD)
         EvccVehicleDataSettings.saveVideoWhileParkedEnabled(context, false)
         EvccVehicleDataSettings.saveTyreTelemetryEnabled(context, false)
         GeelyClusterDisplaySettings.saveDebugDisplayId(context, null)
@@ -87,12 +90,21 @@ class GeelyVehicleSettingsControllerTest {
 
         assertEquals(MediaOutputOwner.DIPLAY, GeelyMediaSettings.loadOwner(context))
         assertTrue(GeelyMediaSettings.bluetoothAutoAvoid(context))
-        val autoAvoid = GeelyVehicleSettingsController().cards(context)
+        assertFalse(GeelyMediaSettings.bluetoothAutoRestore(context))
+        val mediaToggles = GeelyVehicleSettingsController().cards(context)
             .single { it.id == "geely_audio" }
             .rows.filterIsInstance<VehicleSettingRow.Toggle>()
-            .single { it.id == "geely_bluetooth_media_auto_avoid" }
+            .associateBy { it.id }
+        val autoAvoid = mediaToggles.getValue("geely_bluetooth_media_auto_avoid")
+        val autoRestore = mediaToggles.getValue("geely_bluetooth_media_auto_restore")
         assertTrue(autoAvoid.enabled)
         assertTrue(autoAvoid.checked)
+        assertTrue(autoRestore.enabled)
+        assertFalse(autoRestore.checked)
+
+        autoRestore.save(true)
+
+        assertTrue(GeelyMediaSettings.bluetoothAutoRestore(context))
     }
 
     @Test
@@ -179,6 +191,28 @@ class GeelyVehicleSettingsControllerTest {
         assertTrue(EvccVehicleDataSettings.vehicleSpeedEnabled(context))
         assertTrue(EvccVehicleDataSettings.videoWhileParkedEnabled(context))
         assertTrue(EvccVehicleDataSettings.tyreTelemetryEnabled(context))
+    }
+
+    @Test
+    fun `EVCC wheel speed sampling is configurable and connection scoped`() {
+        fun samplingChoice() = GeelyVehicleSettingsController().cards(context)
+            .single { it.id == "geely_evcc_vehicle_data" }
+            .rows.filterIsInstance<VehicleSettingRow.Choice>()
+            .single { it.id == "geely_evcc_wheel_speed_sampling" }
+
+        val initial = samplingChoice()
+        assertEquals(0, initial.selectedIndex)
+        assertFalse(initial.enabled)
+        assertEquals(2, initial.options.size)
+        assertEquals(com.shilapi.xcertplay.vehicle.VehicleSettingEffect.NEXT_CONNECTION, initial.effect)
+
+        EvccVehicleDataSettings.saveVehicleSpeedEnabled(context, true)
+        val enabled = samplingChoice()
+        assertTrue(enabled.enabled)
+        enabled.save(1)
+
+        assertEquals(EvccWheelSpeedSampling.FAST, EvccVehicleDataSettings.wheelSpeedSampling(context))
+        assertEquals(1, samplingChoice().selectedIndex)
     }
 
     @Test

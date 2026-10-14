@@ -24,10 +24,13 @@
     <string name="settings_geely_media_owner">音乐输出</string>
     <string name="settings_geely_media_owner_bluetooth">原车蓝牙</string>
     <string name="settings_geely_media_owner_diplay">CarPlay</string>
-    <string name="settings_geely_bluetooth_media_auto_avoid">自动避让车机蓝牙媒体（实验性）</string>
-    <string name="settings_geely_bluetooth_media_auto_avoid_description">选择 CarPlay 播放音乐时，仅临时断开车机 A2DP 媒体，避免播放/暂停抢占；不会关闭蓝牙或断开通话，CarPlay 结束后自动恢复；下次连接生效。</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">CarPlay 启动时自动禁用车机蓝牙媒体（实验性）</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">CarPlay 启动后仅断开车机 A2DP 媒体，避免播放/暂停抢占；不会关闭蓝牙，通话和配对保持连接；下次连接生效。</string>
+    <string name="settings_geely_bluetooth_media_auto_restore">CarPlay 结束时自动恢复车机蓝牙媒体（实验性）</string>
+    <string name="settings_geely_bluetooth_media_auto_restore_description">CarPlay 结束后请求 G636 系统蓝牙音乐应用重新连接 A2DP 并切回原车蓝牙音源，音乐可能继续播放。若媒体仍关闭，请使用下方恢复按钮。关闭此项可让非 CarPlay 状态始终不播放车载蓝牙音乐。</string>
+    <string name="settings_geely_bluetooth_media_open_settings">打开原车蓝牙恢复媒体</string>
     <string name="settings_geely_bluetooth_media_confirm_title">使用 CarPlay 播放音乐？</string>
-    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay 将在 CarPlay 运行期间自动断开车机蓝牙媒体，不会关闭蓝牙或断开通话，并会在 CarPlay 结束后恢复；需要“附近设备”权限。</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay 将在 CarPlay 运行期间自动断开车机蓝牙媒体，不会关闭蓝牙或断开通话。自动恢复是独立设置，默认关闭；需要“附近设备”权限。</string>
     <string name="settings_geely_bluetooth_media_confirm_action">使用 CarPlay 并开启避让</string>
     <string name="settings_geely_input_title">吉利方向盘输入（实验性）</string>
     <string name="settings_geely_input_description">OneOS 媒体键和 Flyme 语音广播只在 CarPlay 会话活动时生效；原车蓝牙模式不截获媒体键；输入方式修改立即生效。</string>
@@ -65,6 +68,10 @@
     <string name="settings_geely_evcc_vehicle_status_description">EVCC 提供可信数据时，将动力电池电量、剩余续航和充电状态发送给已连接的 iPhone；下次连接生效。</string>
     <string name="settings_geely_evcc_vehicle_speed">向 CarPlay 定位发送车速</string>
     <string name="settings_geely_evcc_vehicle_speed_description">在 iPhone 请求的位置数据中加入 EVCC 轮速和挡位；还需要启用位置共享；下次连接生效。</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling">轮速采样频率（实验性）</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_description">控制 GeePlay 在每个 $PASCD 数据包中采样 EVCC 内存车速缓存的频率；不会强制读取车辆总线。更高频率将在下次连接时生效，并占用更多 CPU。</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_standard">4 Hz · 250 ms（默认）</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_fast">10 Hz · 100 ms</string>
     <string name="settings_geely_evcc_video_while_parked">仅驻车时允许车内视频（实验性）</string>
     <string name="settings_geely_evcc_video_while_parked_description">使用已验证的 EVCC 挡位；数据缺失或过期时禁止播放；下次连接生效。</string>
     <string name="settings_geely_evcc_video_confirm_title">启用驻车视频？</string>

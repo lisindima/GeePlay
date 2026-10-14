@@ -5,6 +5,15 @@ import org.junit.Test
 import java.nio.file.Files
 
 class DiagnosticRedactorTest {
+    @Test fun structuredRouteGuidanceDiagnosticsSurviveButProtocolTracesDoNot() {
+        val line = "RGDIAG stage=RX source=WIRELESS_RUNTIME_TUNNEL:2 message=0x5204 " +
+            "event=9 lanes=2 laneData=[pos=0,status=PREFERRED,angles=-45,0,highlight=-45]"
+
+        assertEquals(line, DiagnosticRedactor.redact(line))
+        assertNull(DiagnosticRedactor.redact("RG_TRACE stage=RX message=0x5204"))
+        assertNull(DiagnosticRedactor.redact("RGDIAG stage=RX roadName=Private Road"))
+    }
+
     @Test fun additionalTroubleshootingMetadataSurvivesSavedReportWithoutPayloads() {
         val lines = listOf(
             "wireless startup elapsedMs=10000 authenticated=true wifiConfigs=2 startRequests=1 tcpAccepted=0 sessionActive=false waitingFor=WiFi_discovery_or_AirPlay_TCP startRequestAgeMs=9000 firstTcpAfterStartMs=none",

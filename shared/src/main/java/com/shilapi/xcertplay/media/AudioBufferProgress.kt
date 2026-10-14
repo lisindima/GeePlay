@@ -15,8 +15,8 @@ internal class AudioBufferProgress(private val frameBytes: Int) {
         return (writtenBytes - playedFrames * frameBytes).coerceAtLeast(0)
     }
 
-    fun shouldRebuffer(isMedia: Boolean, playing: Boolean, underrunSinceStart: Boolean,
+    fun shouldRebuffer(rebufferEnabled: Boolean, playing: Boolean, underrunSinceStart: Boolean,
         compressedQueueEmpty: Boolean, rawHead: Int, floorBytes: Long): Boolean =
-        isMedia && playing && underrunSinceStart && compressedQueueEmpty &&
+        rebufferEnabled && playing && underrunSinceStart && compressedQueueEmpty &&
             queuedBytes(rawHead) <= floorBytes
 }

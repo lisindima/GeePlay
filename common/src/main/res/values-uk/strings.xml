@@ -263,6 +263,7 @@
     <string name="mfi_certificate_signing_target">Сертифікат MFi і ціль підписання</string>
     <string name="model">Модель</string>
     <string name="music_buffer">Буфер музики</string>
+    <string name="music_buffer_reconnect_description">Зміни буфера музики застосовуються після повторного підключення CarPlay.</string>
     <string name="resolution_native">Рідна</string>
     <string name="navigation_on_hud_and_instrument_cluster">Навігація на HUD і панелі приладів</string>
     <string name="navigation_stream_type">Тип аудіопотоку навігації</string>
@@ -333,7 +334,9 @@
     <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. Відкрийте налаштування точки доступу автомобіля, увімкніть її та виберіть 5 ГГц, якщо доступно.\n2. Точно скопіюйте її назву й пароль нижче.\n3. Не вимикайте точку доступу під час підключення. DiPlay передасть дані через Bluetooth; iPhone приєднається автоматично.</string>
     <string name="s_2_4_ghz">2,4 ГГц</string>
     <string name="s_2_pair_your_iphone">2 · Спарте свій iPhone</string>
-    <string name="s_300_ms_default">300 мс · типово</string>
+    <string name="s_50_ms_experimental">50 мс · експериментально</string>
+    <string name="s_100_ms_low_latency">100 мс · низька затримка</string>
+    <string name="s_300_ms_default">300 мс · збалансовано</string>
     <string name="s_30_fps_lighter_load">30 кадрів/с · менше навантаження</string>
     <string name="s_3_connect">3 · Підключіться</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. Натисніть «Перевірити й увімкнути» нижче. Це ввімкне карту на панелі приладів та автоматичне стеження за темою. Активний сеанс CarPlay перепідключиться один раз. Після цього комп’ютер можна відключити.</string>
@@ -679,6 +682,8 @@
     <string name="settings_direct_video_output_description">Передає зображення CarPlay безпосередньо системному компонувальнику головного пристрою, а не малює його у вікні DiPlay. Може зменшити затримку приблизно на одне оновлення екрана. Налаштування зображення не застосовуються. Перепідключає CarPlay.</string>
     <string name="settings_low_latency_decoder">Декодування з низькою затримкою (експериментально)</string>
     <string name="settings_low_latency_decoder_description">Просить відеодекодери Qualcomm видавати кожен кадр одразу після декодування, не утримуючи наступні, і показує кожен декодований кадр з окремого потоку, не чекаючи надходження наступного. Може зменшити затримку на десятки мілісекунд. Вимкніть, якщо на зображенні з’являються артефакти або воно зависає. Застосовується під час наступного підключення.</string>
+    <string name="settings_media_fast_start_experimental">Швидкий запуск музики (експериментально)</string>
+    <string name="settings_media_fast_start_experimental_description">Готує виведення AAC одразу після налаштування iPhone музичного потоку з низькою затримкою, запитує швидкий мікшер Android і починає відтворення після першого декодованого кадру. На деяких головних пристроях можливі клацання або зникнення звуку. Застосовується після перепідключення CarPlay і лише до буферів музики 50/100 мс.</string>
     <string name="settings_fps_counter">Лічильник FPS</string>
     <string name="settings_fps_counter_description">Показує лічильник у правому верхньому куті CarPlay: кадри на екрані за секунду (зелений від 50, жовтий від 30, червоний нижче), кадри від iPhone за секунду і час декодування. На нерухомому екрані кадрів мало, бо iPhone їх не надсилає.</string>
     <string name="car_button_in_carplay">Кнопка автомобіля в CarPlay</string>

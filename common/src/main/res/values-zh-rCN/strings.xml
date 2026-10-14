@@ -264,6 +264,7 @@
     <string name="mfi_certificate_signing_target">MFi 证书与签名目标</string>
     <string name="model">型号</string>
     <string name="music_buffer">音乐缓冲</string>
+    <string name="music_buffer_reconnect_description">音乐缓冲修改会在重新连接 CarPlay 后生效。</string>
     <string name="resolution_native">原生</string>
     <string name="navigation_on_hud_and_instrument_cluster">HUD和仪表盘导航</string>
     <string name="navigation_stream_type">导航音频流类型</string>
@@ -334,7 +335,9 @@
     <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. 打开车机热点设置，开启热点，如有 5 GHz 请选择。\n2. 在下方准确复制热点名称和密码。\n3. 连接时保持车机热点开启。DiPlay 通过蓝牙发送热点信息，iPhone 会自动加入。</string>
     <string name="s_2_4_ghz">2.4 GHz</string>
     <string name="s_2_pair_your_iphone">2 · 配对你的 iPhone</string>
-    <string name="s_300_ms_default">300 毫秒 · 默认</string>
+    <string name="s_50_ms_experimental">50 毫秒 · 实验性</string>
+    <string name="s_100_ms_low_latency">100 毫秒 · 低延迟</string>
+    <string name="s_300_ms_default">300 毫秒 · 均衡</string>
     <string name="s_30_fps_lighter_load">30 帧/秒 · 减轻负载</string>
     <string name="s_3_connect">3 · 连接</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. 点击下方“检查并启用”。这将启用仪表盘地图和自动主题跟随。正在进行的 CarPlay 会话会重新连接一次，之后即可断开电脑。</string>
@@ -727,6 +730,8 @@
     <string name="settings_direct_video_output_description">将 CarPlay 画面直接交给车机的系统合成器，而不是在 DiPlay 窗口内绘制。可将延迟降低约一次屏幕刷新。画面调整不适用。会重新连接 CarPlay。</string>
     <string name="settings_low_latency_decoder">低延迟解码（实验性）</string>
     <string name="settings_low_latency_decoder_description">要求高通视频解码器在每一帧解码后立即输出，而不是保留后续帧，并由专用线程立即显示每个已解码的帧，无需等待下一帧到达。可将延迟降低数十毫秒。如果画面出现花屏或卡住，请关闭。下次连接时生效。</string>
+    <string name="settings_media_fast_start_experimental">快速启动音乐（实验性）</string>
+    <string name="settings_media_fast_start_experimental_description">iPhone 建立低延迟音乐流时立即预热 AAC 输出，请求 Android 快速混音路径，并在首个解码帧后开始播放。部分车机可能出现爆音或短暂断音。重新连接 CarPlay 后生效，仅影响 50/100 毫秒音乐缓冲。</string>
     <string name="settings_fps_counter">FPS 计数器</string>
     <string name="settings_fps_counter_description">在 CarPlay 右上角显示计数器：每秒显示的帧数（50 及以上为绿色，30 及以上为黄色，低于 30 为红色）、每秒从 iPhone 接收的帧数以及解码时间。画面静止时帧数很少，因为 iPhone 不发送帧。</string>
     <string name="car_button_in_carplay">CarPlay 中的车辆按钮</string>

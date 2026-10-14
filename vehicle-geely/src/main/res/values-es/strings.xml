@@ -24,10 +24,13 @@
     <string name="settings_geely_media_owner">Salida de música</string>
     <string name="settings_geely_media_owner_bluetooth">Bluetooth del vehículo</string>
     <string name="settings_geely_media_owner_diplay">CarPlay</string>
-    <string name="settings_geely_bluetooth_media_auto_avoid">Evitar automáticamente el audio Bluetooth del vehículo (experimental)</string>
-    <string name="settings_geely_bluetooth_media_auto_avoid_description">Con música de CarPlay, desconecta temporalmente solo el perfil multimedia A2DP para evitar conflictos. Las llamadas y el emparejamiento siguen activos; se restaura al terminar CarPlay. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">Desactivar automáticamente el audio Bluetooth al iniciar CarPlay (experimental)</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">Al iniciar CarPlay, desconecta solo el perfil multimedia A2DP para evitar conflictos. Las llamadas y el emparejamiento siguen conectados. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_bluetooth_media_auto_restore">Restaurar automáticamente el audio Bluetooth al finalizar CarPlay (experimental)</string>
+    <string name="settings_geely_bluetooth_media_auto_restore_description">Al finalizar CarPlay, pide a la aplicación Bluetooth del sistema G636 que vuelva a conectar A2DP y cambie a la fuente Bluetooth del vehículo; la música puede reanudarse. Si sigue desactivado, usa el botón de recuperación inferior. Déjalo desactivado para evitar música Bluetooth fuera de CarPlay.</string>
+    <string name="settings_geely_bluetooth_media_open_settings">Abrir Bluetooth del vehículo para restaurar el audio</string>
     <string name="settings_geely_bluetooth_media_confirm_title">¿Usar CarPlay para la música?</string>
-    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay desconectará automáticamente el perfil multimedia Bluetooth durante CarPlay. No apaga Bluetooth ni corta llamadas y lo restaura al finalizar. Requiere permiso de dispositivos cercanos.</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay desconectará el perfil multimedia Bluetooth durante CarPlay sin apagar Bluetooth ni cortar llamadas. La restauración automática es independiente y está desactivada de forma predeterminada. Requiere permiso de dispositivos cercanos.</string>
     <string name="settings_geely_bluetooth_media_confirm_action">Usar CarPlay y activar la prevención</string>
     <string name="settings_geely_input_title">Controles del volante de Geely (experimental)</string>
     <string name="settings_geely_input_description">Las teclas multimedia de OneOS y la emisión de voz de Flyme solo funcionan durante una sesión de CarPlay. El Bluetooth del vehículo desactiva la interceptación. Los cambios de entrada se aplican de inmediato.</string>
@@ -65,6 +68,10 @@
     <string name="settings_geely_evcc_vehicle_status_description">Comparte el nivel de la batería de tracción, la autonomía restante y el estado de carga cuando EVCC proporciona una lectura verificada. Se aplica en la siguiente conexión.</string>
     <string name="settings_geely_evcc_vehicle_speed">Enviar velocidad al posicionamiento de CarPlay</string>
     <string name="settings_geely_evcc_vehicle_speed_description">Añade la velocidad y la marcha de EVCC a los datos de ubicación solicitados por el iPhone. También debe estar activada la ubicación. Se aplica en la siguiente conexión.</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling">Frecuencia de muestreo de velocidad de rueda (experimental)</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_description">Controla con qué frecuencia GeePlay muestrea la caché de velocidad en memoria de EVCC para cada paquete $PASCD. No fuerza lecturas del bus del vehículo. Las frecuencias más altas se aplican en la siguiente conexión y usan más CPU.</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_standard">4 Hz · 250 ms (predeterminado)</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_fast">10 Hz · 100 ms</string>
     <string name="settings_geely_evcc_video_while_parked">Permitir vídeo solo con el vehículo estacionado (experimental)</string>
     <string name="settings_geely_evcc_video_while_parked_description">Usa la marcha verificada por EVCC y bloquea la reproducción si falta o está obsoleta. Se aplica en la siguiente conexión.</string>
     <string name="settings_geely_evcc_video_confirm_title">¿Activar vídeo estacionado?</string>

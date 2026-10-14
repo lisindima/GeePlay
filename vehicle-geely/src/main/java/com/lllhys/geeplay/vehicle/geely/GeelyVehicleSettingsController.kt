@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import com.shilapi.xcertplay.media.MediaOutputOwner
 import com.shilapi.xcertplay.media.AmbientMusicSettings
 import com.shilapi.xcertplay.transport.EvChargingConnectors
@@ -20,6 +21,7 @@ import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
 import com.shilapi.xcertplay.vehicle.VehicleSystemAction
 import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataAdapter
 import com.lllhys.geeplay.vehicle.geely.evcc.EvccVehicleDataSettings
+import com.lllhys.geeplay.vehicle.geely.evcc.EvccWheelSpeedSampling
 import com.lllhys.geeplay.vehicle.geely.evcc.EvccAmbientLightingProvider
 
 class GeelyVehicleSettingsController : VehicleSettingsController {
@@ -27,6 +29,7 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
         val navigation = GeelyNavigationSettings.load(context)
         val mediaOwner = GeelyMediaSettings.loadOwner(context)
         val bluetoothAutoAvoid = GeelyMediaSettings.bluetoothAutoAvoid(context)
+        val bluetoothAutoRestore = GeelyMediaSettings.bluetoothAutoRestore(context)
         val ambientSettings = AmbientMusicSettings.load(context)
         val ambientAvailable = EvccAmbientLightingProvider.VALIDATED_PROFILES.isNotEmpty()
         val inputProfile = GeelyInputSettings.loadProfile(context)
@@ -190,6 +193,27 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                             evccAdapter?.prepare()
                         },
                     ),
+                    VehicleSettingRow.Information(
+                        context.getString(R.string.settings_geely_evcc_wheel_speed_sampling_description),
+                    ),
+                    VehicleSettingRow.Choice(
+                        id = "geely_evcc_wheel_speed_sampling",
+                        title = context.getString(R.string.settings_geely_evcc_wheel_speed_sampling),
+                        options = listOf(
+                            context.getString(R.string.settings_geely_evcc_wheel_speed_sampling_standard),
+                            context.getString(R.string.settings_geely_evcc_wheel_speed_sampling_fast),
+                        ),
+                        selectedIndex = EvccWheelSpeedSampling.entries
+                            .indexOf(EvccVehicleDataSettings.wheelSpeedSampling(context)),
+                        enabled = EvccVehicleDataSettings.vehicleSpeedEnabled(context),
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        save = { index ->
+                            EvccVehicleDataSettings.saveWheelSpeedSampling(
+                                context,
+                                EvccWheelSpeedSampling.entries[index],
+                            )
+                        },
+                    ),
                     VehicleSettingRow.Toggle(
                         id = "geely_evcc_video_while_parked",
                         title = context.getString(R.string.settings_geely_evcc_video_while_parked),
@@ -304,6 +328,28 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                         save = { enabled ->
                             GeelyMediaSettings.saveBluetoothAutoAvoid(context, enabled)
                             if (enabled) requestBluetoothConnectPermission(context)
+                        },
+                    ),
+                    VehicleSettingRow.Toggle(
+                        id = "geely_bluetooth_media_auto_restore",
+                        title = context.getString(R.string.settings_geely_bluetooth_media_auto_restore),
+                        description = context.getString(
+                            R.string.settings_geely_bluetooth_media_auto_restore_description,
+                        ),
+                        checked = bluetoothAutoRestore,
+                        enabled = mediaOwner == MediaOutputOwner.DIPLAY,
+                        effect = VehicleSettingEffect.IMMEDIATE,
+                        save = { enabled ->
+                            GeelyMediaSettings.saveBluetoothAutoRestore(context, enabled)
+                        },
+                    ),
+                    VehicleSettingRow.Action(
+                        id = "geely_bluetooth_media_open_settings",
+                        title = context.getString(R.string.settings_geely_bluetooth_media_open_settings),
+                        run = {
+                            context.startActivity(
+                                Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
                         },
                     ),
                 ),

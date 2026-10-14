@@ -5,7 +5,10 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import com.shilapi.xcertplay.vehicle.BluetoothAudioConflictPolicy
@@ -33,14 +36,63 @@ internal interface GeelyA2dpController {
     fun restore(addresses: Set<String>): GeelyA2dpRestoreResult
 }
 
-internal class AndroidGeelyA2dpController(private val context: Context) : GeelyA2dpController {
+internal fun interface GeelyA2dpRestoreRequester {
+    fun request(address: String): Boolean
+}
+
+internal class FlymeBluetoothMusicRestoreRequester(
+    context: Context,
+    private val deviceSupported: () -> Boolean = { Build.MODEL.equals(SUPPORTED_MODEL, ignoreCase = true) },
+    private val receiverAvailable: (ComponentName) -> Boolean = { component ->
+        runCatching {
+            context.packageManager.getReceiverInfo(component, 0).let { info ->
+                info.exported && info.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0
+            }
+        }.getOrDefault(false)
+    },
+    private val sendBroadcast: (Intent) -> Unit = context.applicationContext::sendBroadcast,
+) : GeelyA2dpRestoreRequester {
+    private val appContext = context.applicationContext
+    private val component = ComponentName(OEM_PACKAGE, OEM_RECEIVER)
+
+    override fun request(address: String): Boolean {
+        if (!deviceSupported()) return false
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) return false
+        if (!receiverAvailable(component)) return false
+        return runCatching {
+            sendBroadcast(
+                Intent(ACTION_CHANGE_BLUETOOTH_SOURCE)
+                    .setComponent(component)
+                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+                    .putExtra(EXTRA_FROM, appContext.packageName)
+                    .putExtra(EXTRA_NEED_PLAY, true),
+            )
+            true
+        }.getOrDefault(false)
+    }
+
+    companion object {
+        const val SUPPORTED_MODEL = "G636"
+        const val OEM_PACKAGE = "com.flyme.auto.localmusic.bluetooth"
+        const val OEM_RECEIVER = "com.flyme.auto.local.carcontroller.mediacenter.MediaCenterReceiver"
+        const val ACTION_CHANGE_BLUETOOTH_SOURCE =
+            "com.flyme.auto.localmusic.bluetooth.CHANGE_BT_SOURCE"
+        const val EXTRA_FROM = "from"
+        const val EXTRA_NEED_PLAY = "needPlay"
+    }
+}
+
+internal class AndroidGeelyA2dpController(
+    private val context: Context,
+    private val oemRestoreRequester: GeelyA2dpRestoreRequester = FlymeBluetoothMusicRestoreRequester(context),
+) : GeelyA2dpController {
     private val appContext = context.applicationContext
 
     override fun disconnectSingleConnected(): GeelyA2dpDisconnectResult {
         if (!hasBluetoothPermission()) return GeelyA2dpDisconnectResult.Unavailable("BLUETOOTH_CONNECT not granted")
         val adapter = appContext.getSystemService(BluetoothManager::class.java)?.adapter
             ?: return GeelyA2dpDisconnectResult.Unavailable("Bluetooth adapter unavailable")
-        return withA2dpProxy(adapter) { proxy ->
+        return withA2dpSinkProxy(adapter) { proxy ->
             val devices = proxy.connectedDevices.orEmpty()
             when (devices.size) {
                 0 -> GeelyA2dpDisconnectResult.NothingConnected
@@ -49,14 +101,14 @@ internal class AndroidGeelyA2dpController(private val context: Context) : GeelyA
                     if (invokeConnection(proxy, "disconnect", device)) {
                         GeelyA2dpDisconnectResult.Disconnected(device.address)
                     } else {
-                        GeelyA2dpDisconnectResult.Unavailable("A2DP disconnect rejected")
+                        GeelyA2dpDisconnectResult.Unavailable("A2DP sink disconnect rejected")
                     }
                 }
                 else -> GeelyA2dpDisconnectResult.Unavailable(
-                    "multiple A2DP devices connected; refusing an ambiguous disconnect",
+                    "multiple A2DP sink devices connected; refusing an ambiguous disconnect",
                 )
             }
-        } ?: GeelyA2dpDisconnectResult.Unavailable("A2DP profile unavailable")
+        } ?: GeelyA2dpDisconnectResult.Unavailable("A2DP sink profile unavailable")
     }
 
     override fun restore(addresses: Set<String>): GeelyA2dpRestoreResult {
@@ -66,32 +118,47 @@ internal class AndroidGeelyA2dpController(private val context: Context) : GeelyA
         }
         val adapter = appContext.getSystemService(BluetoothManager::class.java)?.adapter
             ?: return GeelyA2dpRestoreResult(emptySet(), addresses, "Bluetooth adapter unavailable")
-        return withA2dpProxy(adapter) { proxy ->
+        return withA2dpSinkProxy(adapter) { proxy ->
             val connected = proxy.connectedDevices.orEmpty().mapTo(mutableSetOf(), BluetoothDevice::getAddress)
             val restored = LinkedHashSet<String>()
             val pending = LinkedHashSet<String>()
+            var restoredThroughOem = false
             addresses.forEach { address ->
                 if (address in connected) {
                     restored += address
                 } else {
                     val device = runCatching { adapter.getRemoteDevice(address) }.getOrNull()
-                    if (device != null && invokeConnection(proxy, "connect", device)) restored += address
-                    else pending += address
+                    val oemRestored = device != null &&
+                        oemRestoreRequester.request(address) &&
+                        waitForConnection(proxy, device)
+                    val directRestored = device != null && !oemRestored &&
+                        invokeConnection(proxy, "connect", device) &&
+                        waitForConnection(proxy, device)
+                    if (oemRestored || directRestored) {
+                        restored += address
+                        restoredThroughOem = restoredThroughOem || oemRestored
+                    } else {
+                        pending += address
+                    }
                 }
             }
             GeelyA2dpRestoreResult(
                 restored,
                 pending,
-                if (pending.isEmpty()) "A2DP restored" else "A2DP restore incomplete",
+                when {
+                    pending.isNotEmpty() -> "A2DP restore incomplete"
+                    restoredThroughOem -> "A2DP restored through OEM Bluetooth music"
+                    else -> "A2DP restored"
+                },
             )
-        } ?: GeelyA2dpRestoreResult(emptySet(), addresses, "A2DP profile unavailable")
+        } ?: GeelyA2dpRestoreResult(emptySet(), addresses, "A2DP sink profile unavailable")
     }
 
     private fun hasBluetoothPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             appContext.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
 
-    private fun <T> withA2dpProxy(adapter: BluetoothAdapter, action: (BluetoothProfile) -> T): T? {
+    private fun <T> withA2dpSinkProxy(adapter: BluetoothAdapter, action: (BluetoothProfile) -> T): T? {
         val result = AtomicReference<Result<T>?>()
         val latch = CountDownLatch(1)
         val listener = object : BluetoothProfile.ServiceListener {
@@ -108,7 +175,7 @@ internal class AndroidGeelyA2dpController(private val context: Context) : GeelyA
                 latch.countDown()
             }
         }
-        if (!runCatching { adapter.getProfileProxy(appContext, listener, BluetoothProfile.A2DP) }.getOrDefault(false)) {
+        if (!runCatching { adapter.getProfileProxy(appContext, listener, PROFILE_A2DP_SINK) }.getOrDefault(false)) {
             return null
         }
         if (!latch.await(PROFILE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) return null
@@ -126,8 +193,24 @@ internal class AndroidGeelyA2dpController(private val context: Context) : GeelyA
         false
     }
 
+    private fun waitForConnection(proxy: BluetoothProfile, device: BluetoothDevice): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(CONNECTION_TIMEOUT_MILLIS)
+        do {
+            if (runCatching { proxy.getConnectionState(device) }.getOrDefault(BluetoothProfile.STATE_DISCONNECTED) ==
+                BluetoothProfile.STATE_CONNECTED
+            ) return true
+            Thread.sleep(CONNECTION_POLL_MILLIS)
+        } while (System.nanoTime() < deadline)
+        return false
+    }
+
     private companion object {
+        // A phone sends media to the head unit, so Android exposes it under the hidden sink role.
+        // BluetoothProfile.A2DP (2) is the opposite role and only lists devices this head unit sends to.
+        const val PROFILE_A2DP_SINK = 11
         const val PROFILE_TIMEOUT_MILLIS = 4_000L
+        const val CONNECTION_TIMEOUT_MILLIS = 12_000L
+        const val CONNECTION_POLL_MILLIS = 100L
     }
 }
 
@@ -157,12 +240,13 @@ internal class GeelyBluetoothMediaJournal(context: Context) {
     }
 }
 
-/** Disconnects only the OEM A2DP media profile while GeePlay owns CarPlay music. */
+/** Disconnects only the head unit's OEM A2DP sink profile while GeePlay owns CarPlay music. */
 class GeelyBluetoothAudioConflictPolicy internal constructor(
     private val controller: GeelyA2dpController,
     private val journal: GeelyBluetoothMediaJournal,
     private val worker: ScheduledExecutorService,
     private val onStatus: (String) -> Unit,
+    private val restoreEnabled: () -> Boolean = { true },
     private val pollMillis: Long = POLL_MILLIS,
 ) : BluetoothAudioConflictPolicy {
     constructor(
@@ -173,6 +257,7 @@ class GeelyBluetoothAudioConflictPolicy internal constructor(
         GeelyBluetoothMediaJournal(context),
         newWorker(),
         onStatus,
+        restoreEnabled = { GeelyMediaSettings.bluetoothAutoRestore(context) },
     )
 
     private val gate = Any()
@@ -205,7 +290,7 @@ class GeelyBluetoothAudioConflictPolicy internal constructor(
             poll = null
             true
         }
-        if (shouldRestore) worker.execute(::restorePending)
+        if (shouldRestore) restoreIfEnabled()
     }
 
     override fun close() {
@@ -218,7 +303,7 @@ class GeelyBluetoothAudioConflictPolicy internal constructor(
             poll?.cancel(false)
             poll = null
         }
-        worker.execute(::restorePending)
+        restoreIfEnabled()
         worker.shutdown()
     }
 
@@ -242,13 +327,13 @@ class GeelyBluetoothAudioConflictPolicy internal constructor(
         when (val result = controller.disconnectSingleConnected()) {
             is GeelyA2dpDisconnectResult.Disconnected -> {
                 journal.add(result.address)
-                onStatus("A2DP media disconnected for CarPlay")
+                onStatus("A2DP sink media disconnected for CarPlay")
             }
-            GeelyA2dpDisconnectResult.NothingConnected -> onStatus("A2DP media already clear")
+            GeelyA2dpDisconnectResult.NothingConnected -> onStatus("A2DP sink media already clear")
             is GeelyA2dpDisconnectResult.Unavailable -> onStatus("A2DP avoidance unavailable: ${result.detail}")
         }
         if (synchronized(gate) { current(expectedGeneration) }) schedulePoll(expectedGeneration, pollMillis)
-        else restorePending()
+        else restoreInlineIfEnabled()
     }
 
     private fun restorePending() {
@@ -260,6 +345,22 @@ class GeelyBluetoothAudioConflictPolicy internal constructor(
         val result = controller.restore(pending)
         journal.replace(result.pending)
         onStatus(if (result.pending.isEmpty()) result.detail else "${result.detail}: ${result.pending.size} pending")
+    }
+
+    private fun restoreIfEnabled() {
+        if (runCatching(restoreEnabled).getOrDefault(false)) {
+            if (!worker.isShutdown) runCatching { worker.execute(::restorePending) }
+        } else {
+            onStatus("A2DP auto-restore disabled; media remains disconnected")
+        }
+    }
+
+    private fun restoreInlineIfEnabled() {
+        if (runCatching(restoreEnabled).getOrDefault(false)) {
+            restorePending()
+        } else {
+            onStatus("A2DP auto-restore disabled; media remains disconnected")
+        }
     }
 
     private fun current(expectedGeneration: Long): Boolean =
@@ -280,6 +381,10 @@ class GeelyBluetoothAudioConflictPolicy internal constructor(
             val journal = GeelyBluetoothMediaJournal(context)
             val pending = journal.pending()
             if (pending.isEmpty()) return
+            if (!GeelyMediaSettings.bluetoothAutoRestore(context)) {
+                onStatus("A2DP auto-restore disabled; ${pending.size} pending")
+                return
+            }
             val worker = newWorker()
             worker.execute {
                 val result = AndroidGeelyA2dpController(context).restore(pending)

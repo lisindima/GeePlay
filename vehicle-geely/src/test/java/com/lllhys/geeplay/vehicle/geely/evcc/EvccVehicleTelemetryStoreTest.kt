@@ -328,6 +328,20 @@ class EvccVehicleTelemetryStoreTest {
         assertTrue("sourceAgeMs=125" in diagnostic)
     }
 
+    @Test
+    fun `speed source diagnostics expose configured sample and refresh cadence`() {
+        val source = EvccVehicleSpeedSource(
+            telemetry = store,
+            elapsedRealtime = { now },
+            sampleMillis = 100L,
+        )
+
+        val diagnostics = source.diagnostics()
+
+        assertTrue("sampleIntervalMs=100" in diagnostics)
+        assertTrue("refreshEverySamples=10" in diagnostics)
+    }
+
     private fun accept(
         signal: EvccLogicalSignal,
         id: Long,

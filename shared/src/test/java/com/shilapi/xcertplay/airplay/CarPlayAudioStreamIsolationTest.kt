@@ -12,6 +12,30 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class CarPlayAudioStreamIsolationTest {
+    @Test fun audioSetupPreparesOutputBeforeTheFirstPacketStartsPlayback() {
+        val prepared = mutableListOf<Pair<AudioStreamId, AudioFormat>>()
+        val started = mutableListOf<AudioStreamId>()
+        val engine = CarPlayMediaEngine(object : MediaSink {
+            override fun onAudioPrepared(id: AudioStreamId, format: AudioFormat) {
+                prepared += id to format
+            }
+
+            override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {
+                started += id
+            }
+        })
+        val session = session()
+        try {
+            assertNotNull(engine.onAudio(session, 102, setup("media") + ("audioFormat" to 0x800000L)))
+            assertEquals(listOf(AudioStreamId(102, "media")), prepared.map { it.first })
+            assertEquals(AudioCodecKind.AAC_LC, prepared.single().second.codec)
+            assertTrue(started.isEmpty())
+        } finally {
+            engine.onSessionClosed(session)
+            session.close()
+        }
+    }
+
     @Test fun guidanceSetupAndMediaReplacementKeepTheOtherAudioStreamAlive() {
         val session = session()
         val engine = CarPlayMediaEngine(object : MediaSink {})

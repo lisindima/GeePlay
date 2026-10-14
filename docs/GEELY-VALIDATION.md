@@ -36,7 +36,7 @@
 | ECARX Driver | watched/direct、方法签名、dynamic proxy、typed lane array、publish/clear、OEM 拒绝 | fake SDK 通过 |
 | cleanup journal | 写前标记、清理确认、启动恢复、未确认时阻止新输出 | 通过 |
 | lane / junction renderer | Bitmap、工厂 icon ID 映射、0 基 lane、empty array、junction angle seam | fake SDK / Robolectric 通过 |
-| EAS lane Debug probe | 服务器分配 vendor、`-100` fail-closed、`16 → 43 → lanes → clear → 44 → 17`、unregister/release | Robolectric 通过；旧序列真车失败，修正序列暂不投放（未知 vendor 消费规则待明确） |
+| EAS lane Debug probe | 服务器分配 vendor、`-100` 显式 Debug override、`16 → 43 → lanes → clear → 44 → 17`、unregister/release | Robolectric 通过；真车到达 `3418/DIM`，与完整 route frame 组合后仪表可见；不进入生产 |
 | media owner | MEDIA 抑制、非 MEDIA 保留、MediaSession gate、Bluetooth retention | 通过 |
 | OneOS input | descriptor、transaction、key、owner/call/session gate、timeout、death、epoch、quarantine | 通过 |
 | Flyme voice | 两个 action、action type、250 ms 去重、风险确认 | 通过 |
@@ -55,7 +55,7 @@
 | strict RouteGuidance | strict UTF-8、容量边界、原子拒绝、route end | `SOFTWARE_VERIFIED` |
 | Lane capability | Identify 7/8、`0x5204` catalog/whitelist/parser | `SOFTWARE_VERIFIED`; `VEHICLE_PENDING` |
 | ECARX basic navigation | fake SDK publish/clear/recovery | `SOFTWARE_VERIFIED`; `AVAILABLE/DELIVERED/VEHICLE_CONFIRMED` 待实车 |
-| ECARX lane | 0 基 typed array、工厂 icon ID、empty clear；旧 XUI 与 EAS 差分 | `SOFTWARE_VERIFIED`; XUI `DELIVERED`; EAS/仪表 `VEHICLE_PENDING` |
+| ECARX lane | 0 基 typed array、工厂 icon ID、lane-before-route flush、empty clear | 合成输出 `VEHICLE_CONFIRMED`; 真实 CarPlay `VEHICLE_PENDING`（重连未重放 `0x5204`） |
 | media owner | immutable policy、renderer/MediaSession/Bluetooth gates | `SOFTWARE_VERIFIED`; `VEHICLE_PENDING` |
 | OneOS/Flyme input | lifecycle、timeout/death/epoch/quarantine、risk gate | `SOFTWARE_VERIFIED`; `VEHICLE_PENDING` |
 | stream `111` local path | virtual config、decoder/mirror、local UI | `SOFTWARE_VERIFIED` |
@@ -386,17 +386,18 @@ factory data source: 9
 
 - `laneIndex` 为 0 基；Bitmap 在 G636 AdapterService 下不会进入最终协议，真正生效的是 `laneIconId`。
 - 工厂基础 ID：`0` 直行、`1` 左转、`3` 右转、`4` 直行或右转、`8` 右掉头；推荐 ID 至少确认 `15` 直行、`16` 左转。
-- GeePlay 发送 `[0,16, 1,0, 2,4]` 后，`DIMNaviInteractioncService` 收到完全一致数组；完整导航探针也发送并收到 `[0,1, 1,15, 2,3]`。用户确认仪表仍无车道，因此“Binder 调用成功/DIM 收到”不等于仪表呈现。
-- 反编译车机实际 XUI/AdapterService 路径确认：`updateLaneInfo()` 会序列化 `laneNumber,laneIconId`；但 `EcarxNaviInteractionImpl.updateNaviStatus()` 是空操作。工厂地图观察到的 `43/44` 来自 EAS NaviService，不来自旧 XUI。
+- GeePlay 发送 `[0,16, 1,0, 2,4]` 后，`DIMNaviInteractioncService` 收到完全一致数组；完整导航探针也发送并收到 `[0,1, 1,15, 2,3]`。早期两者都在没有后续完整帧时失败，说明“Binder 调用成功/DIM 收到”不等于仪表呈现。
+- 反编译精确 `DIMInteraction.apk` 确认 `updateLaneInfo()` 只更新共享 `mDimNaviInteraction` builder；真正调用 QNX `sendNaviMessgae()` 的是 `updateNaviDataChange()`。当前 XUI SDK 的 `updateNavigationInfo()` 在 ETA 字段触发该发送，而 `EcarxNaviInteractionImpl.updateNaviStatus()` 为空操作。
 - 旧版 Debug-only `eas-lane` 已在真车执行：服务端忽略客户端请求的 vendor `9`，按真实包身份注册 GeePlay 为 `-100`；`43`、三条 lane `16/0/4`、`44` 均到达 NaviService，但当时 `mapForWidget=9`，仪表无车道。随后执行的 `EAS 43 → 500 ms → XUI lane` 也无显示。
 - 离线反编译纠正了旧假设：`43/44` 只表示路口放大图开/关，不会建立导航所有权；`16/33` 才进入 guiding，`17/35` 才退出。lane 事件只有在自身 vendor 等于当前 `mapForWidget` 时，才会变成事件 `1009` 和协议 `3418 RspLanesInfo`。
 - `MapInstallMonitor` 允许正式内置包使用固定 vendor，也允许声明 `ecarx.intent.action.MAP_SERVICE` 的第三方 provider 使用包名 hash vendor。当前没有证据允许 GeePlay 用空壳 service 取得该身份，因此生产继续 fail-closed；修正后的探针不再设置 vendor `9`，仅使用服务端实际分配值。
-- 修正后的 Debug-only 探针序列为 `GUIDE_START(16) → CROSSROAD_ON(43) → lanes → empty clear → CROSSROAD_OFF(44) → GUIDE_STOP(17)`。自动化已通过；该序列尚未真车执行。
-- 二次离线审计确认这组调用经过同一 one-way Binder、serialized RxBus、MapManager dispatcher 和 StateMachine Handler，顺序不会越过；`-100` 在 NaviService 内部也可进入 guiding state、成为 `mapForWidget` 并生成 `3418 RspLanesInfo`。未闭环的是 G636 仪表最终消费者是否拒绝未知 vendor，该消费者不在当前工厂 Map、NaviService 近似包或 NaviWidget 包中。探针已增加 `-100` 硬拒绝测试：未知身份时不发任何 status/lane，仍执行 unregister/release。
+- 修正后的 Debug-only 探针序列为 `GUIDE_START(16) → CROSSROAD_ON(43) → lanes → empty clear → CROSSROAD_OFF(44) → GUIDE_STOP(17)`。真车确认 vendor `-100` 可进入 guiding、产生协议 `3418` 并到达 DIM；单独运行仍因没有 builder flush 而不显示。
+- 在 EAS lane 可见期间，用独立 Activity 发送一次完整 XUI route frame 后，仪表立即出现固定测试车道。旧版 XUI 日志随后进一步证明 `updateNavigationInfo()` 内的 `updateETA(600)` 先发送，独立 `updateLaneInfo [0,1, 1,15, 2,3]` 后写入，而第二次相同 ETA 被 `OnceExecute` 去重。
+- 因此生产不需要注册 EAS provider，也不依赖 vendor `-100`：修复为在已有 XUI driver 中先调用独立 `updateLaneInfo`，再调用 `updateNavigationInfo`，让同一帧 ETA flush 携带 lane；清理时同样先写 empty lane 再发送最终导航帧。
 
-清理确认：工厂模拟导航系统设置恢复为未设置，Mock Location app-op 为 `deny`，测试导航 `published/cleared=true`、`cleanupPending=false`、Driver 最终 `CLOSED`。
+早期清理记录不完整：虽然 Mock Location app-op 为 `deny`，测试导航也达到 `published/cleared=true`、`cleanupPending=false`、Driver `CLOSED`，但 2026-10-14 实车仍读到 `flyme_auto_map_mock_guidance=1`。该 setting 随后已删除并确认为 `null`，同时重启 `com.flyme.auto.map` 清除其进程内缓存路线。
 
-当前等级：lane parser/映射 `SOFTWARE_VERIFIED`；旧 XUI 到 DIM 为 `DELIVERED`；仪表显示与 EAS provider 权限仍为 `VEHICLE_PENDING`。
+当前等级：lane parser/映射与 `lanes → info` 顺序为 `SOFTWARE_VERIFIED`，合成 lane 的 XUI 输出为 `VEHICLE_CONFIRMED`；真实 CarPlay lane 仍为 `VEHICLE_PENDING`。用户看到的可见 lane 来自 Debug `validationSnapshot()`，不能作为真实 `0x5204` 闭环证据。
 
 离线静态证据来自以下候选包；其中 NaviService 是与车机日志同系列的本地近似版本，结论只采用同时被真车日志印证的控制条件：
 
@@ -416,11 +417,157 @@ Corrected EAS lifecycle and unknown-vendor fail-closed tests: PASS
 Base AGENTS.md CI command: BUILD SUCCESSFUL in 4s
 GeePlay AGENTS.md command: BUILD SUCCESSFUL in 14s
 vehicle-geely/geely lint: 0 errors
-Corrected debug APK SHA-256: ab437d98372cd17ba84b290d73edb5d81e3a4e0ee5c4e7336597fb621701b989
-Install/vehicle result: not attempted; user is away from the vehicle
+Combined EAS + XUI flush vehicle result: lanes visible (user confirmed)
+Fixed XUI-only debug APK SHA-256: 689f10c8a25d18d77d98ef27dc49af906a0dddf6bd8f7324ac088dede20265b2
+Fixed XUI-only log order: updateLaneInfo [0,1, 1,15, 2,3] -> updateNavigationInfo/updateETA(600)
+Fixed XUI-only cleanup: published=true, cleared=true, cleanupPending=false
+Fixed XUI-only synthetic result: mock lanes visible (user confirmed; not a real CarPlay lane result)
+Real CarPlay evidence: 22:17 session received eight 0x5204 frames; 22:30 reconnect received 0x5201/0x5202 but no 0x5204 replay while phone still showed lanes
 ```
 
-暂不安排下一次真车运行。先离线解决合法 provider 身份，或拿到 G636 仪表消费者对 `RspLanesInfo.mapVendor` 的接受规则；完成后才允许一次自动化验证，同时确认 `mapForWidget` 切换、`RspLanesInfo(protocol=3418)`、仪表可见和 `17`/empty clear。该结果未确认前不得接入生产。
+上面的“phone still showed lanes”后续被用户纠正为可能与 mock 画面混淆，不能作为证据。当前可靠结论仅为：历史会话收到过 8 帧 `0x5204`，合成输出能在仪表显示，真实两段时序尚未同时抓到。
+
+通勤诊断包已安装，SHA-256：`d254ce8c5ec657ab9978416e13a403e30f6a2b7cc46b0a4fefb66d4a32211a3a`。`RGDIAG` 已在 G636 私有 `files/logs/diplay.log` 实际落盘，并随 `previous.log` 至 `previous-7.log` 自动轮转。记录边界：
+
+- `stage=RX`：5201/5202/5204 的解析结果、source owner、session 和连接 generation；
+- `STORE_PUBLISH/STORE_CLEAR`：当前 maneuver/lane 选择和清除原因；
+- `OEM_PLAN/OEM_LANE_WRITE/OEM_CALL`：Apple lane、G636 icon ID、empty transition 及 DIM 结果；
+- 不保存道路名、目的地、坐标、lane description 正文或原始 payload。
+
+EAS probe 仅保留为 Debug 诊断，不进入生产。下一步在真实通勤后拉取 8 个轮转日志，按 `0x5204 → STORE_PUBLISH → OEM_LANE_WRITE → updateNavigationInfo` 时间线定位缺口。
+
+### 9.4.1 2026-10-14 通勤诊断与残留防护
+
+2026-10-14 从 G636 拉取了诊断包的全部 8 个轮转日志；备份为 `/tmp/geeplay-lane-commute.7uFRHz/route-logs.tar`，SHA-256 `8c1ff4dd7f1e740d07305ba8998403f47e11abc9a9be1a954aa7dbcb07429d5e`。完整通勤统计：
+
+```text
+message=0x5204: 0
+laneCount>0: 0
+OEM_LANE_WRITE: 0
+LaneGuidanceShowing=false: 2484
+OEM_PLAN: 2360
+```
+
+同一时段系统 `NaviService` 独立出现 `[0,16, 1,16, 2,15]`、`[0,16, 1,16, 2,18]`、`[0,2, 1,4]` 等 lane 数组。随后确认 `flyme_auto_map_mock_guidance=1`，说明用户当时看到的方向、推荐态和提前展示来自原车隐藏模拟导航，而不是上述高德 CarPlay 会话。删除 setting 并重启原车地图后，模拟 lane 流停止；GeePlay 重连恢复普通 HUD 导航。
+
+清理后的稳定会话仍持续收到有效 `0x5201`，但每帧 `LaneGuidanceCurrentIndex=0`、`LaneGuidanceShowing=0`，没有 `0x5204`。用户同时确认该时刻 CarPlay 页面本身也没有车道提示，因此“HUD 无车道”是正确结果，不能用于通过或否决真实 lane 闭环。下一有效验收窗口必须是 CarPlay 页面实际出现车道时，并以 `RX 0x5204 → STORE_PUBLISH laneCount>0 → OEM_LANE_WRITE → updateNavigationInfo` 全链日志与 HUD 画面同时成立为准。
+
+该有效窗口已在同日 `18:29` 出现，且得到与预期不同但边界明确的结果。用户在驾驶中明确确认高德 CarPlay UI 正显示车道；物理 G636、GeePlay PID、`flyme_auto_map_mock_guidance=null` 均已在窗口前复核。同步统计如下：
+
+```text
+window: 18:29:15–18:31:10
+RX 0x5201: 125
+RX 0x5202: 2
+RX 0x5204: 0
+LaneGuidanceShowing=false: 125
+LaneGuidanceShowing=true: 0
+STORE_PUBLISH laneCount>0: 0
+OEM_LANE_WRITE visible=true: 0
+DIM non-empty updateLaneInfo: 0
+fatal: 0
+```
+
+该窗口跨越多个 maneuver index 和约两分钟持续更新，不是单帧竞争或延迟上报。当前会话在 `18:27:21/18:27:34` 两次 identification accepted，并分别于 `18:27:22/18:27:36` 向 component 42 发送 RouteGuidance subscription。`Iap2RouteGuidanceSubscriptionTest` 锁定 display component 参数 3/5/6/7/8，其中 `7=64`、`8=8`，接收列表包含 `0x5204`；因此可排除 GeePlay 未声明 lane capability、漏订阅或接收白名单缺失。
+
+用户后续补充：高德 lane 不只出现在高德自己的主画面，也出现在 CarPlay 主页小组件。因此不能表述为“高德只画 UI、没有推 lane”；可靠结论应先收窄为 lane 已进入 CarPlay 系统，但同一窗口没有经 GeePlay 当前订阅的 accessory RouteGuidance component 42 输出 `0x5204/Showing=true`。
+
+安装 Apple Maps 推荐态修复包并切回高德后，建立每分钟只读 heartbeat，扩大到所有 iAP2 RX Control Session 消息。用户在 `19:16` 明确确认 CarPlay 主页小组件正在显示 lane，对应完整窗口为：
+
+```text
+window: 19:15:00–19:17:05
+RX 0x5201: 221
+RX 0x5202: 5
+RX 0x5204: 0
+LaneGuidanceShowing=false: 221
+LaneGuidanceShowing=true: 0
+STORE_PUBLISH laneCount>0: 0
+OEM_LANE_WRITE visible=true: 0
+other RX control IDs: 0x4158 only
+```
+
+`0x4158` 在当前 endpoint catalog 和 identification 中是 `CommunicationsUpdate`，不是导航数据。该窗口还覆盖多个 maneuver 更新和路口切换，期间没有新的控制消息 ID。因此可排除“只过滤错了 `0x5204`”及另一条未监听的 iAP2 Control Session lane message。与 Apple Maps 标准 `0x5204` 正向对照结合后的准确结论是：高德确实向 CarPlay/iOS 主页组件提供 lane，但 iOS 没有把这份第三方导航组件数据桥接到当前 accessory RouteGuidance display component。GeePlay 现有接收端没有可补解析的 lane payload；继续修改 parser、订阅参数或 OEM 输出都不能从该窗口恢复高德 lane。若必须覆盖，只能寻找并验证标准 Control Session 之外的私有 CarPlay 通道，不能凭主页组件画面假设存在可读消息。
+
+用户于 `19:18:48` 再次确认高德主页 lane 仍然可见；延伸分片截至 `19:18:49` 又记录 58 帧 `0x5201`，全部 `LaneGuidanceShowing=false`，继续保持 `0x5204=0`、store/OEM 非空 lane=0，额外消息仍只有 `0x4158`。因此 UI/metadata 分离持续数分钟，可排除短暂显示残留、单帧时序竞争或 metadata 延迟到达。
+
+网络资料复核没有推翻上述抓包结论，但给出了可复现的机制解释和替代路径：
+
+- Apple WWDC23《Optimize CarPlay for vehicle systems》在 8:52 后明确区分：主屏显示 CarPlay video stream；地图小组件和仪表地图使用 CarPlay navigation UI stream；HUD 使用 iAP2 route-guidance metadata。
+- Apple WWDC25《Turbocharge your app for CarPlay》明确第三方导航 App 只有在 `mapTemplateShouldProvideNavigationMetadata` 返回 true，并向 `CPNavigationSession` 添加 maneuvers/lane guidance 后，CarPlay 才把这些 metadata 发送给车辆。官方示例代码为 `cpNavigationSession.add(laneGuidance)`。
+- Apple `CPLaneGuidance` 文档标记为 iOS 17.4+。高德 2024 年公开的 CarPlay 仪表盘导航条件同样是 iPhone 12+、iOS 17.4+、车机支持 CarPlay 仪表盘投屏；其宣传使用“投屏导航”，没有公开承诺 HUD/iAP2 lane metadata。
+- 真车高德窗口中 stream 111 持续收到 20–30 fps navigation UI 视频，证明车辆侧仪表投屏能力和高德 UI 路径确实被激活；同时 `0x5204=0`，说明高德没有在该会话向 accessory 提交可用的 `CPLaneGuidance`，或 iOS 没有为该第三方 App 桥接该字段。
+
+可行方案按目标分级：
+
+1. **仪表直接展示高德导航/车道画面**：使用已收到的 CarPlay stream 111，按现有 `VehicleClusterDisplayPolicy` 只在 G636 找到并验证安全的仪表 Display 后开放。该方案是 Apple 官方 UI-stream 路径，不产生结构化 lane。
+2. **G636 原生 HUD lane icon**：最佳方案是高德 App 完整实现/启用 `cpNavigationSession.add(laneGuidance)`；车辆端无法代替第三方 App 调用。可先确保 iPhone 12+、iOS 17.4+、最新版高德，但当前真车已证明单靠 accessory 参数 7/8 和 component 42 不足以强制高德输出。
+3. **视频识别 fallback**：离屏解码 stream 111，针对固定 lane panel 做模板匹配，再映射 OEM icon。技术上可行，但依赖高德 UI 主题、分辨率、语言和版本，延迟/误判/性能风险显著，应作为独立实验能力，不能混进当前标准 RouteGuidance 修复。
+
+参考：
+
+- <https://developer.apple.com/videos/play/wwdc2023/10150/>
+- <https://developer.apple.com/videos/play/wwdc2025/216/>
+- <https://developer.apple.com/documentation/carplay/cplaneguidance>
+- <https://xinwen.bjd.com.cn/content/s66bc9005e4b07fbcccaecdb2.html>
+
+随后在同一 iPhone、G636、GeePlay session 中切换到 Apple Maps，得到正向对照：
+
+```text
+18:32:26 event=0 0x5204 lanes=4
+18:32:26 event=1 0x5204 lanes=3
+18:32:26 event=2 0x5204 lanes=2
+18:33:32 0x5201 index=0 total=3 showing=false
+18:40:19 0x5201 index=0 total=3 showing=false
+18:40:20 0x5201 index=1 total=3 showing=true
+18:40:20 STORE laneEvent=1 laneCount=3
+18:40:20 DIM [0,15, 1,15, 2,3] -> updateNavigationInfo flush
+```
+
+Apple Maps 会在路线开始时预发后续 lane event，再由 `LaneGuidanceCurrentIndex/Showing` 控制展示；当前 store 行为正确，没有因未来 `0x5204` 提前展示。这证明 GeePlay 当前 capability/订阅能够接收标准 accessory RouteGuidance lane，但不能单独解释高德为何只进入 CarPlay 主页组件而未进入该通道。
+
+event 1 的真实结构为：前两条 `PREFERRED, angles=[], highlight=0`；第三条 `PREFERRED, angles=[90], highlight=0`。用户明确纠正第三条视觉含义是“直行+右转都可”，而不是普通右转。由此确认 `LaneAngleHighlight` 除了选择推荐分支，也可能是 Apple Maps 从 `LaneAngles` 省略的一个允许方向。修复前 parser 将第三条归一为 `[90]`，mapper 输出 `3`；修复后归一为 `[90,0]`，对应 G636 `(straight|right, selected straight)` 图标 `32`，目标数组为 `[0,15, 1,15, 2,32]`。
+
+回归测试先锁定真实失败，再修复：
+
+```text
+AppleRouteGuidanceStoreTest.highlight angle ...: FAIL before fix, PASS after fix
+GeelyLaneIconMapperTest.maps captured Apple Maps lanes ...: PASS
+CarPlayRouteGuidanceReplayTest: PASS with captured Apple Maps fifth phase
+```
+
+修复完成后完整 AGENTS.md 两组检查以 439 tasks 通过。用户停车后覆盖安装，车机与本地 APK SHA-256 均为 `303e8c4c6367d27689133f99df6ab069a9cf1ddc9d74c0e5956678a6f4bbd329`。五阶段 replay 报告 `COMPLETE session=idle phases=5/5`，新增阶段解析为 `angles=90,0, highlight=0`、预期 OEM `[15,15,32]`；用户确认 HUD 上第三条为正确的“直行/右转、推荐直行”。最终 empty lane/status 清理成功，正常 GeePlay 已恢复，无崩溃，原车 mock setting 仍为 `null`。
+
+为避免两个已证实的跨应用生命周期问题，生产 XUI 路径增加：
+
+- 每个新 driver 的首帧即发送一次 typed empty lane array，清除 OEM builder 跨进程残留；同一 driver 后续重复 empty 仍去重；
+- 活动导航每 5 秒重申 `notifyNavigationStatus(1)`，防止原车地图的迟到 stop 事件让 HUD 长期消失。
+
+专项 `GeelyDimNavigationAdapterTest` 和完整 AGENTS.md 两组命令均通过；完整运行共 439 tasks，`BUILD SUCCESSFUL in 1m 26s`。加固 APK 于 `2026-10-14 10:26:15` 首次覆盖安装到物理 G636。`10:29:53` 首次重连确认 bootstrap/runtime 两个新 driver 均执行 `updateLaneInfo(length=0) → updateNavigationInfo → notifyNavigationStatus(1)`；稳定 runtime driver 于 `10:29:59` 记录 `OEM_STATUS_REFRESH status=1 intervalMs=5381`，两项防护均已在真车调用链生效。
+
+随后增加 Debug-only `route-replay`，以真实 iAP2 TLV 结构而非直接构造 snapshot，覆盖 `0x5202 maneuver → 0x5204 lane → 0x5201 route selection → AppleRouteGuidanceStore → GeelyLaneIconMapper → DIM/XUI`。入口在检测到真实 CarPlay session 为 active/retained 时拒绝执行，结束或异常时都发送 route end 并关闭 driver；不会进入 release APK。可复用命令：
+
+```sh
+adb -s 198.18.34.15:34233 shell am force-stop com.lllhys.geeplay.debug
+adb -s 198.18.34.15:34233 shell am start -W \
+  -n com.lllhys.geeplay.debug/com.lllhys.geeplay.GeePlayValidationActivity \
+  --es mode route-replay --el durationMillis 20000
+adb -s 198.18.34.15:34233 shell cat \
+  /sdcard/Android/data/com.lllhys.geeplay.debug/files/validation/latest-route-replay.txt
+adb -s 198.18.34.15:34233 shell am start -W \
+  -n com.lllhys.geeplay.debug/com.shilapi.xcertplay.DiPlayActivity
+```
+
+2026-10-14 第二轮真车重放完整通过：
+
+```text
+left-and-straight-preferred: [0,1, 1,16, 2,15, 3,3]
+straight-and-right-preferred: [0,0, 1,30, 2,18, 3,8]
+lane-hidden-route-kept: []
+first-pattern-restored: [0,1, 1,16, 2,15, 3,3]
+route-ended cleanup: [] + notifyNavigationStatus(0)
+report: COMPLETE phases=4/4
+```
+
+每个非空/空 lane 数组之后都有 `updateNavigationInfo`，因此真实走到了 G636 的 QNX flush 边界。`8dcf3bd6…dab6` 是加入第五阶段前的历史安装包；当前 Debug APK 为 `303e8c4c…d329`，完整 AGENTS.md 两组检查和五阶段 replay 均通过。此 replay 可以替代日常开车验证解析、推荐态映射、切换和清理；高德 CarPlay 主页组件数据未进入当前 `0x5204` 的问题仍需独立追踪。
 
 ### 9.5 G636 状态栏与 CarPlay 圆角调查
 
@@ -511,3 +658,38 @@ Packaged native decoder: arm64-v8a, armeabi-v7a, x86_64
 Authentication assets: repository 0; temporary build directory removed
 Install: pm install -r succeeded on G636; app data preserved
 ```
+
+### 9.8 G636 CarPlay 媒体低延迟
+
+2026-10-14 在同一 G636、同一 iPhone 上对比原车 Bluetooth A2DP 与 GeePlay CarPlay：
+
+- 原车 A2DP AudioTrack 为 44.1 kHz、2836 frames，容量约 64 ms；
+- 旧 GeePlay AAC AudioTrack 为 48 kHz、24000 frames，容量 500 ms，首次启播约需 309 ms；
+- `main_buffered_audio` 未开启，排除额外 1 秒 lookahead；主要确定性延迟来自媒体软件预缓冲；
+- 将阈值直接降到 100 ms 后，真机又暴露无线音频约 400 ms 的突发到达模式：旧 underrun 恢复逻辑会反复暂停并再次预缓冲，长空档后压缩队列还可积到 47 包、约 1 秒。
+
+最终策略：
+
+- 保持上游/其他产品默认 300 ms；仅 GeePlay 在没有已保存选择时初始化为 100 ms；
+- 设置提供 50/100/300/500/1000 ms，修改后明确要求重连；
+- 50/100 ms 档使用小 PCM Track：目标容量分别约 70/120 ms，约 400 ms 的无线突发由压缩队列承接；首次按所选阈值启播，underrun 后不再主动暂停重缓冲；
+- 保留约 400 ms 的正常无线突发窗口，只有压缩音频继续落后到 50 ms 档 450 ms、100 ms 档 500 ms 以上时才丢最旧包追帧；300/500/1000 ms 稳定档保留完整重缓冲和不丢包行为。
+
+最终安装包的真机证据：
+
+```text
+100ms mode: AudioTrack buffer=120ms, steady queued PCM~=80ms
+User result: much better than the old build, but delay was still noticeable
+50ms preference: media_buffer_ms=50
+50ms actual platform floor: AudioTrack start=64ms, buffer=74ms
+50ms first AAC packet: 22:34:33.799
+50ms AudioTrack play: 22:34:33.966 (first packet to play ~=167ms including decoder/track creation)
+50ms steady queued PCM: 0-69ms
+Normal 400-484ms arrival gaps: dropped=0, rebuffers=0
+Long 1.26/1.29s gaps: stale packets trimmed to the 450ms low-latency window
+APK SHA-256 local/device: 2a170d2c6ea399bf80710f567a0de2c5bdbc2f50810eb5af280c5be9e2f15c27
+Base CI: BUILD SUCCESSFUL in 3m 4s (250 actionable tasks)
+GeePlay CI: BUILD SUCCESSFUL in 18s (276 actionable tasks)
+```
+
+低延迟档的单测覆盖首次阈值、小 PCM Track 容量、underrun 后不暂停、正常突发不裁包和超限陈旧队列追帧。车机当前选择 50 ms 极限档；最终体感仍需驾驶者在当前安装包上完成播放/暂停与切歌确认。

@@ -8,6 +8,33 @@ import org.junit.Test
 
 class AppleRouteGuidanceStoreTest {
     @Test
+    fun `diagnostic summaries keep lane geometry but redact navigation text`() {
+        val road = "Private Destination Road"
+        val route = AppleRouteGuidanceParser.diagnosticSummary(
+            AppleRouteGuidanceParser.ROUTE_GUIDANCE_UPDATE,
+            tlvs(tlv(0x0001, 1), tlv(0x0003, *utf8z(road))),
+        )
+        val maneuver = AppleRouteGuidanceParser.diagnosticSummary(
+            AppleRouteGuidanceParser.ROUTE_GUIDANCE_MANEUVER_UPDATE,
+            tlvs(tlv(0x0001, 0, 4), tlv(0x0003, 2), tlv(0x0004, *utf8z(road))),
+        )
+        val lanes = AppleRouteGuidanceParser.diagnosticSummary(
+            AppleRouteGuidanceParser.LANE_GUIDANCE_INFORMATION,
+            laneEvent(
+                9,
+                lane(0, AppleLaneStatus.PREFERRED, intArrayOf(-45, 0), highlight = -45),
+            ) + tlv(0x0003, *utf8z(road)),
+        )
+
+        assertEquals(false, road in route)
+        assertEquals(false, road in maneuver)
+        assertEquals(false, road in lanes)
+        assertEquals(true, "event=9" in lanes)
+        assertEquals(true, "pos=0,status=PREFERRED,angles=-45,0,highlight=-45" in lanes)
+        assertEquals(true, "descriptionBytes=${road.toByteArray().size}" in lanes)
+    }
+
+    @Test
     fun `combines maneuver route and lane events into one snapshot`() {
         val store = AppleRouteGuidanceStore(generation = 7)
 
@@ -185,6 +212,22 @@ class AppleRouteGuidanceStoreTest {
         )
 
         assertNull(parsed!!.lanes.single().highlightAngleDegrees)
+    }
+
+    @Test
+    fun `highlight angle is also an allowed direction when Apple Maps omits it from lane angles`() {
+        val parsed = AppleRouteGuidanceParser.parseLaneGuidanceUpdate(
+            laneEvent(
+                1,
+                lane(0, AppleLaneStatus.PREFERRED, intArrayOf(), highlight = 0),
+                lane(1, AppleLaneStatus.PREFERRED, intArrayOf(), highlight = 0),
+                lane(2, AppleLaneStatus.PREFERRED, intArrayOf(90), highlight = 0),
+            ),
+        )!!
+
+        assertEquals(listOf(0), parsed.lanes[0].anglesDegrees)
+        assertEquals(listOf(0), parsed.lanes[1].anglesDegrees)
+        assertEquals(listOf(90, 0), parsed.lanes[2].anglesDegrees)
     }
 
     @Test

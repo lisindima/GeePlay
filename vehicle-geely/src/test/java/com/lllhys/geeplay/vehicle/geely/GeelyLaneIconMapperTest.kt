@@ -24,6 +24,13 @@ class GeelyLaneIconMapperTest {
         assertEquals(33, icon(AppleLaneStatus.PREFERRED, 0, 45, highlight = 45))
     }
 
+    @Test
+    fun `maps captured Apple Maps lanes after highlight direction normalization`() {
+        assertEquals(15, icon(AppleLaneStatus.PREFERRED, 0, highlight = 0))
+        assertEquals(15, icon(AppleLaneStatus.PREFERRED, 0, highlight = 0))
+        assertEquals(32, icon(AppleLaneStatus.PREFERRED, 90, 0, highlight = 0))
+    }
+
     private fun icon(
         status: AppleLaneStatus,
         vararg angles: Int,

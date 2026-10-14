@@ -265,6 +265,7 @@
     <string name="mfi_certificate_signing_target">MFI certificate &amp; signing target</string>
     <string name="model">Model</string>
     <string name="music_buffer">Music buffer</string>
+    <string name="music_buffer_reconnect_description">Music buffer changes take effect after reconnecting CarPlay.</string>
     <string name="resolution_native">Native</string>
     <string name="navigation_on_hud_and_instrument_cluster">Navigation on HUD and dashboard</string>
     <string name="navigation_stream_type">Navigation stream type</string>
@@ -335,7 +336,9 @@
     <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. Open car hotspot settings, turn the hotspot on and select 5 GHz if available.\n2. Copy its name and password below exactly.\n3. Leave the car hotspot on when connecting. DiPlay sends the details over Bluetooth; your iPhone joins automatically.</string>
     <string name="s_2_4_ghz">2.4 GHz</string>
     <string name="s_2_pair_your_iphone">2 · Pair your iPhone</string>
-    <string name="s_300_ms_default">300 ms · default</string>
+    <string name="s_50_ms_experimental">50 ms · experimental</string>
+    <string name="s_100_ms_low_latency">100 ms · low latency</string>
+    <string name="s_300_ms_default">300 ms · balanced</string>
     <string name="s_30_fps_lighter_load">30 fps · lighter load</string>
     <string name="s_3_connect">3 · Connect</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. Tap Check and enable below. This enables the cluster map and automatic theme following. An active CarPlay session reconnects once. You can then disconnect the computer.</string>
@@ -764,6 +767,8 @@
     <string name="settings_direct_video_output_description">Sends the CarPlay picture straight to the head unit\'s compositor instead of drawing it inside the DiPlay window. Can lower the delay by about one screen refresh. Picture adjustments do not apply. Reconnects CarPlay.</string>
     <string name="settings_low_latency_decoder">Low-latency decoding (experimental)</string>
     <string name="settings_low_latency_decoder_description">Asks Qualcomm video decoders to output each frame as soon as it is decoded instead of holding the next ones, and shows each decoded frame from a dedicated thread without waiting for the next one to arrive. Can lower the delay by tens of milliseconds. Turn it off if the picture shows artifacts or freezes. Applies at the next connection.</string>
+    <string name="settings_media_fast_start_experimental">Fast music start (experimental)</string>
+    <string name="settings_media_fast_start_experimental_description">Prepares AAC output as soon as the iPhone sets up a low-latency music stream, requests Android’s fast mixer and starts after one decoded frame. May click or drop out on some head units. Applies after reconnecting CarPlay and only affects the 50/100 ms music buffers.</string>
     <string name="settings_fps_counter">FPS counter</string>
     <string name="settings_fps_counter_description">Shows a counter in the top-right corner of CarPlay: frames shown per second (green from 50, yellow from 30, red below), frames received from the iPhone per second, and the decode time. A still screen shows few frames because the iPhone sends none.</string>
     <string name="fps_counter_text" translatable="false">%1$d FPS\nRX %2$d · %3$s</string>

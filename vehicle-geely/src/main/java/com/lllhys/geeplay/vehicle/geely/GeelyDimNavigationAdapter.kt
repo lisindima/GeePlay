@@ -3,6 +3,7 @@ package com.lllhys.geeplay.vehicle.geely
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.os.SystemClock
 import com.shilapi.xcertplay.navigation.apple.AppleLane
 import com.shilapi.xcertplay.navigation.apple.AppleNavigationSnapshot
 import java.lang.reflect.Array as ReflectArray
@@ -25,6 +26,8 @@ class GeelyDimNavigationAdapter(
     private val independentLaneRefresh: Boolean = false,
     private val laneIconId: (AppleLane) -> Int = GeelyLaneIconMapper::iconId,
     private val navigationDataSource: Int? = null,
+    private val elapsedRealtimeMillis: () -> Long = SystemClock::elapsedRealtime,
+    private val navigationStatusRefreshMillis: Long = DEFAULT_NAVIGATION_STATUS_REFRESH_MILLIS,
 ) : GeelyNavigationDriver {
     private enum class ParameterKind { NUMBER, STRING, BOOLEAN }
 
@@ -80,6 +83,9 @@ class GeelyDimNavigationAdapter(
     private var switchAttempted = false
     private var navigationTouched = false
     private var navigationActive = false
+    private var independentLanesInitialized = false
+    private var independentLanesVisible = false
+    private var lastNavigationStatusRefreshMillis: Long? = null
     private var initialized = false
     @Volatile private var connectedSignal = false
     @Volatile private var disconnectedSignal = false
@@ -170,6 +176,21 @@ class GeelyDimNavigationAdapter(
         val methods = navigationMethods ?: return false
         return try {
             checkConnection()
+            val diagnosticLanes = if (config.laneGuidanceEnabled) {
+                snapshot.laneGuidance?.lanes.orEmpty()
+            } else {
+                emptyList()
+            }
+            GeelyIntegrationDiagnostics.trace(
+                "OEM_PLAN",
+                "revision=${snapshot.revision} routeState=${snapshot.routeState.name} " +
+                    "maneuverIndex=${snapshot.maneuver.index} maneuverType=${snapshot.maneuver.type} " +
+                    "turnId=${GeelyManeuverCodes.turnId(snapshot.maneuver.type, config.backend, config.originalOneOsIcons)} " +
+                    "laneEvent=${snapshot.laneGuidance?.eventIndex ?: "none"} laneCount=${diagnosticLanes.size} " +
+                    diagnosticLanes.joinToString(prefix = "mappedLanes=[", postfix = "]", separator = ";") { lane ->
+                        "pos=${lane.position},status=${lane.status.name},icon=${laneIconId(lane)}"
+                    },
+            )
             information = Information(
                 status = 1,
                 turnId = GeelyManeuverCodes.turnId(
@@ -192,18 +213,16 @@ class GeelyDimNavigationAdapter(
                         ?: error("ECARX navigation data-source API unavailable")
                     guardedInvoke(method, target, source)
                 }
+                publishIndependentLanes(target, methods, information.lanes)
                 guardedInvoke(methods.updateInformation, target, informationProxy!!)
                 guardedInvoke(methods.updateStatus, target, 1)
+                lastNavigationStatusRefreshMillis = elapsedRealtimeMillis()
                 guardedInvoke(methods.started, target)
-                if (independentLaneRefresh && methods.updateLanes != null && information.lanes != null) {
-                    guardedInvoke(methods.updateLanes, target, information.lanes!!)
-                }
                 navigationActive = true
             } else {
+                refreshNavigationStatusIfDue(target, methods)
+                publishIndependentLanes(target, methods, information.lanes)
                 guardedInvoke(methods.updateInformation, target, informationProxy!!)
-                if (independentLaneRefresh && methods.updateLanes != null && information.lanes != null) {
-                    guardedInvoke(methods.updateLanes, target, information.lanes!!)
-                }
             }
             listOf(
                 methods.destination to information.destination,
@@ -224,6 +243,11 @@ class GeelyDimNavigationAdapter(
 
     @Synchronized
     override fun clear(): Boolean {
+        GeelyIntegrationDiagnostics.trace(
+            "OEM_CLEAR",
+            "navigationActive=$navigationActive lanesVisible=$independentLanesVisible " +
+                "switchAttempted=$switchAttempted navigationTouched=$navigationTouched",
+        )
         information = information.copy(status = 0, turnId = 0, nextDistance = 0, destination = 0, eta = 0, road = "", lanes = emptyLaneArray())
         if (!switchAttempted && !navigationTouched && !navigationActive) return true
         status(GeelyNavigationDriverState.CLEARING, "clearing OEM navigation")
@@ -255,9 +279,12 @@ class GeelyDimNavigationAdapter(
             }
             val laneArray = buildLaneArray(lanes)
             guardedInvoke(update, target, laneArray)
+            independentLanesInitialized = true
+            independentLanesVisible = lanes.isNotEmpty()
             // G636's DIM service only mutates its pending protobuf in updateLaneInfo(); a following
             // navigation status event flushes that snapshot to the instrument cluster.
             guardedInvoke(methods.updateStatus, target, 1)
+            lastNavigationStatusRefreshMillis = elapsedRealtimeMillis()
             true
         } catch (error: Throwable) {
             fail("lane-only publish", error)
@@ -274,7 +301,10 @@ class GeelyDimNavigationAdapter(
         val update = methods.updateLanes ?: return false
         return runCatching {
             guardedInvoke(update, target, emptyLaneArray() ?: return false)
+            independentLanesInitialized = true
+            independentLanesVisible = false
             guardedInvoke(methods.updateStatus, target, 1)
+            lastNavigationStatusRefreshMillis = elapsedRealtimeMillis()
             true
         }.getOrElse {
             status(GeelyNavigationDriverState.FAILED, "ECARX lane-only cleanup failed", unwrap(it))
@@ -385,6 +415,34 @@ class GeelyDimNavigationAdapter(
         ReflectArray.newInstance(loadClass(LANE_INFORMATION), 0)
     }.getOrNull()
 
+    private fun publishIndependentLanes(target: Any, methods: NavigationMethods, lanes: Any?) {
+        if (!independentLaneRefresh || methods.updateLanes == null || lanes == null) return
+        val visible = ReflectArray.getLength(lanes) > 0
+        if (!visible && independentLanesInitialized && !independentLanesVisible) return
+        // G636 flushes updateNavigationInfo when its ETA field is handled. Populate the shared DIM
+        // protobuf first. The first publication always writes an array so a new process clears any
+        // lane state left in the system service by a previous owner; later empty arrays are deduped.
+        guardedInvoke(methods.updateLanes, target, lanes)
+        independentLanesInitialized = true
+        independentLanesVisible = visible
+        GeelyIntegrationDiagnostics.trace(
+            "OEM_LANE_WRITE",
+            "visible=$visible count=${ReflectArray.getLength(lanes)}",
+        )
+    }
+
+    private fun refreshNavigationStatusIfDue(target: Any, methods: NavigationMethods) {
+        val now = elapsedRealtimeMillis()
+        val previous = lastNavigationStatusRefreshMillis
+        if (previous != null && now - previous < navigationStatusRefreshMillis) return
+        guardedInvoke(methods.updateStatus, target, 1)
+        lastNavigationStatusRefreshMillis = now
+        GeelyIntegrationDiagnostics.trace(
+            "OEM_STATUS_REFRESH",
+            "status=1 intervalMs=${if (previous == null) "initial" else now - previous}",
+        )
+    }
+
     private fun laneProxy(type: Class<*>, lane: AppleLane): Any {
         val bitmap by lazy { laneRenderer.render(lane, nightMode()) }
         return proxy(type) { proxy, method, arguments ->
@@ -430,10 +488,10 @@ class GeelyDimNavigationAdapter(
         val target = navigation
         val methods = navigationMethods
         if (target != null && methods != null) {
-            informationProxy?.let { proxy -> attempt(errors) { checkedInvoke(methods.updateInformation, target, proxy) } }
-            methods.updateLanes?.takeIf { independentLaneRefresh }?.let { update ->
+            methods.updateLanes?.takeIf { independentLaneRefresh && independentLanesVisible }?.let { update ->
                 emptyLaneArray()?.let { lanes -> attempt(errors) { checkedInvoke(update, target, lanes) } }
             }
+            informationProxy?.let { proxy -> attempt(errors) { checkedInvoke(methods.updateInformation, target, proxy) } }
             attempt(errors) { checkedInvoke(methods.updateStatus, target, 0) }
             attempt(errors) { checkedInvoke(methods.stopped, target) }
         }
@@ -441,6 +499,9 @@ class GeelyDimNavigationAdapter(
             attempt(errors) { checkedInvoke(dimMethods!!.switchPresentation, dim!!, 1, "", "", false) }
         }
         navigationActive = false
+        independentLanesInitialized = false
+        independentLanesVisible = false
+        lastNavigationStatusRefreshMillis = null
         if (errors.isEmpty()) {
             switchAttempted = false
             navigationTouched = false
@@ -672,5 +733,6 @@ class GeelyDimNavigationAdapter(
             "com.ecarx.xui.adaptapi.diminteraction.INaviInteraction\$INavigationInteractionCallback"
         const val CONNECT_WATCHER = "com.ecarx.xui.adaptapi.binder.IConnectable\$IConnectWatcher"
         private const val MAX_ROAD_UTF16_UNITS = 512
+        private const val DEFAULT_NAVIGATION_STATUS_REFRESH_MILLIS = 5_000L
     }
 }

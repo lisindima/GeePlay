@@ -52,7 +52,15 @@ class Iap2WiredControlClient(
         deadlineNanos.authenticated()
 
         send(powerSourceUpdate(availableCurrentMilliAmps), deadlineNanos)
-        for (subscription in subscriptions()) send(subscription, deadlineNanos)
+        for (subscription in subscriptions()) {
+            send(subscription, deadlineNanos)
+            if (subscription.messageId == 0x5200) {
+                onProgress(
+                    "iap2 route subscription tx component=42 " +
+                        "requests=sourceName,sourceSupportsRouteGuidance,supportsExitInfo",
+                )
+            }
+        }
         stage = Iap2WiredControlStage.SUBSCRIBED
         onProgress("iap2 power/subscriptions sent availableCurrentMa=$availableCurrentMilliAmps")
         onReady()

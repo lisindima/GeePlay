@@ -25,6 +25,8 @@ class Iap2RouteGuidanceSubscriptionTest {
         val component = Iap2ParameterList.parse(parameters.single { it.id == 30 }.payload).asList()
         assertArrayEquals(byteArrayOf(0, 42), component.single { it.id == 0 }.payload)
         assertArrayEquals("RouteGuidance\u0000".encodeToByteArray(), component.single { it.id == 1 }.payload)
+        assertArrayEquals(byteArrayOf(0, 64), component.single { it.id == 3 }.payload)
+        assertArrayEquals(byteArrayOf(0, 64), component.single { it.id == 5 }.payload)
         assertArrayEquals(byteArrayOf(0, 8), component.single { it.id == 6 }.payload)
         assertArrayEquals(byteArrayOf(0, 64), component.single { it.id == 7 }.payload)
         assertArrayEquals(byteArrayOf(0, 8), component.single { it.id == 8 }.payload)
@@ -36,9 +38,17 @@ class Iap2RouteGuidanceSubscriptionTest {
 
         assertEquals(0x5200, frame.messageId)
         assertArrayEquals(
-            byteArrayOf(0, 6, 0, 0, 0, 42, 0, 4, 0, 1, 0, 4, 0, 2),
+            byteArrayOf(0, 6, 0, 0, 0, 42, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 3),
             frame.payload,
         )
+    }
+
+    @Test
+    fun stopRouteGuidanceUpdatesTargetsDeclaredComponent() {
+        val frame = Iap2ControlMessages.stopRouteGuidanceUpdates()
+
+        assertEquals(0x5203, frame.messageId)
+        assertArrayEquals(byteArrayOf(0, 6, 0, 0, 0, 42), frame.payload)
     }
 
     @Test

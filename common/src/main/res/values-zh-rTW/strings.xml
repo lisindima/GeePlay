@@ -263,6 +263,7 @@
     <string name="mfi_certificate_signing_target">MFi 憑證與簽署目標</string>
     <string name="model">型號</string>
     <string name="music_buffer">音樂快取</string>
+    <string name="music_buffer_reconnect_description">音樂快取變更會在重新連接 CarPlay 後生效。</string>
     <string name="resolution_native">原生</string>
     <string name="navigation_on_hud_and_instrument_cluster">HUD 和儀表板導航</string>
     <string name="navigation_stream_type">導航音訊串流類型</string>
@@ -333,7 +334,9 @@
     <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. 開啟車機熱點設定，開啟熱點；如有 5 GHz，請選擇。\n2. 在下方準確輸入熱點名稱和密碼。\n3. 連線時保持車機熱點開啟。DiPlay 會透過藍牙傳送熱點資訊，iPhone 會自動加入。</string>
     <string name="s_2_4_ghz">2.4 GHz</string>
     <string name="s_2_pair_your_iphone">2 · 配對你的 iPhone</string>
-    <string name="s_300_ms_default">300 毫秒 · 預設</string>
+    <string name="s_50_ms_experimental">50 毫秒 · 實驗性</string>
+    <string name="s_100_ms_low_latency">100 毫秒 · 低延遲</string>
+    <string name="s_300_ms_default">300 毫秒 · 均衡</string>
     <string name="s_30_fps_lighter_load">30 fps · 較低負載</string>
     <string name="s_3_connect">3 · 連線</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. 點一下下方的「檢查並啟用」。這會啟用儀表板地圖和自動主題跟隨。進行中的 CarPlay 工作階段會重新連線一次，之後即可中斷電腦連線。</string>
@@ -725,6 +728,8 @@
     <string name="settings_direct_video_output_description">將 CarPlay 畫面直接交給車機的系統合成器，而不是在 DiPlay 視窗內繪製。可將延遲降低約一次螢幕更新。畫面調整不適用。會重新連線至 CarPlay。</string>
     <string name="settings_low_latency_decoder">低延遲解碼（實驗性）</string>
     <string name="settings_low_latency_decoder_description">要求高通影片解碼器在每一幀解碼後立即輸出，而不是保留後續幀，並由專用執行緒立即顯示每個已解碼的幀，無需等待下一幀到達。可將延遲降低數十毫秒。如果畫面出現花屏或凍結，請關閉。下次連線時生效。</string>
+    <string name="settings_media_fast_start_experimental">快速啟動音樂（實驗性）</string>
+    <string name="settings_media_fast_start_experimental_description">iPhone 建立低延遲音樂串流時立即預熱 AAC 輸出，要求 Android 快速混音路徑，並在第一個解碼幀後開始播放。部分車機可能出現爆音或短暫斷音。重新連接 CarPlay 後生效，僅影響 50/100 毫秒音樂快取。</string>
     <string name="settings_fps_counter">FPS 計數器</string>
     <string name="settings_fps_counter_description">在 CarPlay 右上角顯示計數器：每秒顯示的幀數（50 以上為綠色，30 以上為黃色，低於 30 為紅色）、每秒從 iPhone 接收的幀數以及解碼時間。畫面靜止時幀數很少，因為 iPhone 不會傳送幀。</string>
     <string name="manual_grant_cmd_hint">或在電腦上執行以下 ADB 指令：</string>

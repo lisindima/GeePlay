@@ -603,7 +603,7 @@ iPhone 0xA100
 iPhone 0xFFFA 且请求 VehicleSpeedData
     → VehicleSpeedSource.start()
     → EVCC speed/gear demand acquire
-    → 缓存速度按 250 ms 采样到有界队列
+    → 缓存速度按用户选择的 250 ms（默认 4 Hz）或 100 ms（实验 10 Hz）采样到有界队列
     → 每次 0xFFFB 附带自上次发送后的 $PASCD
 
 iPhone 0xA102 / 0xFFFC / session close
@@ -612,6 +612,11 @@ iPhone 0xA102 / 0xFFFC / session close
 ```
 
 首期保留 VehicleStatus 立即首帧 + 30 秒周期，不擅自提高 iAP2 发送频率。若以后希望变化后立即发送，应先取得当前 MFi 规格并验证 iPhone 行为。
+
+轮速采样频率只控制 `$PASCD` 包内的样本密度，不提高 `0xFFFB` 的约 1 秒发送周期，也不启用
+EVCC `forceRefresh`。两档模式都保持约 1 秒一次的缓存健康读取；10 Hz 仅更密集地采样订阅事件已经
+更新的内存值，因此增加的是 GeePlay CPU 与报文长度，而不是车辆总线轮询压力。设置在下一次
+CarPlay 连接时生效。
 
 ## 15. 降级与错误处理
 

@@ -5,6 +5,19 @@ import org.junit.Test
 
 class MediaAudioBufferTest {
     @Test
+    fun `low latency presets keep only a small PCM headroom while compressed packets absorb bursts`() {
+        assertEquals(listOf(50, 100, 300, 500, 1000), MediaAudioBuffer.presets)
+
+        val experimental = MediaAudioBuffer.plan(true, 48_000, 2, minBufferBytes = 7_680, mediaMillis = 50)
+        assertEquals(9_600, experimental.startBytes)
+        assertEquals(13_440, experimental.trackBufferBytes)
+
+        val lowLatency = MediaAudioBuffer.plan(true, 48_000, 2, minBufferBytes = 7_680, mediaMillis = 100)
+        assertEquals(19_200, lowLatency.startBytes)
+        assertEquals(23_040, lowLatency.trackBufferBytes)
+    }
+
+    @Test
     fun `music buffers the chosen delay plus headroom`() {
         // 48 kHz stereo 16-bit = 192 000 bytes/s.
         val plan = MediaAudioBuffer.plan(true, 48_000, 2, minBufferBytes = 7_680, mediaMillis = 500)
@@ -34,8 +47,19 @@ class MediaAudioBufferTest {
 
     @Test
     fun `unknown delay falls back to the default`() {
+        assertEquals(50, MediaAudioBuffer.sanitize(50))
+        assertEquals(100, MediaAudioBuffer.sanitize(100))
         assertEquals(MediaAudioBuffer.DEFAULT_MILLIS, MediaAudioBuffer.sanitize(250))
         assertEquals(57_600, MediaAudioBuffer.plan(true, 48_000, 2, 7_680, mediaMillis = 42).startBytes)
+    }
+
+    @Test
+    fun `low latency mode tolerates normal bursts but drops a growing stale backlog`() {
+        assertEquals(false, MediaAudioBuffer.shouldDropOldestPacket(100, 48_000, 0, 24_000))
+        assertEquals(true, MediaAudioBuffer.shouldDropOldestPacket(100, 48_000, 0, 24_001))
+        assertEquals(false, MediaAudioBuffer.shouldDropOldestPacket(50, 48_000, 0, 21_600))
+        assertEquals(true, MediaAudioBuffer.shouldDropOldestPacket(50, 48_000, 0, 21_601))
+        assertEquals(false, MediaAudioBuffer.shouldDropOldestPacket(300, 48_000, 0, 48_000))
     }
 
     @Test

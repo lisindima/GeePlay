@@ -3,10 +3,16 @@ package com.lllhys.geeplay.vehicle.geely.evcc
 import android.content.Context
 import com.shilapi.xcertplay.transport.EvChargingConnectors
 
+enum class EvccWheelSpeedSampling(val sampleMillis: Long) {
+    STANDARD(250L),
+    FAST(100L),
+}
+
 object EvccVehicleDataSettings {
     private const val PREFERENCES = "geeplay_evcc_vehicle_data"
     private const val KEY_VEHICLE_STATUS_ENABLED = "vehicle_status_enabled"
     private const val KEY_VEHICLE_SPEED_ENABLED = "vehicle_speed_enabled"
+    private const val KEY_WHEEL_SPEED_SAMPLING = "wheel_speed_sampling"
     private const val KEY_LOW_CHARGE_PERCENT = "low_charge_percent"
     private const val KEY_CHARGING_CONNECTORS = "charging_connectors"
     private const val KEY_VIDEO_WHILE_PARKED = "video_while_parked"
@@ -30,6 +36,17 @@ object EvccVehicleDataSettings {
     fun saveVehicleSpeedEnabled(context: Context, enabled: Boolean) {
         check(preferences(context).edit().putBoolean(KEY_VEHICLE_SPEED_ENABLED, enabled).commit()) {
             "Could not persist EVCC vehicle-speed setting"
+        }
+    }
+
+    fun wheelSpeedSampling(context: Context): EvccWheelSpeedSampling =
+        preferences(context).getString(KEY_WHEEL_SPEED_SAMPLING, null)
+            ?.let { saved -> EvccWheelSpeedSampling.entries.firstOrNull { it.name == saved } }
+            ?: EvccWheelSpeedSampling.STANDARD
+
+    fun saveWheelSpeedSampling(context: Context, sampling: EvccWheelSpeedSampling) {
+        check(preferences(context).edit().putString(KEY_WHEEL_SPEED_SAMPLING, sampling.name).commit()) {
+            "Could not persist EVCC wheel-speed sampling setting"
         }
     }
 

@@ -15,7 +15,12 @@ class GeelyNavigationOutput(
     private val config: GeelyNavigationConfig,
     private val onStatus: (GeelyNavigationDriverStatus) -> Unit = {},
     private val driverFactory: (GeelyNavigationConfig) -> GeelyNavigationDriver = { selected ->
-        GeelyDimNavigationAdapter(context.applicationContext, selected, onStatus = onStatus)
+        GeelyDimNavigationAdapter(
+            context.applicationContext,
+            selected,
+            onStatus = onStatus,
+            independentLaneRefresh = selected.laneGuidanceEnabled,
+        )
     },
     private val journal: GeelyNavigationRecoveryJournal = GeelyNavigationRecoveryJournal(context),
     private val retryMillis: Long = RETRY_MILLIS,

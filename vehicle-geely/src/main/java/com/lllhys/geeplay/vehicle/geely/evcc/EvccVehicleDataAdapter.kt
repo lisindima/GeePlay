@@ -278,6 +278,7 @@ class EvccVehicleDataAdapter internal constructor(
                 telemetry,
                 requestRefresh = ::requestMotionRefresh,
                 onDiagnostic = { message -> Log.i(TAG, message) },
+                sampleMillis = EvccVehicleDataSettings.wheelSpeedSampling(appContext).sampleMillis,
             )
         } else {
             null

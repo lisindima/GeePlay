@@ -34,6 +34,23 @@ import org.robolectric.shadows.ShadowDisplayManager
 @Config(sdk = [33])
 class GeePlayApplicationTest {
     @Test
+    fun `GeePlay initializes unsaved music buffering to low latency without overriding a choice`() {
+        val application = RuntimeEnvironment.getApplication() as GeePlayApplication
+        val preferences = application.getSharedPreferences("xcertplay_airplay", 0)
+        preferences.edit().remove("media_buffer_ms").commit()
+        try {
+            application.initializeMediaBufferDefault(application)
+            assertEquals(100, com.shilapi.xcertplay.AirPlayPersistence.loadMediaBufferMillis(application))
+
+            com.shilapi.xcertplay.AirPlayPersistence.saveMediaBufferMillis(application, 500)
+            application.initializeMediaBufferDefault(application)
+            assertEquals(500, com.shilapi.xcertplay.AirPlayPersistence.loadMediaBufferMillis(application))
+        } finally {
+            preferences.edit().remove("media_buffer_ms").commit()
+        }
+    }
+
+    @Test
     fun `GeePlay product copy overrides visible DiPlay branding in every locale`() {
         val application = RuntimeEnvironment.getApplication() as GeePlayApplication
         val productCopy = intArrayOf(
@@ -101,6 +118,7 @@ class GeePlayApplicationTest {
         val application = RuntimeEnvironment.getApplication() as GeePlayApplication
         GeelyMediaSettings.saveOwner(application, MediaOutputOwner.OEM_BLUETOOTH)
         GeelyMediaSettings.saveBluetoothAutoAvoid(application, false)
+        GeelyMediaSettings.saveBluetoothAutoRestore(application, false)
         try {
             assertSame(
                 com.shilapi.xcertplay.vehicle.BluetoothAudioConflictPolicy.NONE,
@@ -114,6 +132,7 @@ class GeePlayApplicationTest {
         } finally {
             GeelyMediaSettings.saveOwner(application, MediaOutputOwner.OEM_BLUETOOTH)
             GeelyMediaSettings.saveBluetoothAutoAvoid(application, false)
+            GeelyMediaSettings.saveBluetoothAutoRestore(application, false)
         }
     }
 

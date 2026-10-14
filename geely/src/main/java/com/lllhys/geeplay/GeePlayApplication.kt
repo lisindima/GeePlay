@@ -2,6 +2,7 @@ package com.lllhys.geeplay
 
 import android.app.Application
 import android.content.Context
+import com.shilapi.xcertplay.AirPlayPersistence
 import com.lllhys.geeplay.vehicle.geely.GeelyVehicleSessionHooks
 import com.lllhys.geeplay.vehicle.geely.GeelyBluetoothAudioConflictPolicy
 import com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
@@ -44,6 +45,7 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         super.onCreate()
         VehicleDataDiagnostics.initialize(this)
         VehicleDataDiagnostics.record("lifecycle", "product=GeePlay action=application-created")
+        initializeMediaBufferDefault(this)
         evccConnection = EvccConnectionCore(this)
         evccVehicleData = EvccVehicleDataAdapter(this, evccConnection)
         evccControl = EvccVehicleControlGateway(evccConnection)
@@ -66,6 +68,12 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
             instrumentMediaOutput = instrumentMediaOutput(context),
             instrumentCallOutput = instrumentCallOutput(context),
         )
+
+    internal fun initializeMediaBufferDefault(context: Context) {
+        if (!AirPlayPersistence.hasSavedMediaBufferMillis(context)) {
+            AirPlayPersistence.saveMediaBufferMillis(context, GEEPLAY_DEFAULT_MEDIA_BUFFER_MILLIS)
+        }
+    }
 
     override fun carPlayVehicleDataAdapter(context: Context): CarPlayVehicleDataAdapter = evccVehicleData
 
@@ -155,4 +163,8 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         enabled = GeelyClusterDisplaySettings.enabled(context),
         debugDisplayId = GeelyClusterDisplaySettings.debugDisplayId(context),
     )
+
+    private companion object {
+        const val GEEPLAY_DEFAULT_MEDIA_BUFFER_MILLIS = 100
+    }
 }

@@ -44,6 +44,39 @@ object AppleRouteGuidanceParser {
         else -> false
     }
 
+    /** Bounded, road-name-free summary suitable for persistent real-car diagnostics. */
+    fun diagnosticSummary(messageId: Int, payload: ByteArray): String = when (messageId) {
+        ROUTE_GUIDANCE_UPDATE -> parseRouteUpdate(payload)?.let { update ->
+            "message=0x5201 bytes=${payload.size} valid=true state=${update.state?.name ?: "unchanged"} " +
+                "maneuvers=${update.maneuverIndexes?.joinToString(",") ?: "unchanged"} " +
+                "nextMeters=${update.nextDistanceMeters ?: "unchanged"} " +
+                "remainingMeters=${if (update.hasRemainingMeters) update.remainingMeters ?: "none" else "unchanged"} " +
+                "remainingSeconds=${if (update.hasRemainingSeconds) update.remainingSeconds ?: "none" else "unchanged"} " +
+                "laneIndex=${if (update.hasLaneGuidanceIndex) update.laneGuidanceIndex ?: "none" else "unchanged"} " +
+                "laneTotal=${update.laneGuidanceTotalCount ?: "unchanged"} " +
+                "laneShowing=${update.laneGuidanceShowing ?: "unchanged"}"
+        } ?: invalidDiagnostic(messageId, payload)
+        ROUTE_GUIDANCE_MANEUVER_UPDATE -> parseManeuverUpdate(payload)?.let { maneuver ->
+            "message=0x5202 bytes=${payload.size} valid=true index=${maneuver.index} type=${maneuver.type} " +
+                "drivingSide=${maneuver.drivingSide} linkedLane=${maneuver.linkedLaneGuidanceIndex ?: "none"} " +
+                "junctionType=${maneuver.junction?.type ?: "none"} " +
+                "junctionAngles=${maneuver.junction?.elementAngles?.joinToString(",") ?: "none"} " +
+                "junctionExit=${maneuver.junction?.exitAngle ?: "none"}"
+        } ?: invalidDiagnostic(messageId, payload)
+        LANE_GUIDANCE_INFORMATION -> parseLaneGuidanceUpdate(payload)?.let { guidance ->
+            "message=0x5204 bytes=${payload.size} valid=true event=${guidance.eventIndex} " +
+                "descriptionBytes=${guidance.description.toByteArray().size} lanes=${guidance.lanes.size} " +
+                guidance.lanes.joinToString(prefix = "laneData=[", postfix = "]", separator = ";") { lane ->
+                    "pos=${lane.position},status=${lane.status.name},angles=${lane.anglesDegrees.joinToString(",")}," +
+                        "highlight=${lane.highlightAngleDegrees ?: "none"}"
+                }
+        } ?: invalidDiagnostic(messageId, payload)
+        else -> "message=0x${messageId.toString(16)} bytes=${payload.size} supported=false"
+    }
+
+    private fun invalidDiagnostic(messageId: Int, payload: ByteArray): String =
+        "message=0x${messageId.toString(16)} bytes=${payload.size} valid=false"
+
     internal fun parseRouteUpdate(payload: ByteArray): AppleRouteUpdate? = parseParameters(payload) { parameters ->
         var state: AppleRouteState? = null
         var currentRoad: String? = null
@@ -190,7 +223,13 @@ object AppleRouteGuidanceParser {
             val lane = current ?: return true
             val status = lane.status ?: return false
             if (lane.position !in 0..0xffff) return false
-            lanes += AppleLane(lane.position, status, lane.angles.toList(), lane.highlight)
+            // Apple Maps may omit the highlighted direction from LaneAngles and provide it only
+            // as LaneAngleHighlight. It is still an allowed branch of the physical lane; retain it
+            // in the normalized geometry so renderers can draw the complete composite arrow while
+            // using highlightAngleDegrees to select the recommended branch.
+            val normalizedAngles = lane.angles.toMutableList()
+            lane.highlight?.takeIf { it !in normalizedAngles }?.let(normalizedAngles::add)
+            lanes += AppleLane(lane.position, status, normalizedAngles, lane.highlight)
             return lanes.size <= MAX_LANES_PER_EVENT
         }
 

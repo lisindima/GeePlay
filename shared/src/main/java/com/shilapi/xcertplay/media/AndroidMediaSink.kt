@@ -192,6 +192,7 @@ class AndroidMediaSink(
     private val navigationStreamType: Int = AudioChannelMapper.DEFAULT_NAVIGATION_STREAM_TYPE,
     onScreenStreamActiveChanged: ((Int, Boolean) -> Unit)? = null,
     private val mediaBufferMillis: Int = MediaAudioBuffer.DEFAULT_MILLIS,
+    private val experimentalMediaFastStart: Boolean = false,
     private val onAudioDiagnostic: (String) -> Unit = {},
     /** True while any music ("media") audio stream is running; called from media threads. */
     private val onMediaAudioChanged: (Boolean) -> Unit = {},
@@ -495,6 +496,15 @@ class AndroidMediaSink(
         }
     }
 
+    override fun onAudioPrepared(id: AudioStreamId, format: AudioFormat) {
+        if (!MediaAudioFastStart.shouldPrewarm(experimentalMediaFastStart, format, mediaBufferMillis)) return
+        if (!localMediaAudioPolicy.shouldRender(format)) return
+        audioRenderer(id, format).start()
+        onAudioDiagnostic(
+            "Audio: experimental fast start prewarmed audioType=${format.audioType} codec=${format.codec}",
+        )
+    }
+
     override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {
         if (!localMediaAudioPolicy.shouldRender(format)) {
             suppressedAudioStreams += id
@@ -689,6 +699,7 @@ class AndroidMediaSink(
             audioFocusCoordinator,
             navigationStreamType,
             mediaBufferMillis,
+            experimentalMediaFastStart,
             onAudioDiagnostic,
             ambientSinkToken,
             speakerphoneCall = format.audioType == "telephony" &&
@@ -1704,6 +1715,7 @@ private class AudioRenderer(
     private val audioFocusCoordinator: AudioFocusCoordinator,
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
+    private val experimentalMediaFastStart: Boolean,
     private val report: (String) -> Unit,
     private val ambientSinkToken: Long,
     private val speakerphoneCall: Boolean = false,
@@ -1732,6 +1744,7 @@ private class AudioRenderer(
     private var startThresholdBytes = 0
     private var fadeApplied = false
     private var droppedPacketsLogged = false
+    private var lowLatencyCatchUpLogged = false
     private var firstAacPayloadLogged = false
     private var firstOpusShortPacketLogged = false
     private var firstInputQueuedLogged = false
@@ -1782,6 +1795,7 @@ private class AudioRenderer(
             val now = System.nanoTime()
             val previous = lastArrivalNs.getAndSet(now)
             if (previous != 0L) maxArrivalGapMs.accumulateAndGet((now - previous) / 1_000_000L, ::maxOf)
+            dropStaleLowLatencyPackets(sample)
         }
         if (!started || !queue.offer(AudioPacket(rtp, sample))) {
             if (started) packetsDropped.incrementAndGet()
@@ -1790,6 +1804,34 @@ private class AudioRenderer(
                 Log.w(TAG, "audio queue full; dropping newest packets to bound latency")
                 report("Audio: queue full audioType=${format.audioType}")
             }
+        }
+    }
+
+    private fun dropStaleLowLatencyPackets(newestSample: Int) {
+        var dropped = 0
+        while (true) {
+            val oldest = queue.peek() ?: break
+            if (!MediaAudioBuffer.shouldDropOldestPacket(
+                    mediaBufferMillis,
+                    format.rtpClockRate,
+                    oldest.sample,
+                    newestSample,
+                )) break
+            if (queue.remove(oldest)) {
+                dropped++
+                packetsDropped.incrementAndGet()
+            }
+        }
+        if (dropped > 0 && !lowLatencyCatchUpLogged) {
+            lowLatencyCatchUpLogged = true
+            Log.w(
+                TAG,
+                "audio low-latency catch-up dropped=$dropped target=${MediaAudioBuffer.sanitize(mediaBufferMillis)}ms",
+            )
+            report(
+                "Audio: low-latency catch-up audioType=${format.audioType} " +
+                    "target=${MediaAudioBuffer.sanitize(mediaBufferMillis)}ms",
+            )
         }
     }
 
@@ -1939,16 +1981,23 @@ private class AudioRenderer(
         bytesPerSecond = format.sampleRate * frameBytes
         val built: AudioTrack
         var routeLabel: String
+        fun buildUsageTrack(configuredAttributes: AudioAttributes): AudioTrack {
+            val builder = AudioTrack.Builder()
+                .setAudioAttributes(configuredAttributes)
+                .setAudioFormat(pcmFormat(encoding, channelMask))
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .setBufferSizeInBytes(plan.trackBufferBytes)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                MediaAudioFastStart.shouldPrewarm(experimentalMediaFastStart, format, mediaBufferMillis)) {
+                builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+            }
+            return builder.build()
+        }
         diagnosticStage = "track-build"
         if (streamOverride == 0) {
             attributes = audioAttributesFor(selection)
             routeLabel = "usage"
-            built = AudioTrack.Builder()
-                .setAudioAttributes(attributes)
-                .setAudioFormat(pcmFormat(encoding, channelMask))
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .setBufferSizeInBytes(plan.trackBufferBytes)
-                .build()
+            built = buildUsageTrack(attributes)
         } else {
             val streamType = streamOverride
             routeLabel = "streamType=$streamType"
@@ -1965,12 +2014,7 @@ private class AudioRenderer(
                     actualLegacyStreamType = null
                     Log.w(TAG, "streamType=$streamType rejected by this ROM; falling back to usage-based track")
                     attributes = audioAttributesFor(selection)
-                    AudioTrack.Builder()
-                        .setAudioAttributes(attributes)
-                        .setAudioFormat(pcmFormat(encoding, channelMask))
-                        .setTransferMode(AudioTrack.MODE_STREAM)
-                        .setBufferSizeInBytes(plan.trackBufferBytes)
-                        .build()
+                    buildUsageTrack(attributes)
                 },
             )
         }
@@ -1984,10 +2028,21 @@ private class AudioRenderer(
         trackAttributes = audioTrackAttributesForFocus(built, attributes)
         diagnosticStage = "track-capacity"
         val capacityBytes = built.bufferSizeInFrames * frameBytes
-        startThresholdBytes = MediaAudioBuffer.startBytesFor(plan.startBytes, capacityBytes, PREBUFFER_WRITE_CHUNK_BYTES)
+        val requestedStartBytes = MediaAudioFastStart.startThresholdBytes(
+            experimentalMediaFastStart,
+            format,
+            mediaBufferMillis,
+            plan.startBytes,
+        )
+        startThresholdBytes = MediaAudioBuffer.startBytesFor(
+            requestedStartBytes,
+            capacityBytes,
+            PREBUFFER_WRITE_CHUNK_BYTES,
+        )
         val trackMetadata = runCatching {
             "api=${Build.VERSION.SDK_INT} trackState=${built.state} trackRate=${built.sampleRate} " +
                 "usage=${trackAttributes?.usage} contentType=${trackAttributes?.contentType} " +
+                (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) "performanceMode=${built.performanceMode} " else "") +
                 "attributesSource=${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "track" else "configured"}"
         }.getOrDefault("api=${Build.VERSION.SDK_INT} trackMetadata=unavailable")
         report("Audio: ready audioType=${format.audioType} codec=${format.codec} " +
@@ -2415,7 +2470,9 @@ private class AudioRenderer(
 
     private fun maintainPlaybackBuffer() {
         val track = track ?: return
-        if (bufferProgress.shouldRebuffer(mappedChannel == AudioChannel.MEDIA, playbackStarted,
+        val rebufferAfterUnderrun = mappedChannel == AudioChannel.MEDIA &&
+            MediaAudioBuffer.shouldRebufferAfterUnderrun(mediaBufferMillis)
+        if (bufferProgress.shouldRebuffer(rebufferAfterUnderrun, playbackStarted,
                 track.underrunCount > underrunsAtPlaybackStart, queue.isEmpty(), track.playbackHeadPosition,
                 startThresholdBytes / 2L)) {
             // The hardware buffer has starved below the recovery floor. Pause without flushing

@@ -31,6 +31,7 @@ interface VehicleHostControls {
  * Implementations must return quickly from callbacks and move vendor I/O to their own workers.
  */
 interface VehicleSessionHooks : Closeable {
+    fun attachDiagnosticLogger(logger: (String) -> Unit) = Unit
     fun attachHostControls(controls: VehicleHostControls) = Unit
     fun sourceOpened(source: RouteGuidanceSource) = Unit
     fun sourceReady(source: RouteGuidanceSource) = Unit
@@ -86,6 +87,9 @@ interface VehicleIntegrationProvider {
 
 class CompositeVehicleSessionHooks(hooks: Iterable<VehicleSessionHooks>) : VehicleSessionHooks {
     private val delegates = hooks.toList()
+
+    override fun attachDiagnosticLogger(logger: (String) -> Unit) =
+        delegates.forEachSafely { it.attachDiagnosticLogger(logger) }
 
     override fun attachHostControls(controls: VehicleHostControls) =
         delegates.forEachSafely { it.attachHostControls(controls) }

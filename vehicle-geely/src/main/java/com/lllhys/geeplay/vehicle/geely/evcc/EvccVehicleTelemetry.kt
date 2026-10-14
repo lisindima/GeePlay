@@ -724,7 +724,10 @@ internal class EvccVehicleSpeedSource(
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val requestRefresh: () -> Unit = {},
     private val onDiagnostic: (String) -> Unit = {},
+    private val sampleMillis: Long = DEFAULT_SAMPLE_MILLIS,
 ) : VehicleSpeedSource {
+    private val refreshEverySamples =
+        ((REFRESH_INTERVAL_MILLIS + sampleMillis.coerceAtLeast(1L) - 1L) / sampleMillis.coerceAtLeast(1L)).toInt()
     private val lock = Any()
     private val samples = ArrayList<VehicleSpeedSample>()
     private var executor: ScheduledExecutorService? = null
@@ -743,6 +746,10 @@ internal class EvccVehicleSpeedSource(
     private var lastMotionAvailable: Boolean? = null
     private var lastDrainHadSamples: Boolean? = null
     private var lastSampleAt: Long? = null
+
+    init {
+        require(sampleMillis in 50L..1_000L) { "Unsupported EVCC wheel-speed sample interval" }
+    }
 
     override fun start() {
         val started = synchronized(lock) {
@@ -769,7 +776,7 @@ internal class EvccVehicleSpeedSource(
                 it.scheduleWithFixedDelay(
                     { sample(currentGeneration) },
                     0,
-                    SAMPLE_MILLIS,
+                    sampleMillis,
                     TimeUnit.MILLISECONDS,
                 )
             }
@@ -831,7 +838,7 @@ internal class EvccVehicleSpeedSource(
     private fun sample(expectedGeneration: Long) {
         val refresh = synchronized(lock) {
             if (executor == null || generation != expectedGeneration) return
-            val shouldRefresh = sampleCount++ % REFRESH_EVERY_SAMPLES == 0
+            val shouldRefresh = sampleCount++ % refreshEverySamples == 0
             if (shouldRefresh) refreshRequests += 1
             shouldRefresh
         }
@@ -841,7 +848,7 @@ internal class EvccVehicleSpeedSource(
             val diagnostic = synchronized(lock) {
                 if (executor == null || generation != expectedGeneration) return
                 missingSamples += 1
-                val shouldReport = lastMotionAvailable != false || missingSamples % DIAGNOSTIC_SAMPLE_INTERVAL == 0L
+                val shouldReport = lastMotionAvailable != false || missingSamples % refreshEverySamples == 0L
                 lastMotionAvailable = false
                 if (shouldReport) "speed-source sample=missing ${diagnosticsLocked(elapsedRealtime())}" else null
             }
@@ -865,7 +872,7 @@ internal class EvccVehicleSpeedSource(
             val moving = current.speedMetersPerSecond >= MOVING_THRESHOLD_MPS
             val shouldReport = lastMotionAvailable != true || previousGear != current.gear ||
                 previousMoving != null && previousMoving != moving ||
-                validSamples % DIAGNOSTIC_SAMPLE_INTERVAL == 0L
+                validSamples % refreshEverySamples == 0L
             lastMotionAvailable = true
             lastSpeed = current.speedMetersPerSecond
             lastGear = current.gear
@@ -879,7 +886,8 @@ internal class EvccVehicleSpeedSource(
     private fun diagnosticsLocked(now: Long): String {
         val speedText = lastSpeed?.let { String.format(Locale.US, "%.3f", it) } ?: "-"
         val age = lastSampleAt?.let { (now - it).coerceAtLeast(0) }?.toString() ?: "-"
-        return "started=${executor != null} refreshes=$refreshRequests validSamples=$validSamples " +
+        return "started=${executor != null} sampleIntervalMs=$sampleMillis " +
+            "refreshEverySamples=$refreshEverySamples refreshes=$refreshRequests validSamples=$validSamples " +
             "missingSamples=$missingSamples queued=${samples.size} drains=$drains emptyDrains=$emptyDrains " +
             "changes=$speedChanges lastSpeedMps=$speedText gear=${lastGear?.letter ?: '-'} sampleAgeMs=$age"
     }
@@ -888,10 +896,9 @@ internal class EvccVehicleSpeedSource(
         onDiagnostic(VehicleDataDiagnostics.record("normalize-speed", message))
 
     private companion object {
-        const val SAMPLE_MILLIS = 250L
+        const val DEFAULT_SAMPLE_MILLIS = 250L
+        const val REFRESH_INTERVAL_MILLIS = 1_000L
         const val MAX_SAMPLES = 40
-        const val REFRESH_EVERY_SAMPLES = 4
-        const val DIAGNOSTIC_SAMPLE_INTERVAL = 4L
         const val DIAGNOSTIC_DRAIN_INTERVAL = 10L
         const val SPEED_CHANGE_EPSILON_MPS = 0.05
         const val MOVING_THRESHOLD_MPS = 0.1

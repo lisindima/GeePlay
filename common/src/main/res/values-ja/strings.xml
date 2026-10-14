@@ -263,6 +263,7 @@
     <string name="mfi_certificate_signing_target">MFi証明書と署名先</string>
     <string name="model">モデル</string>
     <string name="music_buffer">音楽のバッファ</string>
+    <string name="music_buffer_reconnect_description">音楽バッファの変更は、CarPlay の再接続後に適用されます。</string>
     <string name="resolution_native">ネイティブ</string>
     <string name="navigation_on_hud_and_instrument_cluster">HUDとメーターにナビを表示</string>
     <string name="navigation_stream_type">ナビ音声のストリーム種別</string>
@@ -333,7 +334,9 @@
     <string name="s_1_open_car_hotspot_settings_turn_the_hotspot_on_and_sele">1. 車のホットスポット設定を開き、オンにして、可能なら5 GHzを選びます。\n2. ネットワーク名とパスワードを下へ正確に入力します。\n3. 接続するときもホットスポットをオンにしてください。DiPlayがBluetooth経由で接続情報を送り、iPhoneは自動的に参加します。</string>
     <string name="s_2_4_ghz">2.4 GHz</string>
     <string name="s_2_pair_your_iphone">2 · iPhoneをペアリング</string>
-    <string name="s_300_ms_default">300 ms · 標準</string>
+    <string name="s_50_ms_experimental">50 ms · 実験的機能</string>
+    <string name="s_100_ms_low_latency">100 ms · 低遅延</string>
+    <string name="s_300_ms_default">300 ms · バランス</string>
     <string name="s_30_fps_lighter_load">30 fps · 負荷が軽い</string>
     <string name="s_3_connect">3 · 接続</string>
     <string name="s_3_tap_check_and_enable_below_this_enables_the_cluster_ma">3. 下の「確認して有効化」をタップします。メーター内地図とテーマの自動追従が有効になります。接続中のCarPlayは1回再接続します。</string>
@@ -765,6 +768,8 @@
     <string name="settings_direct_video_output_description">DiPlay画面内に描画せず、車載端末のコンポジターへCarPlay映像を直接送ります。画面更新1回分ほどの遅延を減らせる場合があります。画質調整は適用されません。CarPlayを再接続します。</string>
     <string name="settings_low_latency_decoder">低遅延デコード（実験的機能）</string>
     <string name="settings_low_latency_decoder_description">Qualcomm製の映像デコーダーに対し、フレームを保持せずデコード直後に出力するよう要求します。専用スレッドで次のフレームの到着を待たずに表示し、数十ミリ秒の遅延を減らせる場合があります。映像が乱れたり停止したりする場合はオフにしてください。次回の接続から反映されます。</string>
+    <string name="settings_media_fast_start_experimental">音楽の高速開始（実験的機能）</string>
+    <string name="settings_media_fast_start_experimental_description">iPhone が低遅延の音楽ストリームを設定した時点で AAC 出力を準備し、Android の高速ミキサーを要求して、最初のデコード済みフレームから再生します。一部の車載端末ではクリック音や音切れが発生する場合があります。CarPlay の再接続後に反映され、50/100 ms の音楽バッファーにのみ適用されます。</string>
     <string name="settings_fps_counter">FPSカウンター</string>
     <string name="settings_fps_counter_description">CarPlay右上に表示FPS（50以上は緑、30以上は黄、それ未満は赤）、iPhoneからの受信FPS、デコード時間を表示します。静止画面ではiPhoneが送るフレームが少ないため数値も小さくなります。</string>
     <string name="fps_counter_text">%1$d FPS\n受信 %2$d · %3$s</string>

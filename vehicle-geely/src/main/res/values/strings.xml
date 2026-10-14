@@ -24,10 +24,13 @@
     <string name="settings_geely_media_owner">Music output</string>
     <string name="settings_geely_media_owner_bluetooth">Factory Bluetooth</string>
     <string name="settings_geely_media_owner_diplay">CarPlay</string>
-    <string name="settings_geely_bluetooth_media_auto_avoid">Automatically avoid car Bluetooth media (experimental)</string>
-    <string name="settings_geely_bluetooth_media_auto_avoid_description">With CarPlay music selected, temporarily disconnects only the car’s A2DP media profile to prevent play/pause contention. Calls and pairing stay available; A2DP is restored when CarPlay ends. Applies on the next connection.</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid">Automatically disable car Bluetooth media when CarPlay starts (experimental)</string>
+    <string name="settings_geely_bluetooth_media_auto_avoid_description">When CarPlay starts, disconnects only the head unit’s A2DP media profile to prevent play/pause contention. Calls and pairing stay connected. Applies on the next connection.</string>
+    <string name="settings_geely_bluetooth_media_auto_restore">Automatically restore car Bluetooth media when CarPlay ends (experimental)</string>
+    <string name="settings_geely_bluetooth_media_auto_restore_description">When CarPlay ends, asks the G636 system Bluetooth-music app to reconnect A2DP and return to the car Bluetooth source; music may resume. If media stays off, use the recovery button below. Leave this off to keep car Bluetooth media disabled outside CarPlay.</string>
+    <string name="settings_geely_bluetooth_media_open_settings">Open car Bluetooth to restore media</string>
     <string name="settings_geely_bluetooth_media_confirm_title">Use CarPlay for music?</string>
-    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay will automatically disconnect the car’s Bluetooth media profile while CarPlay runs. It does not turn Bluetooth off or disconnect calls, and restores media when CarPlay ends. Nearby devices permission is required.</string>
+    <string name="settings_geely_bluetooth_media_confirm_message">GeePlay will automatically disconnect the car’s Bluetooth media profile while CarPlay runs without turning Bluetooth off or disconnecting calls. Automatic restore is a separate setting and is off by default. Nearby devices permission is required.</string>
     <string name="settings_geely_bluetooth_media_confirm_action">Use CarPlay and enable avoidance</string>
     <string name="settings_geely_input_title">Geely steering-wheel input (experimental)</string>
     <string name="settings_geely_input_description">OneOS media keys and the Flyme voice broadcast require an active CarPlay session. Factory Bluetooth disables interception. Profile changes apply immediately.</string>
@@ -65,6 +68,10 @@
     <string name="settings_geely_evcc_vehicle_status_description">Shares traction-battery percentage, remaining range and charging state with the connected iPhone when EVCC provides a verified reading. Applies on the next connection.</string>
     <string name="settings_geely_evcc_vehicle_speed">Send vehicle speed to CarPlay positioning</string>
     <string name="settings_geely_evcc_vehicle_speed_description">Adds EVCC wheel speed and gear to location updates requested by the iPhone. Location sharing must also be enabled. Applies on the next connection.</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling">Wheel-speed sampling rate (experimental)</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_description">Controls how often GeePlay samples EVCC’s in-memory speed cache for each $PASCD packet. It does not force vehicle-bus reads. Higher rates apply on the next connection and use more CPU.</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_standard">4 Hz · 250 ms (default)</string>
+    <string name="settings_geely_evcc_wheel_speed_sampling_fast">10 Hz · 100 ms</string>
     <string name="settings_geely_evcc_video_while_parked">Allow in-car video only while parked (experimental)</string>
     <string name="settings_geely_evcc_video_while_parked_description">Uses the verified EVCC gear value and fails closed when it is missing or stale. Applies on the next connection.</string>
     <string name="settings_geely_evcc_video_confirm_title">Enable parked video?</string>

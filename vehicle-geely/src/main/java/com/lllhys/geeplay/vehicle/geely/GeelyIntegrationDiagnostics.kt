@@ -12,6 +12,7 @@ import com.shilapi.xcertplay.vehicle.VehicleDisplayCandidate
 import java.util.concurrent.atomic.AtomicLong
 
 object GeelyIntegrationDiagnostics {
+    private val traceSequence = AtomicLong()
     private val routeUpdates = AtomicLong()
     private val maneuverUpdates = AtomicLong()
     private val laneUpdates = AtomicLong()
@@ -27,23 +28,43 @@ object GeelyIntegrationDiagnostics {
     @Volatile private var visibleLaneCount = 0
     @Volatile private var lastOemMethod = "none"
     @Volatile private var lastOemResult = "not_called"
+    @Volatile private var diagnosticLogger: ((String) -> Unit)? = null
+
+    fun attachDiagnosticLogger(logger: (String) -> Unit) {
+        diagnosticLogger = logger
+        trace("LOGGER", "attached=true")
+    }
+
+    fun trace(stage: String, message: String) {
+        val safeStage = stage.take(32).replace(Regex("[^A-Za-z0-9_-]"), "?")
+        val safeMessage = message.take(2_000)
+        runCatching {
+            diagnosticLogger?.invoke(
+                "RGDIAG seq=${traceSequence.incrementAndGet()} stage=$safeStage $safeMessage",
+            )
+        }
+    }
 
     fun sourceReady(source: RouteGuidanceSource) {
         activeSource = "${source.kind.name}:${source.id}"
+        trace("SOURCE_READY", "source=$activeSource")
     }
 
     fun sourceClosed(source: RouteGuidanceSource) {
         if (activeSource.endsWith(":${source.id}")) activeSource = "none"
+        trace("SOURCE_CLOSED", "source=${source.kind.name}:${source.id} activeSource=$activeSource")
     }
 
     fun sessionStarted() {
         sessionGeneration += 1
         sessionActive = true
+        trace("SESSION_START", "sessionGeneration=$sessionGeneration")
     }
 
     fun sessionEnded() {
         sessionGeneration += 1
         sessionActive = false
+        trace("SESSION_END", "sessionGeneration=$sessionGeneration")
     }
 
     fun frame(messageId: Int, accepted: Boolean) {
@@ -62,17 +83,38 @@ object GeelyIntegrationDiagnostics {
         lastPublishAtMillis = SystemClock.elapsedRealtime()
         visibleManeuverCount = 1
         visibleLaneCount = publication.snapshot.laneGuidance?.lanes?.size ?: 0
+        val snapshot = publication.snapshot
+        val lane = snapshot.laneGuidance
+        trace(
+            "STORE_PUBLISH",
+            "source=$activeSource sessionGeneration=$sessionGeneration revision=${snapshot.revision} " +
+                "routeState=${snapshot.routeState.name} maneuverIndex=${snapshot.maneuver.index} " +
+                "maneuverType=${snapshot.maneuver.type} nextMeters=${snapshot.nextDistanceMeters} " +
+                "remainingMeters=${snapshot.remainingMeters ?: "none"} " +
+                "remainingSeconds=${snapshot.remainingSeconds ?: "none"} " +
+                "laneEvent=${lane?.eventIndex ?: "none"} laneCount=${lane?.lanes?.size ?: 0} " +
+                (lane?.lanes?.joinToString(prefix = "laneData=[", postfix = "]", separator = ";") { value ->
+                    "pos=${value.position},status=${value.status.name},angles=${value.anglesDegrees.joinToString(",")}," +
+                        "highlight=${value.highlightAngleDegrees ?: "none"}"
+                } ?: "laneData=[]"),
+        )
     }
 
     fun cleared(clear: NavigationClear) {
         sessionGeneration = clear.sessionGeneration
         visibleManeuverCount = 0
         visibleLaneCount = 0
+        trace(
+            "STORE_CLEAR",
+            "source=${clear.source?.kind?.name ?: "none"}:${clear.source?.id ?: "none"} " +
+                "sessionGeneration=${clear.sessionGeneration} reason=${clear.reason.name}",
+        )
     }
 
     fun oemCall(method: String, result: String) {
         lastOemMethod = method.take(80)
         lastOemResult = result.take(80)
+        if (method in DIAGNOSTIC_OEM_METHODS) trace("OEM_CALL", "method=${method.take(80)} result=${result.take(80)}")
     }
 
     fun input(message: String) {
@@ -100,7 +142,7 @@ object GeelyIntegrationDiagnostics {
         appendLine("geelyDriver state=${driver.state} stage=${driver.stage} failure=${driver.failureType ?: "none"} cleanupPending=${recovery != null}")
         appendLine("geelyOemCall method=$lastOemMethod result=$lastOemResult")
         appendLine("geelyRoute source=$activeSource sessionGeneration=$sessionGeneration sessionActive=$sessionActive frames5201=${routeUpdates.get()} frames5202=${maneuverUpdates.get()} frames5204=${laneUpdates.get()} rejected=${rejectedFrames.get()} lastFrameElapsedMs=$lastFrameAtMillis lastPublishElapsedMs=$lastPublishAtMillis maneuvers=$visibleManeuverCount lanes=$visibleLaneCount")
-        appendLine("geelyMedia owner=${GeelyMediaSettings.loadOwner(context)} retainBluetooth=${GeelyMediaSettings.loadOwner(context) == com.shilapi.xcertplay.media.MediaOutputOwner.OEM_BLUETOOTH} autoAvoid=${GeelyMediaSettings.bluetoothAutoAvoid(context)} arbitration=$bluetoothAudioStatus")
+        appendLine("geelyMedia owner=${GeelyMediaSettings.loadOwner(context)} retainBluetooth=${GeelyMediaSettings.loadOwner(context) == com.shilapi.xcertplay.media.MediaOutputOwner.OEM_BLUETOOTH} autoAvoid=${GeelyMediaSettings.bluetoothAutoAvoid(context)} autoRestore=${GeelyMediaSettings.bluetoothAutoRestore(context)} arbitration=$bluetoothAudioStatus")
         val input = GeelyInputDiagnostics.snapshot()
         appendLine("geelyInput profile=${GeelyInputSettings.loadProfile(context)} status=$inputStatus bind=${input.bindAttempts} register=${input.registrations} unregister=${input.unregisterAttempts} death=${input.binderDeaths} quarantine=${input.quarantines} active=${input.registered}")
         val displays = context.getSystemService(DisplayManager::class.java)?.displays.orEmpty()
@@ -138,4 +180,14 @@ object GeelyIntegrationDiagnostics {
             appendLine("geelyDisplay index=$index id=${display.displayId} name=${display.name} size=${display.width}x${display.height} flags=${display.flags}")
         }
     }
+
+    private val DIAGNOSTIC_OEM_METHODS = setOf(
+        "updateLaneInfo",
+        "updateNavigationInfo",
+        "notifyNavigationStatus",
+        "notifyTurnByTurnStarted",
+        "notifyTurnByTurnStopped",
+        "setPresentationToDimSwitch",
+        "notifyDataSource",
+    )
 }

@@ -86,8 +86,15 @@ class GeelyVehicleSessionHooks(
         }, 1, 1, TimeUnit.SECONDS)
     }
 
+    override fun attachDiagnosticLogger(logger: (String) -> Unit) {
+        GeelyIntegrationDiagnostics.attachDiagnosticLogger(logger)
+    }
+
     override fun sourceOpened(source: RouteGuidanceSource) {
-        if (!closed.get()) coordinator.sourceOpened(source)
+        if (!closed.get()) {
+            GeelyIntegrationDiagnostics.trace("SOURCE_OPEN", "source=${source.kind.name}:${source.id}")
+            coordinator.sourceOpened(source)
+        }
     }
     override fun attachHostControls(controls: VehicleHostControls) {
         if (!closed.get()) {
@@ -138,6 +145,10 @@ class GeelyVehicleSessionHooks(
     }
     override fun sourceClosed(source: RouteGuidanceSource, reason: SourceCloseReason) {
         if (closed.get()) return
+        GeelyIntegrationDiagnostics.trace(
+            "SOURCE_CLOSE_REASON",
+            "source=${source.kind.name}:${source.id} reason=${reason.name}",
+        )
         GeelyIntegrationDiagnostics.sourceClosed(source)
         coordinator.sourceClosed(source)
     }
