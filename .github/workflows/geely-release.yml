@@ -1,0 +1,154 @@
+name: GeePlay checks and releases
+
+on:
+  push:
+    branches: [geely/main]
+    tags: ['v*-geely.*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python3 scripts/check_public_tree.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Base tests, lint and sample builds
+        run: ./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :home:testDebugUnitTest :mobile:lintDebug :home:lintDebug :maphost:lintDebug :mobile:assembleDebug :home:assembleDebug :maphost:assembleDebug --console=plain
+      - name: Geely tests, lint and diagnostic build
+        run: ./gradlew :vehicle-geely:testDebugUnitTest :geely:testDebugUnitTest :vehicle-geely:lintDebug :geely:lintDebug :geely:assembleDebug --console=plain
+      - name: Verify diagnostic APK
+        run: |
+          python3 scripts/verify_geely_apk.py geely/build/outputs/apk/debug/geely-debug.apk \
+            --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --version "$(sed -n 's/.*versionName = "\([^"]*\)"/\1/p' geely/build.gradle.kts)" \
+            --version-code "$(sed -n 's/.*versionCode = \([0-9]*\)/\1/p' geely/build.gradle.kts)" \
+            --profile diagnostic --report diagnostic-verification.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: GeePlay-check-reports
+          path: |
+            **/build/reports/
+            diagnostic-verification.json
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'lisindima/GeePlay'
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    # Configure required reviewers and secrets on these environments before tagging.
+    environment: ${{ contains(github.ref_name, '-diagnostic.') && 'geely-diagnostic' || 'geely-release' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify tag and product branch
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor HEAD origin/geely/main
+          VERSION=$(sed -n 's/.*versionName = "\([^"]*\)"/\1/p' geely/build.gradle.kts)
+          if [[ "$TAG" == *-diagnostic.* ]]; then
+            [[ "$TAG" =~ ^v${VERSION//./\.}-diagnostic\.[0-9]+$ ]]
+          else
+            test "$TAG" = "v$VERSION"
+          fi
+          python3 scripts/check_public_tree.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Restore persistent signing identity and authorized assets
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          CERT_SHA256: ${{ secrets.ANDROID_CERTIFICATE_SHA256 }}
+          IDENTITY: ${{ secrets.CARPLAY_IDENTITY_PK8_BASE64 }}
+          CERTIFICATE: ${{ secrets.CARPLAY_CERTIFICATE_P7B_BASE64 }}
+          DISTRIBUTION_APPROVED: ${{ vars.CARPLAY_DISTRIBUTION_APPROVED }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          umask 077
+          test -n "$KEYSTORE" && test -n "$KEYSTORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" && test -n "$CERT_SHA256"
+          mkdir -p "$RUNNER_TEMP/geeplay-private"
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/geeplay-private/signing.jks"
+          if [[ "$TAG" != *-diagnostic.* ]]; then
+            test "$DISTRIBUTION_APPROVED" = true
+            test -n "$IDENTITY" && test -n "$CERTIFICATE"
+            mkdir -p "$RUNNER_TEMP/geeplay-private/assets/offline-mfi"
+            printf '%s' "$IDENTITY" | base64 --decode > "$RUNNER_TEMP/geeplay-private/assets/offline-mfi/identity.pk8"
+            printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/geeplay-private/assets/offline-mfi/certificate.p7b"
+          fi
+      - name: Build and verify signed artifact
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/geeplay-private/signing.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          CERT_SHA256: ${{ secrets.ANDROID_CERTIFICATE_SHA256 }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION=$(sed -n 's/.*versionName = "\([^"]*\)"/\1/p' geely/build.gradle.kts)
+          CODE=$(sed -n 's/.*versionCode = \([0-9]*\)/\1/p' geely/build.gradle.kts)
+          mkdir dist
+          if [[ "$TAG" == *-diagnostic.* ]]; then
+            export GEEPLAY_DIAGNOSTIC_SIGNING=true
+            ./gradlew :geely:assembleDebug --no-configuration-cache --console=plain
+            PROFILE=diagnostic
+            APK=geely/build/outputs/apk/debug/geely-debug.apk
+          else
+            export DIPLAY_AUTH_ASSETS_DIR="$RUNNER_TEMP/geeplay-private/assets"
+            ./gradlew :geely:assembleRelease --no-configuration-cache --console=plain
+            PROFILE=release
+            APK=geely/build/outputs/apk/release/geely-release.apk
+          fi
+          cp "$APK" "dist/GeePlay-${TAG#v}.apk"
+          python3 scripts/verify_geely_apk.py "dist/GeePlay-${TAG#v}.apk" \
+            --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --version "$VERSION" --version-code "$CODE" --profile "$PROFILE" \
+            --certificate-sha256 "$CERT_SHA256" --report dist/verification.json
+          git archive --format=zip --prefix="GeePlay-${TAG#v}/" HEAD > "dist/GeePlay-${TAG#v}-source.zip"
+          (cd dist && sha256sum *.apk *.zip verification.json > SHA256SUMS.txt)
+          printf '\nBuilt commit: `%s`\n' "$(git rev-parse HEAD)" > dist/commit.txt
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION=$(sed -n 's/.*versionName = "\([^"]*\)"/\1/p' geely/build.gradle.kts)
+          cp "docs/releases/$VERSION.md" "$RUNNER_TEMP/notes.md"
+          cat dist/commit.txt >> "$RUNNER_TEMP/notes.md"
+          if [[ "$TAG" == *-diagnostic.* ]]; then
+            printf '\nDIAGNOSTIC DEBUG APK: no CarPlay authentication. Not a ready-to-use CarPlay release. Uses the persistent diagnostic signing identity and separate .debug package.\n' >> "$RUNNER_TEMP/notes.md"
+            gh release create "$TAG" dist/*.apk dist/*.zip dist/SHA256SUMS.txt dist/verification.json --verify-tag --prerelease --title "GeePlay ${TAG#v} вЂ” diagnostic, no authentication" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$TAG" dist/*.apk dist/*.zip dist/SHA256SUMS.txt dist/verification.json --verify-tag --prerelease --title "GeePlay ${TAG#v}" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+      - name: Delete temporary secrets
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/geeplay-private"
