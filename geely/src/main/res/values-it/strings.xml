@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="setup_error_auth">Impossibile caricare l’autenticazione CarPlay. Installa la versione completa di GeePlay sopra questa app. Non serve disinstallare né cambiare l’hotspot.</string>
+    <string name="about_diplay">Informazioni su GeePlay</string>
+    <string name="in_carplay_swipe_down_with_three_fingers_to_open_diplay_se">In CarPlay, scorri verso il basso con tre dita per aprire le impostazioni di GeePlay.</string>
+    <string name="make_diplay_feel_right_for_your_car">Rendi GeePlay perfetto per la tua auto.</string>
+    <string name="reports_save_to_downloads_diplay">I report vengono salvati in Download/GeePlay.\u0020</string>
+    <string name="settings_interface_size_hint">Dimensione di testo e controlli sulle schermate di GeePlay. Automatica li ingrandisce sugli schermi grandi con bassa densità. CarPlay non è interessato.</string>
+    <string name="backup_open_description">Mostra un codice QR così il browser di un telefono sulla stessa rete può esportare o importare le impostazioni di GeePlay. Il servizio si ferma quando lasci la pagina.</string>
+    <string name="backup_import_invalid">Questo file non è un backup delle impostazioni di GeePlay.</string>
+    <string name="settings_background_update_checks_description">Una volta al giorno, GeePlay controlla su GitHub se c’è una nuova versione e la mostra nella schermata Home. Non scarica mai nulla senza un tuo tocco.</string>
+    <string name="app_name">GeePlay</string>
+    <string name="settings_language_summary">Choose a language for GeePlay</string>
+    <string name="diplay">GeePlay</string>
+</resources>

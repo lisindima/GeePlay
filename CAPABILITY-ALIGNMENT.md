@@ -5,8 +5,8 @@
 > 维护规则：每次从 DiPlay 上游合并（merge/rebase/cherry-pick）到 GeePlay 分支，都必须按 `AGENTS.md`“Upstream merge review for GeePlay”在本表更新受影响能力的状态；本表与 `docs/upstream-merge-checklists/<date>-<sha>.md` 配套，不可只写 checklist 而不更新本表。
 
 - 维护分支：`geely/main`
-- 当前上游基线：`d9881b4a`（DiPlay `main`，2026-10-12 合并；见本次 upstream checklist）
-- 最近更新：2026-10-13
+- 当前上游基线：`9d896330`（DiPlay `main` / 0.2.21，2026-10-26；见 `docs/upstream-merge-checklists/2026-10-26-9d896330.md`）
+- 最近更新：2026-10-26
 
 ## 相关文档
 
@@ -47,22 +47,22 @@
 
 | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | --- | --- | --- | --- |
-| 有线/无线连接、配对、USB/热点引导 | ⬛ 继承 | n/a | `CarPlayController`/`CarPlayHostActivity` 上游通用链路；`d9881b4a` 的 USBMUX、VPN scope、无效 RFCOMM、配置选择及恢复修复已继承 |
-| 视频解码与多 Surface、触控 | ⬛ 继承 | n/a | 上游 `MediaEngine`/stream 处理；`d9881b4a` 的 safe-area、尺寸、MTK 回退和解码等待修复已继承，Harman 专用全屏在 GeePlay 禁用 |
-| 音频媒体/导航流 | ✅ 已对齐 | android-std + bundled libopus | 媒体 owner 由 `GeelyMediaSettings`/`LocalMediaAudioPolicy` 决定；G636 已验证 AAC 媒体流和 Opus 导航流。GeePlay 恢复 DiPlay 发布包中的 `libdiplay_opus_jni.so`，native 不可用时回退已随源码提供的 Concentus 解码器。GeePlay 未保存过设置时使用 100 ms 低延迟媒体缓冲；50/100 ms 档不在 underrun 后再次暂停，并容忍无线 CarPlay 约 400 ms 的正常突发，只裁掉超过低延迟窗口的陈旧压缩包 |
-| 设置备份/恢复 | ⬛ 继承 | n/a | `SettingsBackupServer`/`SettingsBackupCodec`；仅在 About 的备份页存活，导入使用 allowlist，覆盖后提示下次重连 |
-| 设置 IA、搜索与多语言 | ⬛ 继承 | n/a | About 已纳入设置层级，搜索监听清理与日语/阿拉伯语补全已继承；GeePlay compact/full/RTL 大字体截图由 `GeePlaySettingsScreenshotsTest` 生成 |
-| 产品身份（名称/图标/OEM label/更新源） | ✅ 已对齐 | n/a | `GeePlayApplication` 覆写 `VehicleIntegrationProvider`（`GEELY` 标签、独立更新源）；本次随上游 0.2.18 更新为 `0.2.18-geely.4` |
-| 上游厂商设置边界 | ✅ 已对齐 | n/a | `LegacyBydSettingsPolicy` + `GeelyProductSettings.blockLegacyBydMenus` 默认隐藏 BYD/FCE/cluster 项；产品 capability gate 另行禁用 BYD Telecom、Harman 全屏和上游内嵌 Geely 输入，不删上游源码 |
+| 有线/无线连接、配对、USB/热点引导 | ⬛ 继承 | n/a | `CarPlayController`/`CarPlayHostActivity` 上游通用链路；`d9881b4a` 的 USBMUX、VPN scope、无效 RFCOMM、配置选择及恢复修复已继承 0.2.21: USB startup/re-enumeration watchdog, Bluetooth preflight, P2P/tethering recovery and connection diagnostics integrated; Geely source ownership preserved. |
+| 视频解码与多 Surface、触控 | ⬛ 继承 | n/a | 上游 `MediaEngine`/stream 处理；`d9881b4a` 的 safe-area、尺寸、MTK 回退和解码等待修复已继承，Harman 专用全屏在 GeePlay 禁用 0.2.21: screen sizing, corner mask, same-task host and temporary system bars inherited; unvalidated private cluster routing stays disabled. |
+| 音频媒体/导航流 | ✅ 已对齐 | android-std + bundled libopus | 媒体 owner 由 `GeelyMediaSettings`/`LocalMediaAudioPolicy` 决定；G636 已验证 AAC 媒体流和 Opus 导航流。GeePlay 恢复 DiPlay 发布包中的 `libdiplay_opus_jni.so`，native 不可用时回退已随源码提供的 Concentus 解码器。GeePlay 未保存过设置时使用 100 ms 低延迟媒体缓冲；50/100 ms 档不在 underrun 后再次暂停，并容忍无线 CarPlay 约 400 ms 的正常突发，只裁掉超过低延迟窗口的陈旧压缩包 0.2.21: clock trim, microphone recovery, call speaker fallback and navigation gain/focus inherited; separate wired/wireless preferences preserve Geely 50/100 ms wireless choices. |
+| 设置备份/恢复 | ⬛ 继承 | n/a | `SettingsBackupServer`/`SettingsBackupCodec`；仅在 About 的备份页存活，导入使用 allowlist，覆盖后提示下次重连 0.2.21: code/QR HTTP backup and expanded allowlist inherited; Geely fast-start and vehicle diagnostic trace preserved. |
+| 设置 IA、搜索与多语言 | ⬛ 继承 | n/a | About 已纳入设置层级，搜索监听清理与日语/阿拉伯语补全已继承；GeePlay compact/full/RTL 大字体截图由 `GeePlaySettingsScreenshotsTest` 生成 0.2.21: neutral launcher bubble Advanced card and Italian resources inherited; product override/RTL screenshots require validation. |
+| 产品身份（名称/图标/OEM label/更新源） | ✅ 已对齐 | n/a | `GeePlayApplication` 覆写 `VehicleIntegrationProvider`（`GEELY` 标签、独立更新源）；本次随上游 0.2.21 更新为 `0.2.21-geely.1` / code 5；更新源改为 `lisindima/GeePlay` |
+| 上游厂商设置边界 | ✅ 已对齐 | n/a | `LegacyBydSettingsPolicy` + `GeelyProductSettings.blockLegacyBydMenus` 默认隐藏 BYD/FCE/cluster 项；产品 capability gate 另行禁用 BYD Telecom、Harman 全屏和上游内嵌 Geely 输入，不删上游源码 0.2.21: BYD call popup and short-Siri controls gated; native rhythm excluded from Geely; EVCC ambient provider retained. |
 
 ## B. 导航与仪表显示
 
 | # | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | ---: | --- | --- | --- | --- |
-| 1 | 导航箭头/道路/距离/车道/路口到仪表 | 🟡 部分对齐 | DIM/XUI OEM-API | G636 已验证 lane-before-route flush、首次 empty 清残留和 5 秒 ownership heartbeat。同车 Apple Maps 预发 3 个真实 `0x5204`，`Showing=true` 后完整经过 store/OEM/DIM；真实样本修正 highlighted angle 归一化，停车 replay 已确认第三条“直行+右转、推荐直行”映射为 OEM `32`。高德主页组件 lane 窗口内没有任何 accessory lane metadata，但 CarPlay stream 111 持续收到 20–30 fps navigation UI。Apple 官方明确区分 navigation UI stream 与 HUD/iAP2 metadata；第三方 App 还必须显式调用 `cpNavigationSession.add(laneGuidance)`。因此高德仪表投屏可走 stream 111，而原生 HUD lane 仍缺结构化输入；除高德补 metadata 外，只能另立视频识别方案。继续保持部分对齐 |
+| 1 | 导航箭头/道路/距离/车道/路口到仪表 | 🟡 部分对齐 | DIM/XUI OEM-API | G636 已验证 lane-before-route flush、首次 empty 清残留和 5 秒 ownership heartbeat。同车 Apple Maps 预发 3 个真实 `0x5204`，`Showing=true` 后完整经过 store/OEM/DIM；真实样本修正 highlighted angle 归一化，停车 replay 已确认第三条“直行+右转、推荐直行”映射为 OEM `32`。高德主页组件 lane 窗口内没有任何 accessory lane metadata，但 CarPlay stream 111 持续收到 20–30 fps navigation UI。Apple 官方明确区分 navigation UI stream 与 HUD/iAP2 metadata；第三方 App 还必须显式调用 `cpNavigationSession.add(laneGuidance)`。因此高德仪表投屏可走 stream 111，而原生 HUD lane 仍缺结构化输入；除高德补 metadata 外，只能另立视频识别方案。继续保持部分对齐 0.2.21: lane capabilities 5/6/7/8 retained with upstream parser updates; existing DIM evidence unchanged; new build car validation pending. |
 | 7 | 保持/不被原厂地图抢占仪表 | ✅ 已对齐（等价目标） | DIM | `GeelyNavigationDriver` 用 `notifyTurnByTurnStarted/Stopped` + cleanup journal 表达所有权，不禁用 OEM 包 |
 | 2 | 挡风 HUD 导航输出 | 📝 待实现 | DIM→OEM-API | 先验证 DIM 是否自动分发到 HUD；否则 `GeelyHudNavigationOutput`（Spec §10.1） |
-| 5 | CarPlay 仪表地图/私有 Display 路由 | 🧪 条件开放 | OEM-API/Display | `VehicleClusterDisplayPolicy` 已就位，`VALIDATED_PROFILES` 为空，仅 debug 选择；上游新增 cluster speedometer/music overlay 仍由被屏蔽的 `CLUSTER_MAP` 控制，未作为 Geely 生产能力开放（Spec §10.2） |
+| 5 | CarPlay 仪表地图/私有 Display 路由 | 🧪 条件开放 | OEM-API/Display | `VehicleClusterDisplayPolicy` 已就位，`VALIDATED_PROFILES` 为空，仅 debug 选择；上游新增 cluster speedometer/music overlay 仍由被屏蔽的 `CLUSTER_MAP` 控制，未作为 Geely 生产能力开放（Spec §10.2） 0.2.21: upstream FX11 projection watchdog is evidence-pending for GeePlay; VALIDATED_PROFILES remains empty. |
 | 6 | 仪表地图流随导航模式暂停 | 🧪 条件开放 | EVCC-read→OEM-API | 已实现保守目录发现、`ClusterMapVisibilitySource` 与 session 控制；未发现可信属性时保持流开启（Spec §6） |
 | 3 | 独立 HUD 广播输出 | 🚫 不迁移 | n/a | BYD `com.byd.clusterdebug` 私有广播；目标由 #1/#2 覆盖 |
 | 4 | DiLink3 仪表模式/投屏准备 | 🚫 不迁移 | n/a | BYD `AutoContainer` 私有容器；Geely 走 DIM 或已验证 Display |
@@ -72,7 +72,7 @@
 | # | 能力 | 状态 | Geely 实现方式 | 说明/证据 |
 | ---: | --- | --- | --- | --- |
 | 8 | 电池 SOC/续航/充电状态 | ✅ 已对齐 | EVCC-read | `EvccVehicleDataAdapter`；G636 已验证 SOC `ADAPT_API:1051136`、续航 `ADAPT_API:1054976`、充电 `ADAPT_API:605225728` |
-| 9 | 车速 + P/R/N/D 挡位 | ✅ 已对齐 | EVCC-read | 车速 `ADAPT_API:1048832`（fallback `1055232`），G636 实测单位为 m/s；挡位主来源 `CAPI:557849089`（`0=P, 1=N, 2=R, 3=D`），fallback `ADAPT_API:2097664`；`$PASCD` 缓存采样支持默认 4 Hz 与实验 10 Hz，不增加 forceRefresh 或 iAP2 发包频率 |
+| 9 | 车速 + P/R/N/D 挡位 | ✅ 已对齐 | EVCC-read | 车速 `ADAPT_API:1048832`（fallback `1055232`），G636 实测单位为 m/s；挡位主来源 `CAPI:557849089`（`0=P, 1=N, 2=R, 3=D`），fallback `ADAPT_API:2097664`；`$PASCD` 缓存采样支持默认 4 Hz 与实验 10 Hz，不增加 forceRefresh 或 iAP2 发包频率 0.2.21: EVCC remains authoritative; embedded ECARX source excluded for product providers; minute summaries coexist with VEHICLE-DATA diagnostics. |
 | 10 | 仅驻车允许车内视频 | 🟡 部分对齐 | EVCC-read | 已实现 fail-closed `VehicleParkStateSource`、设置与通用 consumer；待 G636 P→D/R 实车（Spec §4） |
 | 11 | 胎压/胎温侧边栏 | 🟡 部分对齐 | EVCC-read | 已实现保守目录发现、轮位/单位映射、`VehicleTyreTelemetrySource` 与侧边栏；待 G636 descriptor 实证（Spec §5） |
 | 21 | 车辆属性发现 | ✅ 已对齐（发现层） | EVCC-read | `queryPropertyDirectory/resolve/read/subscribe` + source generation；生产用已验证 profile |
@@ -146,3 +146,4 @@
 | 2026-10-14 | `320647e8` 后工作区 | #1 高德宽口径复核完成：用户在 `19:16` 明确确认 CarPlay 主页小组件正在显示 lane；`19:15:00–19:17:05` 核心窗口记录 `5201=221`、`5202=5`、`5204=0`、`showing true=0/false=221`，store/OEM 非空 lane=0。用户于 `19:18:48` 再次确认 lane 仍可见，延伸段新增 58 帧 `5201` 仍全部 false、无 `5204`。同期全部额外 RX 控制消息只有 `0x4158 CommunicationsUpdate`，不是导航数据。由此排除短暂延迟、“只过滤错了 5204”及另一 iAP2 Control Session lane message；数据未从 CarPlay 内部主页组件桥接到 accessory RouteGuidance。持续 heartbeat 已停止并删除。 |
 | 2026-10-14 | `320647e8` 后工作区 | #1 外部资料复核：Apple WWDC23 要求仪表地图/小组件使用 navigation UI stream，HUD 使用 iAP2 metadata；WWDC25 要求导航 App 返回 `mapTemplateShouldProvideNavigationMetadata=true` 并向 `CPNavigationSession` 添加 maneuver/lane guidance。`CPLaneGuidance` 从 iOS 17.4 可用，高德公开仪表盘导航同样要求 iPhone 12+、iOS 17.4+ 与车辆仪表投屏。高德 lane 窗口中 stream 111 持续 20–30 fps、但无 `0x5204`，说明其投屏路径已工作而 lane metadata 未提供。 |
 | 2026-10-14 | `320647e8` 后工作区 | G636 媒体低延迟实车修复：原 300 ms 启播阈值和 500 ms Track 容量明显高于原车 A2DP 约 64 ms；GeePlay 新用户默认改为 100 ms，并提供 50/100/300/500/1000 ms 五档。低延迟档改用小 PCM Track，让压缩队列承接约 400 ms 无线突发；100 ms 档真机 Track=120 ms、稳态 PCM≈80 ms，用户确认比旧版明显改善；50 ms 档受平台下限实际为 start=64 ms、Track=74 ms、稳态 PCM≈58–69 ms，正常窗口 `rebuffers=0`、`dropped=0`。遇到 1.2 秒级长空档时按 450 ms 上限追帧，避免重新积累 1–2 秒延迟。最终 APK `2a170d2c…f15c27` 已安装且车机/本地 SHA-256 一致，当前车机选择 50 ms。 |
+| 2026-10-26 | `9d896330` | Integrated DiPlay 0.2.21 (441 commits), preserving DIM/EVCC/iAP2/Geely Navigation. See standalone checklist for inherited fixes, explicit BYD exclusions, test results and pending hardware/auth/signing evidence. |

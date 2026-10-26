@@ -29,6 +29,8 @@ interface AirPlaySessionListener {
     fun onSessionActive(session: AirPlaySession) {}
     fun onSessionEnded(session: AirPlaySession) {}
     fun onVideoFrameRendered(session: AirPlaySession) {}
+    /** Validated downstream; immutable copy of iPhone's top-left grayscale coverage PNG. */
+    fun onCornerMask(session: AirPlaySession, png: ByteArray, displayWidth: Int) {}
     fun onTransportError(message: String) {}
     fun onDeviceInfo(session: AirPlaySession, info: AirPlayDeviceInfo) {}
     fun onHostUiRequested(session: AirPlaySession) {}
@@ -57,6 +59,8 @@ interface AirPlayMediaHandler {
     fun onSessionClosed(session: AirPlaySession) {}
     fun setIapTunnelHandler(handler: ((BlockingDuplexByteStream) -> Boolean)?) {}
     fun onSetupResponseSent(session: AirPlaySession) {}
+    /** duckAudio (true) and unduckAudio (false): the iPhone marks the start and end of a navigation prompt. */
+    fun onAudioDuck(session: AirPlaySession, ducked: Boolean) {}
 }
 
 /**
@@ -86,6 +90,9 @@ class AirPlaySession(
         private set
     private var clusterStreamSetups = 0
     @Volatile private var mainScreenToken: Any? = null
+    @Volatile private var mainFrameRendered = false
+    // Activity 重建后仍可判断当前会话的中控主视频是否已经出帧。
+    val hasRenderedMainFrame: Boolean get() = mainFrameRendered && !closed.get()
 
     private val closed = AtomicBoolean(false)
     internal val isClosed: Boolean get() = closed.get()
@@ -97,6 +104,8 @@ class AirPlaySession(
     private var pendingNightMode: Boolean? = null
     private val firstTouchSendLogged = AtomicBoolean(false)
     private val touchSendFailureLogged = AtomicBoolean(false)
+    // Only the controller's single touch thread calls sendTouch.
+    private val touchSlots = AirPlayTouchSlots(AirPlayHid.TOUCH_CONTACTS)
     private val ntp = NtpClock()
     private var keepAliveSocket: DatagramSocket? = null
     private var keepAliveThread: Thread? = null
@@ -125,7 +134,9 @@ class AirPlaySession(
     internal fun logDebug(message: String) = debugLog(message)
 
     internal fun videoFrameRendered() {
-        if (!closed.get()) listener.onVideoFrameRendered(this)
+        if (closed.get()) return
+        mainFrameRendered = true
+        listener.onVideoFrameRendered(this)
     }
 
     internal fun logTrace(message: String) = trace(message)
@@ -330,8 +341,9 @@ class AirPlaySession(
         }
     }
 
+    /** [contacts] carry Android pointer ids; an empty list releases every finger. */
     fun sendTouch(contacts: List<AirPlayContact>): Boolean {
-        val scaled = contacts.map {
+        val scaled = touchSlots.assign(contacts).map {
             it.copy(x = it.x * config.main.widthPixels, y = it.y * config.main.heightPixels)
         }
         val report = AirPlayHid.touchReport(scaled)
@@ -523,6 +535,15 @@ class AirPlaySession(
     private fun handle(request: RtspMessage.Request): RtspMessage.Response {
         when (request.method) {
             "SETUP" -> return handleSetup(request)
+            "SET_PARAMETER" -> {
+                // iOS can replace the mask when the display changes; never decode PNG on RTSP.
+                if (config.main.useIphoneCornerMask && request.body.size <=
+                    IPhoneCornerMaskWireLimit.MAX_PNG_BYTES + 64 * 1024) {
+                    val value = runCatching { BplistCodec.decode(request.body) }.getOrNull()
+                    findIphoneCornerMask(value)?.let(::notifyCornerMask)
+                }
+                return RtspMessage.Response(status = 200)
+            }
             "RECORD" -> {
                 listener.onSessionActive(this)
                 return RtspMessage.Response(status = 200)
@@ -684,6 +705,9 @@ class AirPlaySession(
                     val port = media.onScreen(this, type, stream)
                     debugLog("airplay screen stream type=$type dataPort=${port ?: "rejected"}")
                     if (port != null) {
+                        if (type == STREAM_TYPE_MAIN_SCREEN && config.main.useIphoneCornerMask) {
+                            findIphoneCornerMask(stream)?.let(::notifyCornerMask)
+                        }
                         activeStreams.add(type)
                         if (type == STREAM_TYPE_ALT_SCREEN) beginClusterContent()
                         else mainScreenToken = Any()
@@ -744,6 +768,10 @@ class AirPlaySession(
                 ?.let { listener.onRemoteControlMessage(this, streamId, it) }
             return RtspMessage.Response(status = 200)
         }
+        when (type) {
+            "duckAudio" -> media.onAudioDuck(this, true)
+            "unduckAudio" -> media.onAudioDuck(this, false)
+        }
         if (type == "requestUI" && string(params["url"]) == VideoInCar.UI_URL) {
             listener.onVideoPlaybackUiRequested(this)
         } else if (type == "requestUI") {
@@ -778,6 +806,11 @@ class AirPlaySession(
         }
         if (STREAM_TYPE_ALT_SCREEN !in activeStreams) clearClusterContent()
         return RtspMessage.Response(status = 200)
+    }
+
+    private fun notifyCornerMask(png: ByteArray) {
+        if (png.size !in 45..IPhoneCornerMaskWireLimit.MAX_PNG_BYTES) return
+        listener.onCornerMask(this, png.copyOf(), config.main.widthPixels)
     }
 
     private fun openTiming(peerPort: Int): Int {
@@ -961,12 +994,31 @@ class AirPlaySession(
 /** The session feature the iPhone proposes for main buffered audio. */
 internal const val MAIN_BUFFERED_FEATURE = "mainBuffered"
 
+internal object IPhoneCornerMaskWireLimit {
+    const val MAX_PNG_BYTES = 512 * 1024
+}
+
+/** The mask may arrive inside the screen stream SETUP entry or in a runtime parameter plist. */
+internal fun findIphoneCornerMask(value: Any?, depth: Int = 0): ByteArray? {
+    if (depth > 6) return null
+    return when (value) {
+        is Map<*, *> -> {
+            val candidate = value["topLeftCornerMask"] as? ByteArray
+            if (candidate != null) candidate
+            else value.values.firstNotNullOfOrNull { findIphoneCornerMask(it, depth + 1) }
+        }
+        is List<*> -> value.firstNotNullOfOrNull { findIphoneCornerMask(it, depth + 1) }
+        else -> null
+    }
+}
+
 internal fun setupEnabledFeatures(config: AirPlayConfig, proposed: List<*>?): List<String> {
     val features = mutableListOf<String>()
     if (config.hevc) features.add("hevc")
     features.add("iAPChannel")
     features.add("viewAreas")
     if (config.cluster != null) features.add("altScreen")
+    if (config.main.useIphoneCornerMask && proposed.orEmpty().contains("cornerMasks")) features.add("cornerMasks")
     if (config.videoInCar && proposed.orEmpty().contains(VideoInCar.FEATURE)) features.add(VideoInCar.FEATURE)
     if (config.bufferedAudioOutputEnabled && proposed.orEmpty().contains(MAIN_BUFFERED_FEATURE)) features.add(MAIN_BUFFERED_FEATURE)
     return features

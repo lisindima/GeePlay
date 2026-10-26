@@ -16,8 +16,8 @@ android {
         applicationId = "com.lllhys.geeplay"
         minSdk = 28
         targetSdk = 37
-        versionCode = 4
-        versionName = "0.2.18-geely.4"
+        versionCode = 5
+        versionName = "0.2.21-geely.1"
     }
 
     localAuthenticationAssets?.let { sourceSets.getByName("main").assets.srcDir(it) }
@@ -38,6 +38,10 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            // CI publication uses a persistent diagnostic certificate, never an ephemeral runner key.
+            if (providers.environmentVariable("GEEPLAY_DIAGNOSTIC_SIGNING").orNull == "true") {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         release {
             optimization {
@@ -112,7 +116,7 @@ val rejectBundledCredentials by tasks.registering {
     } ?: emptySet()
     inputs.files(filesToCheck)
     doLast {
-        check(allowed.all { it.isFile }) { "Explicit local authentication assets are incomplete" }
+        check(allowed.all { it.isFile && it.length() > 0 }) { "Explicit local authentication assets are incomplete" }
         val unexpected = filesToCheck.files.filter { it.canonicalFile !in allowed }
         check(unexpected.isEmpty()) { "Unexpected credential files in APK assets" }
     }

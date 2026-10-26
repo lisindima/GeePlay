@@ -51,6 +51,24 @@ class GeePlayApplicationTest {
     }
 
     @Test
+    fun `Geely low latency wireless choice survives independent wired changes`() {
+        val application = RuntimeEnvironment.getApplication() as GeePlayApplication
+        val prefs = application.getSharedPreferences("xcertplay_airplay", 0)
+        prefs.edit().putInt("media_buffer_ms", 50).remove("wired_media_buffer_ms").commit()
+        try {
+            assertEquals(50, com.shilapi.xcertplay.AirPlayPersistence.loadMediaBufferMillis(application, true))
+            assertEquals(50, com.shilapi.xcertplay.AirPlayPersistence.loadMediaBufferMillis(application, false))
+            com.shilapi.xcertplay.AirPlayPersistence.saveMediaBufferMillis(application, false, 200)
+            assertEquals(50, com.shilapi.xcertplay.AirPlayPersistence.loadMediaBufferMillis(application, true))
+            com.shilapi.xcertplay.AirPlayPersistence.saveMediaBufferMillis(application, true, 100)
+            assertEquals(100, com.shilapi.xcertplay.AirPlayPersistence.loadMediaBufferMillis(application, true))
+            assertEquals(200, com.shilapi.xcertplay.AirPlayPersistence.loadMediaBufferMillis(application, false))
+        } finally {
+            prefs.edit().remove("media_buffer_ms").remove("wired_media_buffer_ms").commit()
+        }
+    }
+
+    @Test
     fun `GeePlay product copy overrides visible DiPlay branding in every locale`() {
         val application = RuntimeEnvironment.getApplication() as GeePlayApplication
         val productCopy = intArrayOf(
@@ -68,7 +86,7 @@ class GeePlayApplicationTest {
             HostR.string.settings_background_update_checks_description,
         )
 
-        listOf("en", "ar", "es", "ja", "ru", "uk", "zh-CN", "zh-TW").forEach { languageTag ->
+        listOf("en", "ar", "es", "it", "ja", "ru", "uk", "zh-CN", "zh-TW").forEach { languageTag ->
             val localized = application.createConfigurationContext(
                 Configuration(application.resources.configuration).apply {
                     setLocales(LocaleList(Locale.forLanguageTag(languageTag)))
@@ -91,7 +109,7 @@ class GeePlayApplicationTest {
         assertEquals("GEELY", com.shilapi.xcertplay.AirPlayPersistence.loadOemLabel(application))
         assertNotNull(application.defaultCarIconResource(application))
         assertEquals(
-            "https://api.github.com/repos/lllhys/GeePlay/releases?per_page=3",
+            "https://api.github.com/repos/lisindima/GeePlay/releases?per_page=3",
             application.updateReleasesUrl(application),
         )
         assertEquals(MediaOutputOwner.OEM_BLUETOOTH, application.mediaAudioPolicy(application).owner)

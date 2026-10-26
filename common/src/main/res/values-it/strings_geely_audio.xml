@@ -1,0 +1,8 @@
+<resources>
+    <string name="music_buffer">Buffer musicale</string>
+    <string name="music_buffer_reconnect_description">Le modifiche al buffer musicale si applicano dopo aver ricollegato CarPlay.</string>
+    <string name="s_50_ms_experimental">50 ms · sperimentale</string>
+    <string name="s_100_ms_low_latency">100 ms · bassa latenza</string>
+    <string name="settings_media_fast_start_experimental">Avvio rapido della musica (experimental)</string>
+    <string name="settings_media_fast_start_experimental_description">Prepara l’uscita AAC appena l’iPhone configura un flusso musicale a bassa latenza, richiede il mixer rapido Android e avvia dopo un fotogramma decodificato. Su alcune unità può causare scatti o interruzioni. Si applica dopo aver ricollegato CarPlay e riguarda solo i buffer musicali da 50/100 ms.</string>
+</resources>

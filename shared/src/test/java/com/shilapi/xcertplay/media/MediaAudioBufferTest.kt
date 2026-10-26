@@ -6,7 +6,7 @@ import org.junit.Test
 class MediaAudioBufferTest {
     @Test
     fun `low latency presets keep only a small PCM headroom while compressed packets absorb bursts`() {
-        assertEquals(listOf(50, 100, 300, 500, 1000), MediaAudioBuffer.presets)
+        assertEquals(MediaAudioBuffer.wiredPresets, MediaAudioBuffer.presets)
 
         val experimental = MediaAudioBuffer.plan(true, 48_000, 2, minBufferBytes = 7_680, mediaMillis = 50)
         assertEquals(9_600, experimental.startBytes)
@@ -43,6 +43,39 @@ class MediaAudioBufferTest {
         val guidance = AudioChannelMapper.map("default", 100, AudioChannelMappingMode.AUTOMOTIVE_BUS)
         assertEquals(plan, MediaAudioBuffer.plan(guidance.channel == AudioChannel.MEDIA,
             16_000, 1, minBufferBytes = 1_280, mediaMillis = 1000))
+    }
+
+    @Test
+    fun `wired presets step by 50 ms up to 200 ms, then by 100 ms up to 1000 ms`() {
+        assertEquals(listOf(50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900, 1000), MediaAudioBuffer.wiredPresets)
+        assertEquals(MediaAudioBuffer.DEFAULT_MILLIS, MediaAudioBuffer.wiredPresets[4])
+        assertEquals(MediaAudioBuffer.MOST_STABLE_MILLIS, MediaAudioBuffer.wiredPresets.last())
+    }
+
+    @Test
+    fun `wireless keeps the classic presets`() {
+        assertEquals(listOf(300, 500, 1000), MediaAudioBuffer.wirelessPresets)
+        assertEquals(MediaAudioBuffer.DEFAULT_MILLIS, MediaAudioBuffer.sanitizeWireless(50))
+        assertEquals(MediaAudioBuffer.DEFAULT_MILLIS, MediaAudioBuffer.sanitizeWireless(400))
+        assertEquals(50, MediaAudioBuffer.sanitizeWired(50))
+    }
+
+    @Test
+    fun `delays saved by earlier versions stay selected`() {
+        for (millis in listOf(300, 500, 1000)) {
+            assertEquals(millis, MediaAudioBuffer.sanitize(millis))
+            assertEquals(millis, MediaAudioBuffer.sanitizeWireless(millis))
+            assertEquals(millis, MediaAudioBuffer.sanitizeWired(millis))
+        }
+    }
+
+    @Test
+    fun `shortest music buffer still keeps the low-latency floor and headroom`() {
+        val plan = MediaAudioBuffer.plan(true, 48_000, 2, minBufferBytes = 7_680, mediaMillis = 50)
+        assertEquals(9_600, plan.startBytes)
+        assertEquals(13_440, plan.trackBufferBytes)
+        // A device minimum above the preset wins over it.
+        assertEquals(15_360, MediaAudioBuffer.plan(true, 48_000, 2, minBufferBytes = 15_360, mediaMillis = 50).startBytes)
     }
 
     @Test

@@ -131,7 +131,7 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         geelyClusterDisplayPolicy(context).select(GeelyClusterDisplaySettings.debugCandidates(context)) != null
 
     override fun updateReleasesUrl(context: Context): String =
-        "https://api.github.com/repos/lllhys/GeePlay/releases?per_page=3"
+        "https://api.github.com/repos/lisindima/GeePlay/releases?per_page=3"
 
     override fun diagnosticReport(context: Context): String = buildString {
         append(GeelyIntegrationDiagnostics.report(context))

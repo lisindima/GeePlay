@@ -19,6 +19,9 @@ interface VehicleSpeedSource {
 
     /** Readings since the previous call, or null when there are none. */
     fun drain(): VehicleSpeedReading?
+
+    /** What the reads returned, for a report minute that sent no speed; null when there is nothing to say. */
+    fun status(): String? = null
 }
 
 /**
@@ -54,6 +57,8 @@ object PascdEncoder {
 class VehicleSpeedLocationProvider(
     private val position: Iap2LocationProvider,
     private val speed: VehicleSpeedSource,
+    private val log: (String) -> Unit = {},
+    private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000L },
     private val onDiagnostic: (String) -> Unit = {},
 ) : Iap2LocationProvider {
     @Volatile private var speedRequested = false
@@ -62,6 +67,14 @@ class VehicleSpeedLocationProvider(
     private var packets = 0
     private var drainedSamples = 0
     private var lastDrainHadReading: Boolean? = null
+    // A minute of what reached the iPhone. In a tunnel the speed went after about two minutes (#807), and
+    // the report could not say whether the car's position or its wheel speed had stopped.
+    private var windowStart = -1L
+    private var updates = 0
+    private var withFix = 0
+    private var withSpeed = 0
+    private var speedSamples = 0
+    private var lastKmh: Double? = null
 
     override fun onRequested(components: Set<Int>) {
         speedRequested = Iap2LocationMessages.VEHICLE_SPEED_DATA in components
@@ -97,6 +110,7 @@ class VehicleSpeedLocationProvider(
     override fun latestNmea(): String? {
         val fix = position.latestNmea()
         val reading = if (speedRequested) speed.drain() else null
+        record(fix != null, reading)
         if (speedRequested) diagnoseDrain(reading)
         val pascd = reading?.let(PascdEncoder::encode)
         return if (fix == null) pascd else fix + pascd.orEmpty()
@@ -138,7 +152,31 @@ class VehicleSpeedLocationProvider(
     private fun format(format: String, vararg arguments: Any): String =
         String.format(Locale.US, format, *arguments)
 
-    private companion object {
+    private fun record(hasFix: Boolean, reading: VehicleSpeedReading?) {
+        val now = nowMillis()
+        if (windowStart < 0) windowStart = now
+        updates++
+        if (hasFix) withFix++
+        if (!reading?.samples.isNullOrEmpty()) {
+            withSpeed++
+            speedSamples += reading!!.samples.size
+            lastKmh = reading.samples.last().metersPerSecond * 3.6
+        }
+        if (now - windowStart < SUMMARY_MILLIS) return
+        val reads = if (speedRequested && withSpeed == 0) speed.status()?.let { " wheelSpeedReads=[$it]" }.orEmpty() else ""
+        log("Location: last ${(now - windowStart) / 1000} s updates=$updates withPosition=$withFix " +
+            "withWheelSpeed=$withSpeed wheelSpeedSamples=$speedSamples " +
+            "lastWheelSpeed=${lastKmh?.let { String.format(Locale.US, "%.1f", it) + " km/h" } ?: "none"} " +
+            "speedRequested=$speedRequested$reads")
+        windowStart = now
+        updates = 0
+        withFix = 0
+        withSpeed = 0
+        speedSamples = 0
+    }
+
+    internal companion object {
         const val DIAGNOSTIC_PACKET_INTERVAL = 1
+        const val SUMMARY_MILLIS = 60_000L
     }
 }

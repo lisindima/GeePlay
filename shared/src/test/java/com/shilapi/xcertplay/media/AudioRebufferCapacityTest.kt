@@ -47,7 +47,7 @@ class AudioRebufferCapacityTest {
     }
 
     @Test fun residualAudioCountsTowardRestartBeforeAPausedTrackFills() {
-        for (millis in listOf(500, 1000)) {
+        for (millis in MediaAudioBuffer.presets.filter(MediaAudioBuffer::shouldRebufferAfterUnderrun)) {
             val plan = MediaAudioBuffer.plan(true, 48_000, 2, 4096, millis)
             val threshold = MediaAudioBuffer.startBytesFor(plan.startBytes, plan.trackBufferBytes, 4096)
             CapacityTrack.capacity = plan.trackBufferBytes

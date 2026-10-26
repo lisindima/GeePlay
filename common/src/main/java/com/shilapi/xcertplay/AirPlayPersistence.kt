@@ -46,18 +46,23 @@ object AirPlayPersistence {
     private const val KEY_ADVANCED_AUDIO_CHANNEL_MAPPING = "advanced_audio_channel_mapping"
     private const val KEY_AUDIO_FOCUS_ENABLED = "audio_focus_enabled"
     private const val KEY_AUDIO_FOCUS_AUTO_YIELD = "audio_focus_auto_yield"
+    private const val KEY_NAVIGATION_PROMPT_AUDIO_FOCUS = "navigation_prompt_audio_focus"
     private const val KEY_DISABLE_MEDIA_KEY_AUDIO_FOCUS = "disable_media_key_audio_focus"
     private const val KEY_MEDIA_AUDIO_CHANNEL = "media_audio_channel"
     private const val KEY_NAVIGATION_AUDIO_CHANNEL = "navigation_audio_channel"
+    private const val KEY_NAVIGATION_AUDIO_ATTENUATION = "navigation_audio_attenuation_db"
     private const val KEY_NAVIGATION_STREAM_TYPE = "navigation_stream_type"
     private const val KEY_WIRELESS_ENABLED = "wireless_enabled"
     private const val KEY_WIRELESS_HOTSPOT_MODE = "wireless_hotspot_mode"
     private const val KEY_WIFI_P2P_PREFERRED_CHANNEL = "wifi_p2p_preferred_channel"
+    /** Read by CarPlayController in the shared module under the same name. */
+    const val KEY_WIFI_DIRECT_SCAN_PAUSE = "wifi_direct_scan_pause"
     private const val KEY_MANUAL_HOTSPOT_SSID = "manual_hotspot_ssid"
     private const val KEY_MANUAL_HOTSPOT_PASSPHRASE = "manual_hotspot_passphrase"
     private const val KEY_MANUAL_HOTSPOT_BAND = "manual_hotspot_band"
     private const val KEY_MANUAL_HOTSPOT_CHANNEL = "manual_hotspot_channel"
     private const val KEY_MANUAL_HOTSPOT_SECURITY = "manual_hotspot_security"
+    private const val KEY_MANUAL_HOTSPOT_INTERFACE = "manual_hotspot_interface"
     private const val KEY_DEBUG_LOGS_ENABLED = "debug_logs_enabled"
     private const val KEY_MANUFACTURER = "manufacturer"
     private const val KEY_MODEL = "model"
@@ -68,23 +73,35 @@ object AirPlayPersistence {
     private const val KEY_CARPLAY_NIGHT_END = "carplay_night_end_minute"
     private const val KEY_AMBIENT_LUX_THRESHOLD = "ambient_lux_threshold"
     private const val KEY_FPS = "display_fps"
-    private const val KEY_MEDIA_BUFFER_MS = "media_buffer_ms"
+    private const val KEY_MEDIA_BUFFER_MS = "media_buffer_ms" // wireless; was shared by both transports
+    private const val KEY_WIRED_MEDIA_BUFFER_MS = "wired_media_buffer_ms"
     private const val KEY_EXPERIMENTAL_MEDIA_FAST_START = "experimental_media_fast_start"
     private const val KEY_MAIN_BUFFERED_AUDIO = "main_buffered_audio"
     private const val KEY_SPEECH_WITHOUT_8_16_KHZ = "speech_without_8_16_khz"
+    private const val KEY_CALL_AT_CALL_RATE = "call_at_call_rate"
     private const val KEY_CAR_BLUETOOTH_AUDIO = "car_bluetooth_audio"
     private const val KEY_CALL_ECHO_CANCELLATION = "call_echo_cancellation"
     private const val KEY_CALL_VOICE_FILTER = "call_voice_filter"
+    private const val KEY_CALL_SPEAKERPHONE = "call_speakerphone"
     private const val KEY_SMOOTH_VIDEO = "smooth_video"
     private const val KEY_MTK_DECODER_TUNING = "mtk_decoder_tuning"
     private const val KEY_DIRECT_VIDEO_OUTPUT = "direct_video_output"
     private const val KEY_LOW_LATENCY_DECODER = "low_latency_decoder"
     private const val KEY_FPS_COUNTER = "fps_counter"
     private const val KEY_CLUSTER_MAP = "cluster_map_enabled"
+
+    /**
+     * The Geely cluster projection switch is DiPlay's right now. The switch belongs to the head unit
+     * and carries no owner, and the process can be killed without running `onStop`, so the claim is
+     * kept on disk and handed back by the next run ([GeelyClusterProjection.releaseStale]).
+     */
+    private const val KEY_CLUSTER_PROJECTION_HELD = "geely_cluster_projection_held"
     private const val KEY_ADB_CLUSTER_ACTIVITY = "adb_cluster_activity_enabled"
     private const val KEY_CENTER_MAP_OVERLAY = "center_map_overlay"
     private const val KEY_CENTER_MAP_AUTO_HIDE = "center_map_auto_hide"
     private const val KEY_LAUNCHER_MAP_SHARING = "launcher_map_sharing"
+    private const val KEY_LAUNCHER_BUBBLE = "launcher_bubble"
+    private const val KEY_LAUNCHER_BUBBLE_SIZE = "launcher_bubble_size"
     private const val KEY_CLUSTER_MAP_SCALE = "cluster_map_scale_percent"
     private const val KEY_CLUSTER_CONTENT = "cluster_content"
     private const val KEY_CLUSTER_MARKER_X = "cluster_marker_horizontal_step"
@@ -105,9 +122,12 @@ object AirPlayPersistence {
     private const val KEY_RIGHT_HAND_DRIVE = "right_hand_drive"
     private const val KEY_HIDE_TOP_BAR = "hide_top_bar"
     private const val KEY_HIDE_BOTTOM_BAR = "hide_bottom_bar"
+    private const val KEY_TEMPORARY_SYSTEM_BARS = "temporary_system_bars"
     private const val KEY_HARMAN_FULLSCREEN = "harman_fullscreen"
+    private const val KEY_CARPLAY_SAME_TASK = "carplay_same_task"
     private const val KEY_SAFE_AREA_DRAW_OUTSIDE = "safe_area_draw_outside"
     private const val KEY_MAIN_DISPLAY_DISABLE_SAFE_AREA = "main_display_disable_safe_area"
+    private const val KEY_BLACK_CORNER_RADIUS = "black_corner_radius_dp"
     private const val KEY_ADAPT_PIP_RESOLUTION = "adapt_pip_resolution"
     private const val KEY_AUTO_START_ON_BOOT = "auto_start_on_boot"
     private const val KEY_BT_SUSPEND_DURING_CARPLAY = "bt_suspend_during_carplay"
@@ -248,6 +268,17 @@ object AirPlayPersistence {
             .apply()
     }
 
+    /** Opt-in (#946, #545): each navigation prompt requests duckable focus. Applies only while audio focus is on. */
+    fun loadNavigationPromptAudioFocus(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_NAVIGATION_PROMPT_AUDIO_FOCUS, false)
+
+    fun saveNavigationPromptAudioFocus(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_NAVIGATION_PROMPT_AUDIO_FOCUS, enabled)
+            .apply()
+    }
+
     /** Opt-out for head units that route physical volume buttons to DiPlay's focus owner. */
     fun loadDisableMediaKeyAudioFocus(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -281,6 +312,30 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, channel.takeIf { it in AUDIO_CHANNELS } ?: 0)
             .apply()
+    }
+
+    fun loadNavigationAudioAttenuationDb(context: Context): Int =
+        com.shilapi.xcertplay.media.NavigationAudioGain.clamp(
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getInt(KEY_NAVIGATION_AUDIO_ATTENUATION, 0),
+        )
+
+    fun saveNavigationAudioAttenuationDb(context: Context, db: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(KEY_NAVIGATION_AUDIO_ATTENUATION,
+                com.shilapi.xcertplay.media.NavigationAudioGain.clamp(db))
+            .apply()
+    }
+
+    /** Applies a nonzero setup-guide default only when no current or legacy choice exists. */
+    fun applySetupNavigationAudioChannelDefault(context: Context, channel: Int): Boolean {
+        if (channel !in AUDIO_CHANNELS || channel == 0) return false
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.contains(KEY_NAVIGATION_AUDIO_CHANNEL) || prefs.contains(KEY_NAVIGATION_STREAM_TYPE)) return false
+        prefs.edit()
+            .putInt(KEY_NAVIGATION_AUDIO_CHANNEL, channel)
+            .apply()
+        return true
     }
 
     fun loadWirelessEnabled(context: Context): Boolean =
@@ -368,6 +423,15 @@ object AirPlayPersistence {
             .putInt(KEY_WIFI_P2P_PREFERRED_CHANNEL, channel).apply()
     }
 
+    /** Wi-Fi Direct: pause the car's own Wi-Fi search while CarPlay runs (on by default, needs ADB). */
+    fun loadWifiDirectScanPause(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_WIFI_DIRECT_SCAN_PAUSE, true)
+
+    fun saveWifiDirectScanPause(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_WIFI_DIRECT_SCAN_PAUSE, enabled).apply()
+    }
+
     fun loadExistingWifiSsid(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString("existing_wifi_ssid", "").orEmpty()
@@ -442,6 +506,18 @@ object AirPlayPersistence {
     fun saveManualHotspotSecurity(context: Context, security: ManualHotspotSecurity) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_MANUAL_HOTSPOT_SECURITY, security.name)
+            .apply()
+    }
+
+    /** Interface that carries the car hotspot when the platform does not report it as a Wi-Fi AP. */
+    fun loadManualHotspotInterface(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_MANUAL_HOTSPOT_INTERFACE, null)
+            .orEmpty()
+
+    fun saveManualHotspotInterface(context: Context, interfaceName: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_MANUAL_HOTSPOT_INTERFACE, interfaceName.trim())
             .apply()
     }
 
@@ -618,10 +694,18 @@ object AirPlayPersistence {
             .getInt(KEY_FPS, 30),
     )
 
-    fun loadMediaBufferMillis(context: Context): Int = com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS),
-    )
+    /** Music buffer for the session's transport. Wireless and wired USB have separate settings. */
+    fun loadMediaBufferMillis(context: Context, wireless: Boolean = true): Int {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val shared = prefs.getInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS)
+        return if (wireless) {
+            if (lowLatencyWirelessAvailable(context)) com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(shared)
+            else com.shilapi.xcertplay.media.MediaAudioBuffer.sanitizeWireless(shared)
+        } else {
+            // Until wired has its own value, keep the delay saved when one setting covered both transports.
+            com.shilapi.xcertplay.media.MediaAudioBuffer.sanitizeWired(prefs.getInt(KEY_WIRED_MEDIA_BUFFER_MS, shared))
+        }
+    }
 
     fun hasSavedMediaBufferMillis(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).contains(KEY_MEDIA_BUFFER_MS)
@@ -650,6 +734,14 @@ object AirPlayPersistence {
 
     fun saveSpeechWithout8And16Khz(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_SPEECH_WITHOUT_8_16_KHZ, enabled).apply()
+    }
+
+    /** Offer calls only as PCM at the call's own rate instead of 48 kHz Opus; experimental, applies at reconnect. */
+    fun loadCallAtCallRate(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CALL_AT_CALL_RATE, false)
+
+    fun saveCallAtCallRate(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CALL_AT_CALL_RATE, enabled).apply()
     }
 
     /** Offer no CarPlay audio, so the iPhone keeps audio on its Bluetooth link with the car; applies at reconnect. */
@@ -697,9 +789,29 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_LOW_LATENCY_DECODER, enabled).apply()
     }
 
-    fun saveMediaBufferMillis(context: Context, millis: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(millis)).apply()
+    fun lowLatencyWirelessAvailable(context: Context): Boolean =
+        context.applicationContext is com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider
+
+    /** Compatibility for the GeePlay defaults and existing callers; wireless is the legacy setting. */
+    fun saveMediaBufferMillis(context: Context, millis: Int) =
+        saveMediaBufferMillis(context, wireless = true, millis = millis)
+
+    fun saveMediaBufferMillis(context: Context, wireless: Boolean, millis: Int) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (wireless) {
+            val wired = loadMediaBufferMillis(context, wireless = false)
+            prefs.edit()
+                // Pin the wired delay first, so it no longer follows the wireless value.
+                .putInt(KEY_WIRED_MEDIA_BUFFER_MS, wired)
+                .putInt(KEY_MEDIA_BUFFER_MS, if (lowLatencyWirelessAvailable(context))
+                    com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(millis)
+                    else com.shilapi.xcertplay.media.MediaAudioBuffer.sanitizeWireless(millis))
+                .apply()
+        } else {
+            prefs.edit()
+                .putInt(KEY_WIRED_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.sanitizeWired(millis))
+                .apply()
+        }
     }
 
     /** DiPlay's own experimental echo canceller on CarPlay call audio; opt-in, applies at reconnect. */
@@ -716,6 +828,13 @@ object AirPlayPersistence {
 
     fun saveCallVoiceFilter(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CALL_VOICE_FILTER, enabled).apply()
+    }
+
+    fun loadCallSpeakerphone(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CALL_SPEAKERPHONE, false)
+
+    fun saveCallSpeakerphone(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CALL_SPEAKERPHONE, enabled).apply()
     }
 
     fun saveFps(context: Context, fps: Int) {
@@ -785,6 +904,10 @@ object AirPlayPersistence {
         edit.apply()
     }
 
+    /** Either DiLink 4 cluster route, ADB video or the Platform 21 task; on DiLink 3 both stop the dashboard map (#722). */
+    fun loadDiLink4ClusterRouteEnabled(context: Context): Boolean =
+        loadAdbClusterEnabled(context) || loadLegacyClusterEnabled(context)
+
     fun loadLegacyClusterEnabled(context: Context): Boolean = loadClusterMapEnabled(context) &&
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("platform21_cluster_enabled", false)
 
@@ -797,6 +920,13 @@ object AirPlayPersistence {
 
     fun saveClusterMapEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CLUSTER_MAP, enabled).apply()
+    }
+
+    fun loadClusterProjectionHeld(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CLUSTER_PROJECTION_HELD, false)
+
+    fun saveClusterProjectionHeld(context: Context, held: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CLUSTER_PROJECTION_HELD, held).apply()
     }
 
     /** The dashboard map as a card on the centre screen while DiPlay is in the background. */
@@ -819,12 +949,39 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_LAUNCHER_MAP_SHARING, enabled).apply()
     }
 
+    /** A shortcut over the launcher's home screen that comes back to CarPlay (LauncherBubble). */
+    fun loadLauncherBubble(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_LAUNCHER_BUBBLE, false)
+
+    fun saveLauncherBubble(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_LAUNCHER_BUBBLE, enabled).apply()
+    }
+
+    /** Bubble height as a share of the screen height; the bubble width follows the icon's ratio. */
+    fun loadLauncherBubbleSize(context: Context): Int = LauncherBubbleLayout.snapSizePercent(
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt(KEY_LAUNCHER_BUBBLE_SIZE, LauncherBubbleLayout.DEFAULT_SIZE_PERCENT),
+    )
+
+    fun saveLauncherBubbleSize(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(KEY_LAUNCHER_BUBBLE_SIZE, LauncherBubbleLayout.snapSizePercent(percent)).apply()
+    }
+
     fun loadClusterSpeedometerEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cluster_speedometer_enabled", false)
 
     fun saveClusterSpeedometerEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean("cluster_speedometer_enabled", enabled).apply()
+    }
+
+    fun loadClusterSpeedometerAlbumColor(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cluster_speedometer_album_color", false)
+
+    fun saveClusterSpeedometerAlbumColor(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_speedometer_album_color", enabled).apply()
     }
 
     internal fun observeClusterSpeedometer(context: Context, changed: () -> Unit): () -> Unit {
@@ -1277,6 +1434,17 @@ object AirPlayPersistence {
             .apply()
     }
 
+    /** Optional three-finger upward reveal; does not alter the saved bar visibility preference. */
+    fun loadTemporarySystemBars(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_TEMPORARY_SYSTEM_BARS, false)
+
+    fun saveTemporarySystemBars(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_TEMPORARY_SYSTEM_BARS, enabled)
+            .apply()
+    }
+
     fun loadHarmanFullscreen(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_HARMAN_FULLSCREEN, false)
@@ -1284,6 +1452,17 @@ object AirPlayPersistence {
     fun saveHarmanFullscreen(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_HARMAN_FULLSCREEN, enabled)
+            .apply()
+    }
+
+    /** Opens CarPlay in DiPlay's own task, for launchers that show that task in a card (#463). */
+    fun loadCarPlaySameTask(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_CARPLAY_SAME_TASK, false)
+
+    fun saveCarPlaySameTask(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_CARPLAY_SAME_TASK, enabled)
             .apply()
     }
 
@@ -1306,6 +1485,18 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_MAIN_DISPLAY_DISABLE_SAFE_AREA, disable)
             .apply()
+    }
+
+    /** Local video overlay; does not alter the iPhone's display or safe-area negotiation. */
+    fun loadBlackCornerRadiusDp(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt(KEY_BLACK_CORNER_RADIUS, 0)
+            .takeIf { it in CarPlayBlackCornerOverlay.RADII_DP } ?: 0
+
+    fun saveBlackCornerRadiusDp(context: Context, value: Int) {
+        require(value in CarPlayBlackCornerOverlay.RADII_DP)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(KEY_BLACK_CORNER_RADIUS, value).apply()
     }
 
     fun loadSafeAreaRect(context: Context, widthPixels: Int, heightPixels: Int): SafeAreaRect? {
