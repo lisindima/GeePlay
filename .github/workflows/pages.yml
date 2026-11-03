@@ -15,6 +15,9 @@ concurrency:
   cancel-in-progress: true
 jobs:
   deploy:
+    # Forks do not necessarily have Pages enabled. Avoid hourly failures while
+    # retaining an explicit manual deployment for owners who configure it.
+    if: github.repository == 'shihabal3amri/DiPlay' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
