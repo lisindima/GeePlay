@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_geely_qnx_title">Distribución del cuadro QNX (experimental)</string>
+    <string name="settings_geely_qnx_description">Arrastra el mapa y las maniobras o introduce las coordenadas y el tamaño. Requiere acceso root a QNX y AtlasDim instalado. Mantén visibles los indicadores y testigos del vehículo. Vuelve a conectar CarPlay después de guardar.</string>
+    <string name="settings_geely_qnx_host">Dirección QNX</string>
+    <string name="settings_geely_qnx_password">Contraseña root de QNX (no se guarda)</string>
+    <string name="settings_geely_qnx_binary">Programa instalado (vacío para elegir)</string>
+    <string name="settings_geely_qnx_layer">Capa de ventana (0–8)</string>
+    <string name="settings_geely_qnx_map">Mapa</string>
+    <string name="settings_geely_qnx_turns">Maniobras</string>
+    <string name="settings_geely_qnx_save">Guardar distribución</string>
+    <string name="settings_geely_qnx_start">Iniciar ventanas de GeePlay y guardar</string>
+    <string name="settings_geely_qnx_saved">Guardado. Vuelve a conectar CarPlay para aplicar.</string>
+    <string name="settings_geely_qnx_invalid">Comprueba dirección, programa, capa y coordenadas. Las ventanas deben caber en 1920 × 532.</string>
+    <string name="settings_geely_qnx_connecting">Conectando con QNX…</string>
+    <string name="settings_geely_qnx_failed">Error al configurar QNX. Comprueba conexión, contraseña, programa y puertos.</string>
+    <string name="settings_geely_qnx_stop">Detener ventanas de GeePlay</string>
+    <string name="settings_geely_qnx_coordinates">X · Y · Ancho · Alto</string>
+</resources>

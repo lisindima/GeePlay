@@ -1,0 +1,4 @@
+<resources>
+    <string name="settings_geely_external_media_session">媒體代理（實驗性）</string>
+    <string name="settings_geely_external_media_session_description">向外部媒體代理發布 CarPlay 曲目資訊，不要求音訊焦點。代理可能切換車機音源。重新連接 CarPlay 後生效。</string>
+</resources>

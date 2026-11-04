@@ -138,18 +138,8 @@ class GeelyVehicleSettingsControllerTest {
     }
 
     @Test
-    fun `GeePlay blocks legacy BYD menus by default and refreshes settings when changed`() {
-        val row = GeelyVehicleSettingsController().cards(context)
-            .single { it.id == "geeplay_upstream_compatibility" }
-            .rows.filterIsInstance<VehicleSettingRow.Toggle>()
-            .single { it.id == "geeplay_block_legacy_byd_menus" }
-
-        assertTrue(row.checked)
-        assertEquals(com.shilapi.xcertplay.vehicle.VehicleSettingEffect.REFRESH_SETTINGS, row.effect)
-
-        row.save(false)
-
-        assertFalse(GeelyProductSettings.blockLegacyBydMenus(context))
+    fun `GeePlay has no switch to restore legacy BYD menus`() {
+        assertFalse(GeelyVehicleSettingsController().cards(context).any { it.id == "geeplay_upstream_compatibility" })
     }
 
     @Test

@@ -131,6 +131,15 @@ object GeelyClusterDisplaySettings {
 object GeelyMediaSettings {
     private const val PREFERENCES = "geeplay_geely_media"
     private const val KEY_OWNER = "media_output_owner"
+    private const val KEY_EXTERNAL_MEDIA_SESSION = "external_media_session"
+
+    fun externalMediaSession(context: Context): Boolean =
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).getBoolean(KEY_EXTERNAL_MEDIA_SESSION, false)
+
+    fun saveExternalMediaSession(context: Context, enabled: Boolean) {
+        check(context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_EXTERNAL_MEDIA_SESSION, enabled).commit())
+    }
     private const val KEY_BLUETOOTH_AUTO_AVOID = "bluetooth_media_auto_avoid"
     private const val KEY_BLUETOOTH_AUTO_RESTORE = "bluetooth_media_auto_restore"
 

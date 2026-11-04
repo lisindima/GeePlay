@@ -34,6 +34,20 @@ import org.robolectric.shadows.ShadowDisplayManager
 @Config(sdk = [33])
 class GeePlayApplicationTest {
     @Test
+    fun `external media proxy is opt in and persists without changing audio owner`() {
+        val application = RuntimeEnvironment.getApplication() as GeePlayApplication
+        val oldOwner = GeelyMediaSettings.loadOwner(application)
+        GeelyMediaSettings.saveExternalMediaSession(application, false)
+        try {
+            assertFalse(application.publishExternalMediaSession(application))
+            GeelyMediaSettings.saveExternalMediaSession(application, true)
+            assertTrue(application.publishExternalMediaSession(application))
+            assertEquals(oldOwner, GeelyMediaSettings.loadOwner(application))
+        } finally {
+            GeelyMediaSettings.saveExternalMediaSession(application, false)
+        }
+    }
+    @Test
     fun `GeePlay initializes unsaved music buffering to low latency without overriding a choice`() {
         val application = RuntimeEnvironment.getApplication() as GeePlayApplication
         val preferences = application.getSharedPreferences("xcertplay_airplay", 0)
@@ -167,13 +181,13 @@ class GeePlayApplicationTest {
     }
 
     @Test
-    fun `legacy BYD settings availability follows the GeePlay product switch`() {
+    fun `legacy BYD settings stay unavailable regardless of old preferences`() {
         val application = RuntimeEnvironment.getApplication() as GeePlayApplication
         GeelyProductSettings.saveBlockLegacyBydMenus(application, true)
         try {
             assertFalse(application.legacyBydSettingsAvailable(application))
             GeelyProductSettings.saveBlockLegacyBydMenus(application, false)
-            assertTrue(application.legacyBydSettingsAvailable(application))
+            assertFalse(application.legacyBydSettingsAvailable(application))
         } finally {
             GeelyProductSettings.saveBlockLegacyBydMenus(application, true)
         }

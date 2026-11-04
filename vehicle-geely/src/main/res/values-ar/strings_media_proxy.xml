@@ -1,0 +1,4 @@
+<resources>
+    <string name="settings_geely_external_media_session">وسيط الوسائط (تجريبي)</string>
+    <string name="settings_geely_external_media_session_description">نشر معلومات موسيقى CarPlay لوسيط خارجي دون طلب تركيز الصوت. قد يغيّر الوسيط مصدر صوت السيارة. يسري بعد إعادة توصيل CarPlay.</string>
+</resources>

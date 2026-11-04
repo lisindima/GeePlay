@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_geely_qnx_title">QNX cluster layout (experimental)</string>
+    <string name="settings_geely_qnx_description">Drag the map and manoeuvre windows or enter coordinates and dimensions. Requires QNX root access and installed AtlasDim. Keep vehicle readouts and warning lamps visible. Reconnect CarPlay after saving.</string>
+    <string name="settings_geely_qnx_host">QNX host</string>
+    <string name="settings_geely_qnx_password">QNX root password (not saved)</string>
+    <string name="settings_geely_qnx_binary">Installed daemon (leave blank to choose)</string>
+    <string name="settings_geely_qnx_layer">Window layer (0–8)</string>
+    <string name="settings_geely_qnx_map">Map</string>
+    <string name="settings_geely_qnx_turns">Manoeuvres</string>
+    <string name="settings_geely_qnx_save">Save layout</string>
+    <string name="settings_geely_qnx_start">Start GeePlay windows and save</string>
+    <string name="settings_geely_qnx_saved">Saved. Reconnect CarPlay to apply.</string>
+    <string name="settings_geely_qnx_invalid">Check the host, daemon path, layer and coordinates. Windows must fit within 1920 × 532.</string>
+    <string name="settings_geely_qnx_connecting">Connecting to QNX…</string>
+    <string name="settings_geely_qnx_failed">QNX setup failed. Check the connection, root password, installed daemon and ports.</string>
+    <string name="settings_geely_qnx_stop">Stop GeePlay windows</string>
+    <string name="settings_geely_qnx_coordinates">X · Y · Width · Height</string>
+</resources>

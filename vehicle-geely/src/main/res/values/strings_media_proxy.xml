@@ -1,0 +1,4 @@
+<resources>
+    <string name="settings_geely_external_media_session">Media proxy (experimental)</string>
+    <string name="settings_geely_external_media_session_description">Publish CarPlay track information for an external media proxy without requesting audio focus. The proxy may switch the car audio source. Applies after reconnecting CarPlay.</string>
+</resources>

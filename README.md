@@ -4,9 +4,19 @@
 
 > **Product scope:** GeePlay currently targets the ECARX G636 head unit on Android 11. Other Geely, Lynk & Co and ECARX systems require their own firmware evidence. BYD/DiLink-only controls from DiPlay stay hidden or disabled in GeePlay.
 
-[Releases](https://github.com/lllhys/GeePlay/releases) · [Chinese README](README.zh-CN.md) · [Capability alignment](CAPABILITY-ALIGNMENT.md) · [Report a problem](https://github.com/lllhys/GeePlay/issues/new)
+[Releases](https://github.com/lisindima/GeePlay/releases) · [Chinese README](README.zh-CN.md) · [Capability alignment](CAPABILITY-ALIGNMENT.md) · [Report a problem](https://github.com/lisindima/GeePlay/issues/new)
 
-## 0.2.18-geely.4 — development preview
+## 0.2.21-geely.2 — QNX experimental release
+
+- Independent QNX windows for the CarPlay map and RouteGuidance arrows, using ports **53281 / 53283**.
+- **Advanced → QNX cluster layout**: draggable placement, dimensions, installed-daemon discovery, explicit start/stop and reconnect handling.
+- Uses separate on-device copies of an already installed AtlasDim daemon for the selected QNX display. No AtlasDim/ANHUD binary is redistributed in the APK; QNX root access is needed for setup.
+- Optional external MediaSession publication for [GMediaProxy](https://github.com/Salat39/GMediaProxy), including when OEM Bluetooth owns audio.
+- GeePlay permanently excludes the legacy BYD settings switch, BYD package queries and BYD-specific Usage Access.
+
+[Инструкция для Cityray/QNX](docs/CITYRAY-QNX.md). The new QNX and media-proxy paths are experimental and off by default. Local tests and UI checks pass; physical Cityray output is not yet verified.
+
+## Earlier G636 development evidence
 
 Install GeePlay on the **car head unit**, not the iPhone. The validated target is the Geely/ECARX G636 (`ecarx`, Android 11). Core wired and wireless CarPlay comes from the DiPlay transport stack. Geely-specific integrations live behind product interfaces and fail closed when the required firmware API, permission or EVCC property is unavailable.
 

@@ -60,6 +60,7 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         GeelyVehicleSessionHooks(
             context.applicationContext,
             onStatus = GeelyNavigationStatusStore::update,
+            additionalOutputs = com.lllhys.geeplay.vehicle.geely.GeelyQnxSettings.turnOutput(context),
             bluetoothAudioConflict = bluetoothAudioConflictPolicy(context),
             clusterMapVisibility = evccVehicleData.takeIf {
                 GeelyClusterDisplaySettings.enabled(context) ||
@@ -99,6 +100,8 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
             MediaOutputOwner.PHONE_OR_EXTERNAL -> LocalMediaAudioPolicy.PHONE_OR_EXTERNAL
         }
 
+    override fun publishExternalMediaSession(context: Context): Boolean = GeelyMediaSettings.externalMediaSession(context)
+
     override fun productDisplayName(context: Context): String = context.getString(R.string.app_name)
 
     override fun defaultOemLabel(context: Context): String = "GEELY"
@@ -112,7 +115,7 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         GeelyVehicleSettingsController()
 
     override fun legacyBydSettingsAvailable(context: Context): Boolean =
-        !GeelyProductSettings.blockLegacyBydMenus(context)
+        false
 
     override fun embeddedGeelyWheelKeysAvailable(context: Context): Boolean = false
 
@@ -128,7 +131,12 @@ class GeePlayApplication : Application(), VehicleIntegrationProvider {
         geelyClusterDisplayPolicy(context)
 
     override fun requiresClusterStream(context: Context): Boolean =
-        geelyClusterDisplayPolicy(context).select(GeelyClusterDisplaySettings.debugCandidates(context)) != null
+        com.lllhys.geeplay.vehicle.geely.GeelyQnxSettings.load(context, true) != null ||
+            geelyClusterDisplayPolicy(context).select(GeelyClusterDisplaySettings.debugCandidates(context)) != null
+
+    override fun createVehicleMapMirror(context: Context, streamWidth: Int, streamHeight: Int):
+        com.shilapi.xcertplay.vehicle.VehicleMapMirror? =
+        com.lllhys.geeplay.vehicle.geely.GeelyQnxSettings.mapMirror(context, streamWidth, streamHeight)
 
     override fun updateReleasesUrl(context: Context): String =
         "https://api.github.com/repos/lisindima/GeePlay/releases?per_page=3"

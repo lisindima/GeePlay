@@ -1,0 +1,4 @@
+<resources>
+    <string name="settings_geely_external_media_session">Медіапроксі (експериментально)</string>
+    <string name="settings_geely_external_media_session_description">Передавати відомості про музику CarPlay зовнішньому медіапроксі без запиту аудіофокусу. Проксі може перемкнути джерело звуку автомобіля. Діє після перепідключення CarPlay.</string>
+</resources>

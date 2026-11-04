@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_geely_qnx_title">Розміщення на панелі QNX (експериментально)</string>
+    <string name="settings_geely_qnx_description">Перетягніть карту й стрілки або введіть координати та розміри. Потрібні доступ root до QNX і встановлений AtlasDim. Залиште видимими показники автомобіля та контрольні лампи. Після збереження перепідключіть CarPlay.</string>
+    <string name="settings_geely_qnx_host">Адреса QNX</string>
+    <string name="settings_geely_qnx_password">Пароль root QNX (не зберігається)</string>
+    <string name="settings_geely_qnx_binary">Встановлена програма (порожньо — вибір)</string>
+    <string name="settings_geely_qnx_layer">Шар вікна (0–8)</string>
+    <string name="settings_geely_qnx_map">Карта</string>
+    <string name="settings_geely_qnx_turns">Стрілки</string>
+    <string name="settings_geely_qnx_save">Зберегти розміщення</string>
+    <string name="settings_geely_qnx_start">Запустити вікна GeePlay та зберегти</string>
+    <string name="settings_geely_qnx_saved">Збережено. Перепідключіть CarPlay для застосування.</string>
+    <string name="settings_geely_qnx_invalid">Перевірте адресу, програму, шар і координати. Вікна мають вміщуватися в 1920 × 532.</string>
+    <string name="settings_geely_qnx_connecting">Підключення до QNX…</string>
+    <string name="settings_geely_qnx_failed">Не вдалося налаштувати QNX. Перевірте з’єднання, пароль, програму та порти.</string>
+    <string name="settings_geely_qnx_stop">Зупинити вікна GeePlay</string>
+    <string name="settings_geely_qnx_coordinates">X · Y · Ширина · Висота</string>
+</resources>

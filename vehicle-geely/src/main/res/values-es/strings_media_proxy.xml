@@ -1,0 +1,4 @@
+<resources>
+    <string name="settings_geely_external_media_session">Proxy multimedia (experimental)</string>
+    <string name="settings_geely_external_media_session_description">Publica información de CarPlay para un proxy externo sin solicitar el foco de audio. El proxy puede cambiar la fuente de audio del vehículo. Se aplica al volver a conectar CarPlay.</string>
+</resources>

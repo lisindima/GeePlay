@@ -37,7 +37,6 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
         val clusterPolicy = GeelyClusterDisplayPolicy()
         val clusterAvailable = clusterPolicy.hasValidatedFirmware()
         val clusterEnabled = GeelyClusterDisplaySettings.enabled(context)
-        val blockLegacyBydMenus = GeelyProductSettings.blockLegacyBydMenus(context)
         val clusterDebugDisplays = GeelyClusterDisplaySettings.debugCandidates(context)
         val clusterDebugDisplayId = GeelyClusterDisplaySettings.debugDisplayId(context)
         val clusterDebugSelectedIndex = clusterDebugDisplays
@@ -51,6 +50,19 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
         val systemActions = (context.applicationContext as? VehicleIntegrationProvider)
             ?.vehicleSystemActionPort(context)
         return listOf(
+            VehicleSettingsCard(
+                id = "geely_qnx",
+                placement = VehicleSettingsPlacement.ADVANCED,
+                title = context.getString(R.string.settings_geely_qnx_title),
+                rows = listOf(
+                    VehicleSettingRow.Information(context.getString(R.string.settings_geely_qnx_description)),
+                    VehicleSettingRow.Action(
+                        id = "geely_qnx_editor",
+                        title = context.getString(R.string.settings_geely_qnx_title),
+                        run = { context.startActivity(Intent(context, GeelyQnxSetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                    ),
+                ),
+            ),
             VehicleSettingsCard(
                 id = "geely_navigation",
                 placement = VehicleSettingsPlacement.NAVIGATION,
@@ -318,6 +330,14 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                         },
                     ),
                     VehicleSettingRow.Toggle(
+                        id = "geely_external_media_session",
+                        title = context.getString(R.string.settings_geely_external_media_session),
+                        description = context.getString(R.string.settings_geely_external_media_session_description),
+                        checked = GeelyMediaSettings.externalMediaSession(context),
+                        effect = VehicleSettingEffect.NEXT_CONNECTION,
+                        save = { enabled -> GeelyMediaSettings.saveExternalMediaSession(context, enabled) },
+                    ),
+                    VehicleSettingRow.Toggle(
                         id = "geely_bluetooth_media_auto_avoid",
                         title = context.getString(R.string.settings_geely_bluetooth_media_auto_avoid),
                         description = context.getString(R.string.settings_geely_bluetooth_media_auto_avoid_description),
@@ -443,24 +463,6 @@ class GeelyVehicleSettingsController : VehicleSettingsController {
                             ),
                         ),
                         save = { index -> GeelyInputSettings.saveProfile(context, GeelyInputProfile.entries[index]) },
-                    ),
-                ),
-            ),
-            VehicleSettingsCard(
-                id = "geeplay_upstream_compatibility",
-                placement = VehicleSettingsPlacement.ADVANCED,
-                title = context.getString(R.string.settings_geely_upstream_compatibility_title),
-                rows = listOf(
-                    VehicleSettingRow.Information(
-                        context.getString(R.string.settings_geely_block_byd_menus_description),
-                    ),
-                    VehicleSettingRow.Toggle(
-                        id = "geeplay_block_legacy_byd_menus",
-                        title = context.getString(R.string.settings_geely_block_byd_menus),
-                        description = context.getString(R.string.settings_geely_block_byd_menus_description),
-                        checked = blockLegacyBydMenus,
-                        effect = VehicleSettingEffect.REFRESH_SETTINGS,
-                        save = { block -> GeelyProductSettings.saveBlockLegacyBydMenus(context, block) },
                     ),
                 ),
             ),

@@ -513,6 +513,17 @@ open class CarPlayHostActivity : ComponentActivity() {
     }
     // Copies of stream 111 outside the dashboard (centre card, launcher maps) each get their own decoder.
     private val mirrorSink: (String, Surface?) -> Unit = { key, surface -> sink?.setMirrorSurface(SCREEN_TYPE_ALT, key, surface) }
+    private var vehicleMapMirror: com.shilapi.xcertplay.vehicle.VehicleMapMirror? = null
+
+    private fun replaceVehicleMapMirror(width: Int, height: Int) {
+        MapMirrors.set("vehicle:qnx", null)
+        vehicleMapMirror?.close()
+        vehicleMapMirror = if (width > 0 && height > 0)
+            (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+                ?.createVehicleMapMirror(applicationContext, width, height)
+            else null
+        vehicleMapMirror?.let { MapMirrors.set("vehicle:qnx", it.surface) }
+    }
     private val mirrorsChanged: () -> Unit = {
         updateClusterMapShown()
         if (MapMirrors.launcherShowsMap) CenterMapOverlay.hide()
@@ -2051,6 +2062,11 @@ open class CarPlayHostActivity : ComponentActivity() {
         homeMonitor?.stop()
         CenterMapOverlay.hide()
         if (CenterMapOverlay.requestShow == (::showCenterMap)) CenterMapOverlay.requestShow = null
+        if (vehicleMapMirror != null) {
+            MapMirrors.set("vehicle:qnx", null)
+            vehicleMapMirror?.close()
+            vehicleMapMirror = null
+        }
         if (MapMirrors.sink === mirrorSink) {
             MapMirrors.sink = null
             MapMirrors.setStreamActive(false)
@@ -5639,6 +5655,9 @@ open class CarPlayHostActivity : ComponentActivity() {
         controller = snapshot.controller
         updateClusterMapShown()
         sink = snapshot.sink
+        snapshot.controller.configuredClusterSize()?.let { (width, height) ->
+            replaceVehicleMapMirror(width, height)
+        }
         sessionDisplay = snapshot.display
         // The hotspot came up under the host that started this session; the menu keeps naming it.
         CarPlayBackgroundSession.hotspotReady?.let {
@@ -5793,6 +5812,7 @@ open class CarPlayHostActivity : ComponentActivity() {
             controllerGeneration = controllerGeneration,
         )
         sink = renderer
+        replaceVehicleMapMirror(airPlayConfig.cluster?.widthPixels ?: 0, airPlayConfig.cluster?.heightPixels ?: 0)
         currentSurface?.let(::attachSurface)
         MapMirrors.reapply()
         val media = createMediaEngine(renderer)
@@ -5821,7 +5841,12 @@ open class CarPlayHostActivity : ComponentActivity() {
         controller = next
         resetSidePanel() // a new session starts without the side panel
         updateClusterMapShown()
-        if (mediaAudioPolicy().ownMediaSession) CarPlayMediaKeys.attach(this, next)
+        val ownMediaSession = mediaAudioPolicy().ownMediaSession
+        val externalMediaSession = (application as? com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
+            ?.publishExternalMediaSession(applicationContext) == true
+        if (ownMediaSession || externalMediaSession) {
+            CarPlayMediaKeys.attach(this, next, metadataOnly = !ownMediaSession)
+        }
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
         val display = CarPlaySessionDisplay(
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,

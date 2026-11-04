@@ -39,7 +39,7 @@ def main():
     elif not diagnostic:
         raise SystemExit("Release requires a pinned signing certificate")
     manifest = subprocess.check_output([args.aapt, "dump", "xmltree", str(args.apk), "AndroidManifest.xml"], text=True)
-    for forbidden in ("MapEmbedService", "MyCarAppService", "PhoneAudioConnectionService", "AutoDisplay", "com.lllhys.geeplay.permission.NAVIGATION"):
+    for forbidden in ("MapEmbedService", "MyCarAppService", "PhoneAudioConnectionService", "AutoDisplay", "com.lllhys.geeplay.permission.NAVIGATION", "com.byd.", "android.permission.PACKAGE_USAGE_STATS"):
         assert forbidden not in manifest, "Forbidden component in merged manifest: " + forbidden
     assert "GeePlayApplication" in manifest, "Wrong application class"
     with zipfile.ZipFile(args.apk) as archive:

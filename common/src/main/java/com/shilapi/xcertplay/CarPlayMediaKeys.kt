@@ -65,6 +65,7 @@ internal object CarPlayMediaKeys {
     private var transientFocusInterrupted = false
     private var appContext: Context? = null
     private var mediaAudioActive = false
+    private var metadataOnly = false
     private var nowPlaying = CarPlayNowPlaying()
     private var elapsedUpdatedAt = 0L
     private var artwork: Bitmap? = null
@@ -72,13 +73,14 @@ internal object CarPlayMediaKeys {
     private var placeholder: Bitmap? = null
 
     @Synchronized
-    fun attach(context: Context, next: CarPlayController) {
+    fun attach(context: Context, next: CarPlayController, metadataOnly: Boolean = false) {
         if (controller !== next) {
             releaseLocked()
             artworkOwner = artworkQueue.newSession()
         }
         appContext = context.applicationContext
         controller = next
+        this.metadataOnly = metadataOnly
         val embeddedWheelKeys = (context.applicationContext as?
             com.shilapi.xcertplay.vehicle.VehicleIntegrationProvider)
             ?.embeddedGeelyWheelKeysAvailable(context.applicationContext) != false
@@ -148,6 +150,9 @@ internal object CarPlayMediaKeys {
                 if (nowPlaying.elapsedMillis != update.elapsedMillis) elapsedUpdatedAt = SystemClock.elapsedRealtime()
                 val metadataChanged = metadataChanged(nowPlaying, update) || artwork !== previousArtwork
                 nowPlaying = update
+                if (metadataOnly && session == null && !update.title.isNullOrBlank()) {
+                    appContext?.let(::start)
+                }
                 if (metadataChanged) ClusterMusicState.publish(update, artwork)
                 updateInitialAlbumRecovery(expected)
                 // The iPhone repeats NowPlayingUpdate about twice a second for the position alone.
@@ -297,7 +302,7 @@ internal object CarPlayMediaKeys {
 
     private fun start(context: Context) {
         val expectedController = controller ?: return
-        val focusDisabled = AirPlayPersistence.loadDisableMediaKeyAudioFocus(context)
+        val focusDisabled = metadataOnly || AirPlayPersistence.loadDisableMediaKeyAudioFocus(context)
         transientFocusInterrupted = false
         val granted = if (focusDisabled) {
             // Some OEMs route physical volume buttons to the focus owner. Keep an active
@@ -390,6 +395,7 @@ internal object CarPlayMediaKeys {
         }
         session = null
         mediaAudioActive = false
+        metadataOnly = false
         nowPlaying = CarPlayNowPlaying()
         artwork = null
         artworkCache.clear()

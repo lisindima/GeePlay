@@ -85,6 +85,23 @@ class CarPlayMediaFocusDisabledTest {
         assertFocusDisabled()
     }
 
+    @Test fun externalPlaybackPublishesMetadataWithoutRequestingFocusOrLocalAudio() {
+        AirPlayPersistence.saveDisableMediaKeyAudioFocus(app, false)
+        val controller = mock(CarPlayController::class.java).also(controllers::add)
+        `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying(title = "Cityray test", playing = true))
+        CarPlayMediaKeys.attach(app, controller, metadataOnly = true)
+        shadowOf(Looper.getMainLooper()).idle()
+        val session = currentSession()
+        assertNotNull(session)
+        assertTrue(session!!.isActive)
+        val retained = ReflectionHelpers.getField<CarPlayNowPlaying>(CarPlayMediaKeys, "nowPlaying")
+        org.junit.Assert.assertEquals("Cityray test", retained.title)
+        org.junit.Assert.assertEquals("Cityray test", CarPlayMediaKeys.androidMetadata(retained).getString(android.media.MediaMetadata.METADATA_KEY_TITLE))
+        assertFocusDisabled()
+        CarPlayMediaKeys.detach(controller)
+        assertFalse(session.isActive)
+    }
+
     private fun start(controller: CarPlayController): MediaSession {
         `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
         CarPlayMediaKeys.attach(app, controller)

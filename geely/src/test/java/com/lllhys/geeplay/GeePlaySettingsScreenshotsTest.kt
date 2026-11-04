@@ -53,7 +53,8 @@ class GeePlaySettingsScreenshotsTest {
             val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
             layout(root, 1280)
             val visible = descendants(root).filterIsInstance<TextView>().map { it.text.toString() }.toSet()
-            assertTrue(activity.getString(GeelyR.string.settings_geely_block_byd_menus) in visible)
+            assertFalse(activity.getString(GeelyR.string.settings_geely_block_byd_menus) in visible)
+            assertTrue(activity.getString(GeelyR.string.settings_geely_qnx_title) in visible)
             assertFalse(activity.getString(HostR.string.carplay_map_on_instrument_cluster_experimental) in visible)
             assertFalse(activity.getString(HostR.string.settings_navigation_wheel_volume) in visible)
             assertFalse(activity.getString(HostR.string.settings_ambient_title) in visible)
@@ -69,7 +70,8 @@ class GeePlaySettingsScreenshotsTest {
             val titles = results.map { result ->
                 result.javaClass.getDeclaredMethod("getTitle").invoke(result) as String
             }.toSet()
-            assertTrue(activity.getString(GeelyR.string.settings_geely_block_byd_menus) in titles)
+            assertFalse(activity.getString(GeelyR.string.settings_geely_block_byd_menus) in titles)
+            assertTrue(activity.getString(GeelyR.string.settings_geely_qnx_title) in titles)
             listOf(
                 HostR.string.carplay_map_on_instrument_cluster_experimental,
                 HostR.string.settings_navigation_wheel_volume,

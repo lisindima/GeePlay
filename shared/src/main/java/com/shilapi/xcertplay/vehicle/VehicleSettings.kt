@@ -1,6 +1,14 @@
 package com.shilapi.xcertplay.vehicle
 
 import android.content.Context
+import java.util.concurrent.atomic.AtomicBoolean
+
+/** Carries changes made in a product-owned editor back to the host reconnect bar. */
+object VehicleSettingsChanges {
+    private val reconnect = AtomicBoolean()
+    fun requestReconnect() { reconnect.set(true) }
+    fun consumeReconnectRequest(): Boolean = reconnect.getAndSet(false)
+}
 
 enum class VehicleSettingsPlacement {
     AUDIO,

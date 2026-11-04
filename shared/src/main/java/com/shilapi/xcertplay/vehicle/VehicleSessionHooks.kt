@@ -7,6 +7,12 @@ import com.shilapi.xcertplay.navigation.runtime.RouteGuidanceSource
 import java.io.Closeable
 import android.content.Context
 import android.bluetooth.BluetoothAdapter
+import android.view.Surface
+
+/** Product-owned destination for the secondary navigation video stream. */
+interface VehicleMapMirror : Closeable {
+    val surface: Surface
+}
 
 enum class SourceCloseReason {
     CHANNEL_CLOSED,
@@ -51,6 +57,7 @@ interface VehicleSessionHooks : Closeable {
 /** Application-level composition point for product-specific vehicle integrations. */
 interface VehicleIntegrationProvider {
     fun createVehicleSessionHooks(context: Context): VehicleSessionHooks
+    fun createVehicleMapMirror(context: Context, streamWidth: Int, streamHeight: Int): VehicleMapMirror? = null
     fun carPlayVehicleDataAdapter(context: Context): CarPlayVehicleDataAdapter? = null
     fun vehicleParkStateSource(context: Context): VehicleParkStateSource? = null
     fun vehicleTyreTelemetrySource(context: Context): VehicleTyreTelemetrySource? = null
@@ -62,6 +69,8 @@ interface VehicleIntegrationProvider {
     fun ambientLightingProvider(context: Context): AmbientLightingProvider? = null
     fun vehicleSystemActionPort(context: Context): VehicleSystemActionPort? = null
     fun mediaAudioPolicy(context: Context): LocalMediaAudioPolicy = LocalMediaAudioPolicy.DIPLAY
+    /** Publish CarPlay metadata without claiming audio focus when another source owns playback. */
+    fun publishExternalMediaSession(context: Context): Boolean = false
     fun vehicleSettings(context: Context): VehicleSettingsController? = null
     /** Whether this product should render DiPlay's legacy BYD settings and availability copy. */
     fun legacyBydSettingsAvailable(context: Context): Boolean = true

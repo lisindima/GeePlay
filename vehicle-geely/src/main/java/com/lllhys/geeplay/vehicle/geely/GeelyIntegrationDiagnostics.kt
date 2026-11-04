@@ -141,6 +141,7 @@ object GeelyIntegrationDiagnostics {
         appendLine("geelyEvidence sdk=${if (navigationSdk) "AVAILABLE" else "UNAVAILABLE"} vehicleNavigation=NOT_CONFIRMED lane=NOT_CONFIRMED wheel=NOT_CONFIRMED clusterDisplay=NOT_CONFIRMED")
         appendLine("geelyDriver state=${driver.state} stage=${driver.stage} failure=${driver.failureType ?: "none"} cleanupPending=${recovery != null}")
         appendLine("geelyOemCall method=$lastOemMethod result=$lastOemResult")
+        appendLine(GeelyQnxStatus.report())
         appendLine("geelyRoute source=$activeSource sessionGeneration=$sessionGeneration sessionActive=$sessionActive frames5201=${routeUpdates.get()} frames5202=${maneuverUpdates.get()} frames5204=${laneUpdates.get()} rejected=${rejectedFrames.get()} lastFrameElapsedMs=$lastFrameAtMillis lastPublishElapsedMs=$lastPublishAtMillis maneuvers=$visibleManeuverCount lanes=$visibleLaneCount")
         appendLine("geelyMedia owner=${GeelyMediaSettings.loadOwner(context)} retainBluetooth=${GeelyMediaSettings.loadOwner(context) == com.shilapi.xcertplay.media.MediaOutputOwner.OEM_BLUETOOTH} autoAvoid=${GeelyMediaSettings.bluetoothAutoAvoid(context)} autoRestore=${GeelyMediaSettings.bluetoothAutoRestore(context)} arbitration=$bluetoothAudioStatus")
         val input = GeelyInputDiagnostics.snapshot()

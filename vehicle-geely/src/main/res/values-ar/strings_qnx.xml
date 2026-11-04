@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_geely_qnx_title">تخطيط لوحة QNX (تجريبي)</string>
+    <string name="settings_geely_qnx_description">اسحب الخريطة وأسهم المناورات أو أدخل الإحداثيات والأبعاد. يتطلب التشغيل وصول root إلى QNX وبرنامج AtlasDim مثبتًا. أبقِ بيانات السيارة ومصابيح التحذير ظاهرة. أعد توصيل CarPlay بعد الحفظ.</string>
+    <string name="settings_geely_qnx_host">عنوان QNX</string>
+    <string name="settings_geely_qnx_password">كلمة مرور root في QNX (لا تُحفظ)</string>
+    <string name="settings_geely_qnx_binary">البرنامج المثبت (اتركه فارغًا للاختيار)</string>
+    <string name="settings_geely_qnx_layer">طبقة النافذة (0–8)</string>
+    <string name="settings_geely_qnx_map">الخريطة</string>
+    <string name="settings_geely_qnx_turns">المناورات</string>
+    <string name="settings_geely_qnx_save">حفظ التخطيط</string>
+    <string name="settings_geely_qnx_start">تشغيل نوافذ GeePlay والحفظ</string>
+    <string name="settings_geely_qnx_saved">تم الحفظ. أعد توصيل CarPlay للتطبيق.</string>
+    <string name="settings_geely_qnx_invalid">تحقق من العنوان والبرنامج والطبقة والإحداثيات. يجب أن تكون النوافذ ضمن 1920 × 532.</string>
+    <string name="settings_geely_qnx_connecting">جارٍ الاتصال بـ QNX…</string>
+    <string name="settings_geely_qnx_failed">فشل إعداد QNX. تحقق من الاتصال وكلمة المرور والبرنامج والمنافذ.</string>
+    <string name="settings_geely_qnx_stop">إيقاف نوافذ GeePlay</string>
+    <string name="settings_geely_qnx_coordinates">X · Y · العرض · الارتفاع</string>
+</resources>

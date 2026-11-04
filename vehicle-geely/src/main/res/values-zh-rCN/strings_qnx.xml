@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_geely_qnx_title">QNX 仪表布局（实验性）</string>
+    <string name="settings_geely_qnx_description">拖动地图和转向窗口，或输入坐标和尺寸。需要 QNX root 权限及已安装的 AtlasDim。请保持车辆读数和警告灯可见。保存后重新连接 CarPlay。</string>
+    <string name="settings_geely_qnx_host">QNX 地址</string>
+    <string name="settings_geely_qnx_password">QNX root 密码（不保存）</string>
+    <string name="settings_geely_qnx_binary">已安装的程序（留空选择）</string>
+    <string name="settings_geely_qnx_layer">窗口图层（0–8）</string>
+    <string name="settings_geely_qnx_map">地图</string>
+    <string name="settings_geely_qnx_turns">转向</string>
+    <string name="settings_geely_qnx_save">保存布局</string>
+    <string name="settings_geely_qnx_start">启动 GeePlay 窗口并保存</string>
+    <string name="settings_geely_qnx_saved">已保存。重新连接 CarPlay 后生效。</string>
+    <string name="settings_geely_qnx_invalid">请检查地址、程序、图层和坐标。窗口必须位于 1920 × 532 范围内。</string>
+    <string name="settings_geely_qnx_connecting">正在连接 QNX…</string>
+    <string name="settings_geely_qnx_failed">QNX 设置失败。请检查连接、密码、程序和端口。</string>
+    <string name="settings_geely_qnx_stop">停止 GeePlay 窗口</string>
+    <string name="settings_geely_qnx_coordinates">X · Y · 宽度 · 高度</string>
+</resources>
