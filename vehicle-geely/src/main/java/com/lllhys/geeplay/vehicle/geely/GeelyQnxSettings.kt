@@ -12,7 +12,7 @@ data class GeelyQnxLayout(
     val width: Int,
     val height: Int,
     val display: Int = 2,
-    val layer: Int = 1,
+    val layer: Int = 6,
 ) {
     init {
         GeelyQnxProtocol.hello(x, y, width, height)
@@ -32,7 +32,7 @@ object GeelyQnxSettings {
                     p.getInt("${key}_port", if (map) 53281 else 53283), true),
                 p.getInt("${key}_x", 0), p.getInt("${key}_y", 0),
                 p.getInt("${key}_width", 320), p.getInt("${key}_height", 160),
-                p.getInt("${key}_display", 2), p.getInt("${key}_layer", 1),
+                p.getInt("${key}_display", 2), p.getInt("${key}_layer", 6),
             )
         }.getOrNull()
     }

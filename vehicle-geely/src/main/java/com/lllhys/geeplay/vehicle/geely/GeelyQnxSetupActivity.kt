@@ -55,7 +55,7 @@ class GeelyQnxSetupActivity : Activity() {
             enabled.add(check); form.addView(check)
             check.setOnCheckedChangeListener { _, _ -> if (::preview.isInitialized) preview.invalidate() }
             displays.add(field(R.string.settings_geely_qnx_display, (saved?.display ?: 2).toString(), InputType.TYPE_CLASS_NUMBER))
-            layers.add(field(R.string.settings_geely_qnx_layer, (saved?.layer ?: 1).toString(), InputType.TYPE_CLASS_NUMBER))
+            layers.add(field(R.string.settings_geely_qnx_layer, (saved?.layer ?: 6).toString(), InputType.TYPE_CLASS_NUMBER))
             label(R.string.settings_geely_qnx_coordinates)
             val row = LinearLayout(this)
             val fields = positions[index].mapIndexed { coordinate, value ->
