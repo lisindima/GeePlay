@@ -18,4 +18,5 @@
   <string name="settings_geely_qnx_add_turns">新增轉向</string>
   <string name="settings_geely_qnx_remove_turns">移除轉向</string>
   <string name="settings_geely_qnx_uploading">正在安裝 QNX 元件：%1$d%%</string>
+  <string name="settings_geely_qnx_password_builtin">留空以使用內建的標準登入資訊</string>
 </resources>

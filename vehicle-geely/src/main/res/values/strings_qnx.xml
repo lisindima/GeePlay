@@ -18,4 +18,5 @@
   <string name="settings_geely_qnx_add_turns">Add manoeuvres</string>
   <string name="settings_geely_qnx_remove_turns">Remove manoeuvres</string>
   <string name="settings_geely_qnx_uploading">Installing QNX component: %1$d%%</string>
+  <string name="settings_geely_qnx_password_builtin">Leave blank to use the built-in standard login</string>
 </resources>

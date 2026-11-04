@@ -105,6 +105,7 @@ jobs:
           fi
       - name: Build and verify signed artifact
         env:
+          QNX_PASS: ${{ secrets.QNX_PASS }}
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/geeplay-private/signing.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -121,6 +122,7 @@ jobs:
             PROFILE=diagnostic
             APK=geely/build/outputs/apk/debug/geely-debug.apk
           else
+            test -n "$QNX_PASS"
             export DIPLAY_AUTH_ASSETS_DIR="$RUNNER_TEMP/geeplay-private/assets"
             ./gradlew :geely:assembleRelease --no-configuration-cache --console=plain
             PROFILE=release
@@ -140,6 +142,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already published; keeping its verified assets unchanged."
+            exit 0
+          fi
           VERSION=$(sed -n 's/.*versionName = "\([^"]*\)"/\1/p' geely/build.gradle.kts)
           cp "docs/releases/$VERSION.md" "$RUNNER_TEMP/notes.md"
           cat dist/commit.txt >> "$RUNNER_TEMP/notes.md"

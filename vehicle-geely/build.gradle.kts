@@ -2,6 +2,9 @@ plugins {
     id("com.android.library")
 }
 
+val qnxPassword = providers.environmentVariable("QNX_PASS").getOrElse("")
+fun quotedBuildString(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""
+
 android {
     namespace = "com.lllhys.geeplay.vehicle.geely"
     compileSdk {
@@ -10,7 +13,10 @@ android {
 
     defaultConfig {
         minSdk = 28
+        buildConfigField("String", "QNX_PASSWORD", quotedBuildString(qnxPassword))
     }
+
+    buildFeatures { buildConfig = true }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

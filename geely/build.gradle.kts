@@ -16,8 +16,8 @@ android {
         applicationId = "com.lllhys.geeplay"
         minSdk = 28
         targetSdk = 37
-        versionCode = 6
-        versionName = "0.2.21-geely.2"
+        versionCode = 7
+        versionName = "0.2.21-geely.3"
     }
 
     localAuthenticationAssets?.let { sourceSets.getByName("main").assets.srcDir(it) }

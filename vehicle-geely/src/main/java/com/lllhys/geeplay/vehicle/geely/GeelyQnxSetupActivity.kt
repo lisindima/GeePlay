@@ -45,6 +45,7 @@ class GeelyQnxSetupActivity : Activity() {
             ?: GeelyQnxSettings.load(this, false)?.endpoint?.host ?: "192.168.118.2")
         password = field(R.string.settings_geely_qnx_password, "", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
             .apply { isSaveEnabled = false; importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO }
+        if (BuildConfig.QNX_PASSWORD.isNotEmpty()) password.setHint(R.string.settings_geely_qnx_password_builtin)
         for (index in 0..1) {
             val saved = GeelyQnxSettings.load(this, index == 0)
             saved?.let { positions[index] = intArrayOf(it.x, it.y, it.width, it.height) }
@@ -54,7 +55,7 @@ class GeelyQnxSetupActivity : Activity() {
             }
             enabled.add(check); form.addView(check)
             check.setOnCheckedChangeListener { _, _ -> if (::preview.isInitialized) preview.invalidate() }
-            displays.add(field(R.string.settings_geely_qnx_display, (saved?.display ?: 2).toString(), InputType.TYPE_CLASS_NUMBER))
+            displays.add(field(R.string.settings_geely_qnx_display, (saved?.display ?: GeelyQnxLogin.display()).toString(), InputType.TYPE_CLASS_NUMBER))
             layers.add(field(R.string.settings_geely_qnx_layer, (saved?.layer ?: 6).toString(), InputType.TYPE_CLASS_NUMBER))
             label(R.string.settings_geely_qnx_coordinates)
             val row = LinearLayout(this)
@@ -111,7 +112,7 @@ class GeelyQnxSetupActivity : Activity() {
         val layouts = if (stop) listOf(null, null) else runCatching { layouts(selected) }.getOrElse { status.setText(R.string.settings_geely_qnx_invalid); return }
         val address = host.text.toString().trim()
         if (address.isEmpty()) { status.setText(R.string.settings_geely_qnx_invalid); return }
-        val secret = password.text.toString().toCharArray()
+        val secret = GeelyQnxLogin.password(password.text.toString())
         password.text.clear()
         busy = true; status.setText(R.string.settings_geely_qnx_connecting)
         worker.execute {

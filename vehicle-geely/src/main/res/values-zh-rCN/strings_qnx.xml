@@ -18,4 +18,5 @@
   <string name="settings_geely_qnx_add_turns">添加转向</string>
   <string name="settings_geely_qnx_remove_turns">移除转向</string>
   <string name="settings_geely_qnx_uploading">正在安装 QNX 组件：%1$d%%</string>
+  <string name="settings_geely_qnx_password_builtin">留空以使用内置的标准登录信息</string>
 </resources>

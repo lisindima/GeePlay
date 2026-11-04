@@ -18,4 +18,5 @@
   <string name="settings_geely_qnx_add_turns">Додати стрілки</string>
   <string name="settings_geely_qnx_remove_turns">Прибрати стрілки</string>
   <string name="settings_geely_qnx_uploading">Встановлення компонента QNX: %1$d%%</string>
+  <string name="settings_geely_qnx_password_builtin">Порожньо — використовувати вбудований штатний вхід</string>
 </resources>

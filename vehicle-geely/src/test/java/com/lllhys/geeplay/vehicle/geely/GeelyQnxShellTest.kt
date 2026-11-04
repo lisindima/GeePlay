@@ -7,7 +7,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class GeelyQnxShellTest {
-    @Test fun logsInExecutesChecksExitCodeAndErasesPassword() {
+    @Test fun logsInExecutesChecksExitCodeAndErasesPassword() = exerciseLogin("Password:")
+    @Test fun supportsPasswordPromptWithoutColonLikeAtlasDim() = exerciseLogin("Password")
+
+    private fun exerciseLogin(passwordPrompt: String) {
         ServerSocket(0).use { server ->
             val executor = Executors.newSingleThreadExecutor()
             try {
@@ -23,7 +26,7 @@ class GeelyQnxShellTest {
                         send("login:")
                         assertEquals(255, input.read()); assertEquals(254, input.read()); assertEquals(1, input.read())
                         assertEquals("root", reader.readLine())
-                        send("Password:")
+                        send(passwordPrompt)
                         assertEquals("test-secret", reader.readLine())
                         send("\n# ")
                         repeat(3) { index ->

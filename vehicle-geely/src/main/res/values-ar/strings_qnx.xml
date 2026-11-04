@@ -18,4 +18,5 @@
   <string name="settings_geely_qnx_add_turns">إضافة المناورات</string>
   <string name="settings_geely_qnx_remove_turns">إزالة المناورات</string>
   <string name="settings_geely_qnx_uploading">تثبيت مكوّن QNX: %1$d%%</string>
+  <string name="settings_geely_qnx_password_builtin">اتركه فارغًا لاستخدام بيانات الدخول القياسية المضمّنة</string>
 </resources>

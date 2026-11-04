@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -46,6 +47,9 @@ def main():
         names = archive.namelist()
         qnx_sha256 = hashlib.sha256(archive.read('assets/qnx/geeplay-navd')).hexdigest()
         assert qnx_sha256 == 'd369a9a654016cc1b193fc2b483d400cf166958bf7464dc7a528c9aa9ed799b0', 'Unexpected QNX component'
+        built_in_login = os.environ.get('QNX_PASS', '')
+        if built_in_login and not diagnostic:
+            assert any(built_in_login.encode() in archive.read(name) for name in names if name.endswith('.dex')), 'Built-in QNX login missing from release'
         credentials = [name for name in names if name.startswith("assets/") and (
             "/offline-mfi/" in name or Path(name).suffix.lower() in
             {".pk8", ".p7b", ".key", ".pem", ".p12", ".pfx", ".jks", ".keystore"})]
@@ -61,6 +65,7 @@ def main():
               "profile": args.profile, "signerSha256": fingerprint,
               "sha256": hashlib.file_digest(args.apk.open("rb"), "sha256").hexdigest(),
               "qnxComponentSha256": qnx_sha256,
+              "qnxAutomaticLogin": bool(built_in_login) and not diagnostic,
               "authentication": "absent" if diagnostic else "bundled; distribution permission required"}
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))

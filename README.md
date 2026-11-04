@@ -6,11 +6,11 @@
 
 [Releases](https://github.com/lisindima/GeePlay/releases) · [Chinese README](README.zh-CN.md) · [Capability alignment](CAPABILITY-ALIGNMENT.md) · [Report a problem](https://github.com/lisindima/GeePlay/issues/new)
 
-## 0.2.21-geely.2 — QNX experimental release
+## 0.2.21-geely.3 — QNX experimental release
 
 - Independent QNX windows for the CarPlay map and RouteGuidance arrows, using ports **53281 / 53283**.
 - **Advanced → QNX cluster layout**: independent Add/Remove controls, placement, dimensions, QNX display/layer and reconnect handling for each window.
-- Includes the pinned QNX component in the APK and installs separate GeePlay processes directly. AtlasDim does not need to be installed. QNX root access is needed for setup; component provenance is included in assets/qnx/NOTICE.txt.
+- Includes the pinned QNX component in the APK and installs separate GeePlay processes directly. AtlasDim does not need to be installed. Standard QNX login is supplied automatically in release builds, with an optional custom password; component provenance is included in assets/qnx/NOTICE.txt.
 - Optional external MediaSession publication for [GMediaProxy](https://github.com/Salat39/GMediaProxy), including when OEM Bluetooth owns audio.
 - GeePlay permanently excludes the legacy BYD settings switch, BYD package queries and BYD-specific Usage Access.
 

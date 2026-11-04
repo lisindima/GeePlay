@@ -67,10 +67,10 @@ internal class GeelyQnxShell private constructor(private val socket: Socket) : G
                 socket.connect(InetSocketAddress(host, port), 5000)
                 socket.soTimeout = 500
                 val shell = GeelyQnxShell(socket)
-                fun prompt(text: String) = Regex("(?m)(login:|[Pp]assword:|[^\\n]*#\\s*$|[Ii]ncorrect)").containsMatchIn(text)
+                fun prompt(text: String) = Regex("(?m)(login:|[Pp]assword:?|[^\\n]*#\\s*$|[Ii]ncorrect)").containsMatchIn(text)
                 var response = shell.readUntil(::prompt)
                 if (response.trimEnd().endsWith("login:")) { shell.line("root"); response = shell.readUntil(::prompt) }
-                if (response.trimEnd().endsWith("assword:")) { shell.line(String(password)); response = shell.readUntil(::prompt) }
+                if (Regex("[Pp]assword:?").containsMatchIn(response)) { shell.line(String(password)); response = shell.readUntil(::prompt) }
                 if (!response.trimEnd().endsWith("#")) throw IOException("QNX login failed")
                 shell.execute("PS1=; PS2=; stty -echo")
                 return shell

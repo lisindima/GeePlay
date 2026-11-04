@@ -32,7 +32,7 @@ object GeelyQnxSettings {
                     p.getInt("${key}_port", if (map) 53281 else 53283), true),
                 p.getInt("${key}_x", 0), p.getInt("${key}_y", 0),
                 p.getInt("${key}_width", 320), p.getInt("${key}_height", 160),
-                p.getInt("${key}_display", 2), p.getInt("${key}_layer", 6),
+                p.getInt("${key}_display", GeelyQnxLogin.display()), p.getInt("${key}_layer", 6),
             )
         }.getOrNull()
     }
