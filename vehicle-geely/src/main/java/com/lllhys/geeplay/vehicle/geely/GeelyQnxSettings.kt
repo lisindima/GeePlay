@@ -11,8 +11,13 @@ data class GeelyQnxLayout(
     val y: Int,
     val width: Int,
     val height: Int,
+    val display: Int = 2,
+    val layer: Int = 1,
 ) {
-    init { GeelyQnxProtocol.hello(x, y, width, height) }
+    init {
+        GeelyQnxProtocol.hello(x, y, width, height)
+        require(display in 1..5 && layer in 0..8)
+    }
 }
 
 object GeelyQnxSettings {
@@ -27,6 +32,7 @@ object GeelyQnxSettings {
                     p.getInt("${key}_port", if (map) 53281 else 53283), true),
                 p.getInt("${key}_x", 0), p.getInt("${key}_y", 0),
                 p.getInt("${key}_width", 320), p.getInt("${key}_height", 160),
+                p.getInt("${key}_display", 2), p.getInt("${key}_layer", 1),
             )
         }.getOrNull()
     }
@@ -45,6 +51,7 @@ object GeelyQnxSettings {
             p.putString("${key}_host", it.endpoint.host).putInt("${key}_port", it.endpoint.port)
                 .putInt("${key}_x", it.x).putInt("${key}_y", it.y)
                 .putInt("${key}_width", it.width).putInt("${key}_height", it.height)
+                .putInt("${key}_display", it.display).putInt("${key}_layer", it.layer)
         }
         p.apply()
         com.shilapi.xcertplay.vehicle.VehicleSettingsChanges.requestReconnect()

@@ -27,10 +27,13 @@ class GeelyQnxShellTest {
                         assertEquals("test-secret", reader.readLine())
                         send("\n# ")
                         repeat(3) { index ->
+                            val beginCommand = reader.readLine()
                             val command = reader.readLine()
-                            val marker = Regex("GP_[a-f0-9]+:").find(command)!!.value
+                            val endCommand = reader.readLine()
+                            val begin = beginCommand.removePrefix("echo ")
+                            val marker = Regex("GP_[a-f0-9]+_END:").find(endCommand)!!.value
                             // Echo includes the marker text but must not terminate the response.
-                            send(command + "\n" + if (index == 1) "payload\n" else "")
+                            send(beginCommand + "\n# " + begin + "\n" + command + "\n" + endCommand + "\n" + if (index == 1) "payload\n" else "")
                             send("$marker${if (index == 2) 7 else 0}\n# ")
                         }
                     }

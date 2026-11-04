@@ -39,13 +39,24 @@ internal class GeelyQnxShell private constructor(private val socket: Socket) : G
 
     @Synchronized override fun execute(command: String): String {
         require('\n' !in command && '\r' !in command)
+        require(command.length <= 190) { "QNX terminal command too long" }
         val marker = "GP_" + UUID.randomUUID().toString().replace("-", "")
-        line("$command; printf '\\n$marker:%s\\n' \"\$?\"")
-        val end = Regex("(?m)^$marker:([0-9]+)\\n")
+        val begin = "${marker}_BEGIN"
+        line("echo $begin")
+        line(command)
+        line("gp_status=\$?; echo; echo ${marker}_END:\$gp_status")
+        val end = Regex("(?m)^${marker}_END:([0-9]+)\\n")
         val response = readUntil { end.containsMatchIn(it) }
         val match = end.find(response) ?: throw IOException("QNX command incomplete")
         if (match.groupValues[1] != "0") throw IOException("QNX command failed (${match.groupValues[1]})")
-        return response.substring(0, match.range.first)
+        val start = Regex("(?m)^[ \\t#]*$begin\\n").find(response)
+            ?: throw IOException("QNX command start marker missing")
+        return response.substring(start.range.last + 1, match.range.first)
+    }
+    @Synchronized override fun executeBatch(commands: List<String>) {
+        require(commands.size <= 8 && commands.all { it.length <= 190 && '\n' !in it && '\r' !in it })
+        commands.forEach(::line)
+        execute("true")
     }
     override fun close() = socket.close()
 
@@ -61,7 +72,7 @@ internal class GeelyQnxShell private constructor(private val socket: Socket) : G
                 if (response.trimEnd().endsWith("login:")) { shell.line("root"); response = shell.readUntil(::prompt) }
                 if (response.trimEnd().endsWith("assword:")) { shell.line(String(password)); response = shell.readUntil(::prompt) }
                 if (!response.trimEnd().endsWith("#")) throw IOException("QNX login failed")
-                shell.execute("stty -echo")
+                shell.execute("PS1=; PS2=; stty -echo")
                 return shell
             } catch (error: Exception) { socket.close(); throw error }
             finally { password.fill('\u0000') }

@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.CheckBox
 import android.widget.ScrollView
 import java.io.File
 import java.io.FileOutputStream
@@ -35,6 +36,7 @@ class GeelyQnxSetupUiTest {
                 val content = activity.findViewById<ViewGroup>(android.R.id.content)
                 val scroll = content.getChildAt(0) as ScrollView
                 val form = scroll.getChildAt(0) as ViewGroup
+                (0 until form.childCount).map { form.getChildAt(it) }.filterIsInstance<CheckBox>().forEach { it.isChecked = true }
                 val fields = (0 until form.childCount).map { form.getChildAt(it) }.filterIsInstance<EditText>()
                 assertFalse(fields[1].isSaveEnabled)
                 assertEquals("", fields[1].text.toString())

@@ -15,7 +15,7 @@ class GeelyQnxSettingsTest {
         assertNull(GeelyQnxSettings.load(app, true))
         assertNull(GeelyQnxSettings.load(app, false))
         val map = GeelyQnxLayout(GeelyQnxWindowConfig("127.0.0.1", 53281, true), 10, 20, 640, 320)
-        val turns = GeelyQnxLayout(GeelyQnxWindowConfig("127.0.0.1", 53283, true), 900, 20, 320, 160)
+        val turns = GeelyQnxLayout(GeelyQnxWindowConfig("127.0.0.1", 53283, true), 900, 20, 320, 160, display = 3, layer = 2)
         GeelyQnxSettings.save(app, true, map)
         GeelyQnxSettings.save(app, false, turns)
         assertEquals(map, GeelyQnxSettings.load(app, true))

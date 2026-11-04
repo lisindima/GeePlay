@@ -1,18 +1,21 @@
 <resources>
-    <string name="settings_geely_qnx_title">QNX 儀表配置（實驗性）</string>
-    <string name="settings_geely_qnx_description">拖曳地圖和轉向視窗，或輸入座標和尺寸。需要 QNX root 權限及已安裝的 AtlasDim。請保持車輛讀數和警告燈可見。儲存後重新連線 CarPlay。</string>
-    <string name="settings_geely_qnx_host">QNX 位址</string>
-    <string name="settings_geely_qnx_password">QNX root 密碼（不儲存）</string>
-    <string name="settings_geely_qnx_binary">已安裝的程式（留空選擇）</string>
-    <string name="settings_geely_qnx_layer">視窗圖層（0–8）</string>
-    <string name="settings_geely_qnx_map">地圖</string>
-    <string name="settings_geely_qnx_turns">轉向</string>
-    <string name="settings_geely_qnx_save">儲存配置</string>
-    <string name="settings_geely_qnx_start">啟動 GeePlay 視窗並儲存</string>
-    <string name="settings_geely_qnx_saved">已儲存。重新連線 CarPlay 後生效。</string>
-    <string name="settings_geely_qnx_invalid">請檢查位址、程式、圖層和座標。視窗必須位於 1920 × 532 範圍內。</string>
-    <string name="settings_geely_qnx_connecting">正在連線 QNX…</string>
-    <string name="settings_geely_qnx_failed">QNX 設定失敗。請檢查連線、密碼、程式和連接埠。</string>
-    <string name="settings_geely_qnx_stop">停止 GeePlay 視窗</string>
-    <string name="settings_geely_qnx_coordinates">X · Y · 寬度 · 高度</string>
+  <string name="settings_geely_qnx_title">QNX 儀表配置（實驗性）</string>
+  <string name="settings_geely_qnx_description">分別新增地圖和轉向視窗。拖曳視窗或輸入座標和尺寸。已包含 QNX 元件；需要 QNX root 權限。請保持車輛讀數和警告燈可見。儲存後重新連線 CarPlay。</string>
+  <string name="settings_geely_qnx_host">QNX 位址</string>
+  <string name="settings_geely_qnx_password">QNX root 密碼（不儲存）</string>
+  <string name="settings_geely_qnx_layer">視窗圖層（0–8）</string>
+  <string name="settings_geely_qnx_map">地圖</string>
+  <string name="settings_geely_qnx_turns">轉向</string>
+  <string name="settings_geely_qnx_save">儲存配置</string>
+  <string name="settings_geely_qnx_saved">已儲存。重新連線 CarPlay 後生效。</string>
+  <string name="settings_geely_qnx_invalid">請檢查位址、QNX 顯示器、圖層和座標。視窗必須位於 1920 × 532 範圍內。</string>
+  <string name="settings_geely_qnx_connecting">正在連線 QNX…</string>
+  <string name="settings_geely_qnx_failed">QNX 設定失敗。請檢查連線、root 密碼和 QNX 顯示器。失敗階段顯示於下方。</string>
+  <string name="settings_geely_qnx_coordinates">X · Y · 寬度 · 高度</string>
+  <string name="settings_geely_qnx_display">QNX 顯示器（1–5）</string>
+  <string name="settings_geely_qnx_add_map">新增地圖</string>
+  <string name="settings_geely_qnx_remove_map">移除地圖</string>
+  <string name="settings_geely_qnx_add_turns">新增轉向</string>
+  <string name="settings_geely_qnx_remove_turns">移除轉向</string>
+  <string name="settings_geely_qnx_uploading">正在安裝 QNX 元件：%1$d%%</string>
 </resources>

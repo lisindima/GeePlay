@@ -39,11 +39,13 @@ def main():
     elif not diagnostic:
         raise SystemExit("Release requires a pinned signing certificate")
     manifest = subprocess.check_output([args.aapt, "dump", "xmltree", str(args.apk), "AndroidManifest.xml"], text=True)
-    for forbidden in ("MapEmbedService", "MyCarAppService", "PhoneAudioConnectionService", "AutoDisplay", "com.lllhys.geeplay.permission.NAVIGATION", "com.byd.", "android.permission.PACKAGE_USAGE_STATS"):
+    for forbidden in ("MapEmbedService", "MyCarAppService", "PhoneAudioConnectionService", "AutoDisplay", "com.lllhys.geeplay.permission.NAVIGATION", "com.byd.", "android.permission.PACKAGE_USAGE_STATS", "com.mmwtl.atlasdim"):
         assert forbidden not in manifest, "Forbidden component in merged manifest: " + forbidden
     assert "GeePlayApplication" in manifest, "Wrong application class"
     with zipfile.ZipFile(args.apk) as archive:
         names = archive.namelist()
+        qnx_sha256 = hashlib.sha256(archive.read('assets/qnx/geeplay-navd')).hexdigest()
+        assert qnx_sha256 == 'd369a9a654016cc1b193fc2b483d400cf166958bf7464dc7a528c9aa9ed799b0', 'Unexpected QNX component'
         credentials = [name for name in names if name.startswith("assets/") and (
             "/offline-mfi/" in name or Path(name).suffix.lower() in
             {".pk8", ".p7b", ".key", ".pem", ".p12", ".pfx", ".jks", ".keystore"})]
@@ -58,6 +60,7 @@ def main():
     report = {"package": package, "versionCode": int(code), "versionName": version,
               "profile": args.profile, "signerSha256": fingerprint,
               "sha256": hashlib.file_digest(args.apk.open("rb"), "sha256").hexdigest(),
+              "qnxComponentSha256": qnx_sha256,
               "authentication": "absent" if diagnostic else "bundled; distribution permission required"}
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))

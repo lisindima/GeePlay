@@ -3,18 +3,42 @@ package com.lllhys.geeplay.vehicle.geely
 /** Shell transport is supplied by the setup flow; credentials never enter persisted settings. */
 internal fun interface GeelyQnxCommandPort {
     fun execute(command: String): String
+    fun executeBatch(commands: List<String>) { commands.forEach { execute(it) } }
 }
 
 /** Owns only explicitly provisioned GeePlay processes, never an AtlasDim process. */
 internal class GeelyQnxDaemonController(private val shell: GeelyQnxCommandPort) {
     private val owned = mutableMapOf<Int, Int>()
 
-    fun provision(source: String, port: Int) {
+    fun install(bytes: ByteArray, port: Int, progress: (Int, Int) -> Unit = { _, _ -> }) {
         require(port == 53281 || port == 53283)
-        require(Regex("/tmp/ghudbridgelited-dim-[A-Za-z0-9_-]+").matches(source))
-        val version = shell.execute("$source --version 2>&1")
-        check("ghudbridgelited/" in version) { "Unsupported QNX daemon" }
-        shell.execute("cp $source /tmp/geeplay-navd-$port.new && chmod 755 /tmp/geeplay-navd-$port.new && mv /tmp/geeplay-navd-$port.new /tmp/geeplay-navd-$port")
+        require(bytes.isNotEmpty() && bytes.size <= 1_048_576)
+        val binary = "/tmp/geeplay-navd-$port"
+        val expected = GeelyQnxBinary.sha256(bytes)
+        if (runCatching { shell.execute("openssl sha256 $binary").contains(expected) }.getOrDefault(false)) {
+            shell.execute("chmod 755 $binary")
+            return
+        }
+        val temp = "$binary-${java.util.UUID.randomUUID().toString().take(8)}.new"
+        try {
+            shell.execute(": > $temp")
+            val commands = bytes.asList().chunked(24).map { chunk ->
+                val escaped = chunk.joinToString("") { "\\0" + (it.toInt() and 255).toString(8).padStart(3,'0') }
+                "print -n '$escaped' >> $temp"
+            }
+            for ((index, batch) in commands.chunked(8).withIndex()) {
+                shell.executeBatch(batch)
+                if (index % 10 == 0) progress(minOf((index+1)*8*24,bytes.size),bytes.size)
+            }
+            check(shell.execute("openssl sha256 $temp").contains(expected)) { "QNX component transfer checksum mismatch" }
+            shell.execute("chmod 755 $temp")
+            check("ghudbridgelited/" in shell.execute("$temp --version 2>&1")) { "Unsupported QNX component" }
+            shell.execute("mv -f $temp $binary")
+            progress(bytes.size,bytes.size)
+        } catch (error: Exception) {
+            runCatching { shell.execute("rm -f $temp") }
+            throw error
+        }
     }
 
     @Synchronized fun start(port: Int, z: Int): Int {

@@ -1,18 +1,21 @@
 <resources>
-    <string name="settings_geely_qnx_title">Размещение на приборке QNX (экспериментально)</string>
-    <string name="settings_geely_qnx_description">Перетащите карту и стрелки или введите координаты и размеры. Нужны доступ root к QNX и установленный AtlasDim. Оставьте видимыми показания автомобиля и контрольные лампы. После сохранения переподключите CarPlay.</string>
-    <string name="settings_geely_qnx_host">Адрес QNX</string>
-    <string name="settings_geely_qnx_password">Пароль root QNX (не сохраняется)</string>
-    <string name="settings_geely_qnx_binary">Установленный демон (пусто — выбор из списка)</string>
-    <string name="settings_geely_qnx_layer">Слой окна (0–8)</string>
-    <string name="settings_geely_qnx_map">Карта</string>
-    <string name="settings_geely_qnx_turns">Стрелки</string>
-    <string name="settings_geely_qnx_save">Сохранить размещение</string>
-    <string name="settings_geely_qnx_start">Запустить окна GeePlay и сохранить</string>
-    <string name="settings_geely_qnx_saved">Сохранено. Переподключите CarPlay для применения.</string>
-    <string name="settings_geely_qnx_invalid">Проверьте адрес, путь демона, слой и координаты. Окна должны помещаться в 1920 × 532.</string>
-    <string name="settings_geely_qnx_connecting">Подключение к QNX…</string>
-    <string name="settings_geely_qnx_failed">Настройка QNX не выполнена. Проверьте соединение, пароль root, установленный демон и порты.</string>
-    <string name="settings_geely_qnx_stop">Остановить окна GeePlay</string>
-    <string name="settings_geely_qnx_coordinates">X · Y · Ширина · Высота</string>
+  <string name="settings_geely_qnx_title">Размещение на приборке QNX (экспериментально)</string>
+  <string name="settings_geely_qnx_description">Добавляйте карту и стрелки независимо. Перетащите окно или введите координаты и размеры. Компонент QNX включён в приложение; нужен доступ root к QNX. Оставьте видимыми показания автомобиля и контрольные лампы. После сохранения переподключите CarPlay.</string>
+  <string name="settings_geely_qnx_host">Адрес QNX</string>
+  <string name="settings_geely_qnx_password">Пароль root QNX (не сохраняется)</string>
+  <string name="settings_geely_qnx_layer">Слой окна (0–8)</string>
+  <string name="settings_geely_qnx_map">Карта</string>
+  <string name="settings_geely_qnx_turns">Стрелки</string>
+  <string name="settings_geely_qnx_save">Сохранить размещение</string>
+  <string name="settings_geely_qnx_saved">Сохранено. Переподключите CarPlay для применения.</string>
+  <string name="settings_geely_qnx_invalid">Проверьте адрес, дисплей QNX, слой и координаты. Окна должны помещаться в 1920 × 532.</string>
+  <string name="settings_geely_qnx_connecting">Подключение к QNX…</string>
+  <string name="settings_geely_qnx_failed">Не удалось настроить QNX. Проверьте соединение, пароль root и дисплей QNX. Этап сбоя указан ниже.</string>
+  <string name="settings_geely_qnx_coordinates">X · Y · Ширина · Высота</string>
+  <string name="settings_geely_qnx_display">Дисплей QNX (1–5)</string>
+  <string name="settings_geely_qnx_add_map">Добавить карту</string>
+  <string name="settings_geely_qnx_remove_map">Убрать карту</string>
+  <string name="settings_geely_qnx_add_turns">Добавить стрелки</string>
+  <string name="settings_geely_qnx_remove_turns">Убрать стрелки</string>
+  <string name="settings_geely_qnx_uploading">Установка компонента QNX: %1$d%%</string>
 </resources>

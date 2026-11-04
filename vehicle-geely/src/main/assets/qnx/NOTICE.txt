@@ -1,0 +1,13 @@
+QNX window component: ghudbridgelited-dim
+
+Source: https://github.com/mmwtl/AtlasDim/blob/7f8397dafc6f9249dbcb0d34a6e9f8a38ee982b3/qnx/ghudbridgelited-dim
+Original component: https://github.com/g992/ANHUD/tree/main/third_party/ghudbridgelited
+SHA-256: d369a9a654016cc1b193fc2b483d400cf166958bf7464dc7a528c9aa9ed799b0
+Size: 29736 bytes. Architecture: QNX AArch64.
+
+AtlasDim attributes this component to ANHUD and excludes it from its MIT license.
+The component retains its upstream authorship and terms; GeePlay does not assert
+that this third-party binary is covered by AtlasDim's MIT license or relicense it.
+The original binary is preserved in the APK. GeePlay validates its checksum and
+changes only the two display-selection instructions on installation to QNX.
+Application-side transport, installation and editor code are implemented in GeePlay.
