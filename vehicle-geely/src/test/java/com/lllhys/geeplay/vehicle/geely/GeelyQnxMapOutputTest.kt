@@ -13,13 +13,16 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.CountDownLatch
 
 class GeelyQnxMapOutputTest {
-    @Test fun copiesPlaneWithoutPaddingAndWithoutMovingPosition() {
-        val bytes = byteArrayOf(99, 1, 2, 3, 4, 5, 6, 7, 8, 88, 88, 9, 10, 11, 12, 13, 14, 15, 16)
-        val input = ByteBuffer.wrap(bytes).apply { position(1) }
-        assertArrayEquals(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16),
-            copyRgbaPlane(input, 2, 2, 10, 4))
+    @Test fun mapFitsWindowWithoutStretching() {
+        assertArrayEquals(intArrayOf(0,60,640,360), mapViewport(640,480,1280,720))
+        assertArrayEquals(intArrayOf(320,0,640,360), mapViewport(1280,360,1280,720))
+        assertThrows(IllegalArgumentException::class.java) { mapViewport(640,480,0,720) }
+    }
+    @Test fun convertsGlReadbackToTopDownWithoutMovingBuffer() {
+        val input = ByteBuffer.wrap(byteArrayOf(99, 1, 2, 3, 4, 5, 6, 7, 8)).apply { position(1) }
+        assertArrayEquals(byteArrayOf(5, 6, 7, 8, 1, 2, 3, 4), topDownRgba(input, 1, 2))
         assertEquals(1, input.position())
-        assertThrows(IllegalArgumentException::class.java) { copyRgbaPlane(input, 2, 3, 10, 4) }
+        assertThrows(IllegalArgumentException::class.java) { topDownRgba(input, 1, 3) }
     }
 
     @Test fun repeatedPixelsUseCompressedFrame() {
@@ -28,15 +31,6 @@ class GeelyQnxMapOutputTest {
         assertEquals(1, header.getShort(0).toInt())
         assertEquals(512, header.getInt(20))
         assertArrayEquals(byteArrayOf(0xff.toByte(), 42, 42, 42, 42), frame.copyOfRange(24, frame.size))
-    }
-
-    @Test fun scalesDecodedFrameIntoSmallerWindow() {
-        val pixels = byteArrayOf(1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4)
-        assertArrayEquals(byteArrayOf(1, 1, 1, 1, 3, 3, 3, 3),
-            scaleRgbaPlane(ByteBuffer.wrap(pixels), 2, 2, 8, 4, 1, 2))
-        assertThrows(IllegalArgumentException::class.java) {
-            scaleRgbaPlane(ByteBuffer.wrap(pixels), 2, 2, 8, 4, 1921, 1)
-        }
     }
 
     @Test fun sendsMapFrameToIndependentEndpointAndClosesWindow() {

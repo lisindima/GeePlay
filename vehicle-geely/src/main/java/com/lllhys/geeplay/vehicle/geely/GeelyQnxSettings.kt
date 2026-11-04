@@ -51,7 +51,11 @@ object GeelyQnxSettings {
     }
 
     fun mapMirror(context: Context, streamWidth: Int, streamHeight: Int): VehicleMapMirror? =
-        load(context, true)?.let { GeelyQnxMapSurface(it.endpoint, it.x, it.y, it.width, it.height, streamWidth, streamHeight) }
+        load(context, true)?.let {
+            runCatching { GeelyQnxMapSurface(it.endpoint, it.x, it.y, it.width, it.height, streamWidth, streamHeight) }
+                .onFailure { error -> GeelyQnxStatus.update("map", "initialization_failed:${error.javaClass.simpleName}") }
+                .getOrNull()
+        }
 
     fun turnOutput(context: Context): List<NavigationOutput> = load(context, false)?.let {
         listOf(GeelyQnxTurnOutput(it.endpoint, it.x, it.y, it.width, it.height))
