@@ -68,6 +68,11 @@ internal object MapMirrors {
 
     val any: Boolean get() = surfaces.isNotEmpty()
 
+    /** An old host must not remove a replacement host's surface during delayed teardown. */
+    fun clear(key: String, expected: Surface) {
+        if (surfaces[key] === expected) set(key, null)
+    }
+
     /** Whether a launcher shows the map (see [MapEmbedService]), so the centre card is not needed. */
     val launcherShowsMap: Boolean get() = surfaces.keys.any { it != CARD }
 

@@ -2063,7 +2063,7 @@ open class CarPlayHostActivity : ComponentActivity() {
         CenterMapOverlay.hide()
         if (CenterMapOverlay.requestShow == (::showCenterMap)) CenterMapOverlay.requestShow = null
         if (vehicleMapMirror != null) {
-            MapMirrors.set("vehicle:qnx", null)
+            vehicleMapMirror?.let { MapMirrors.clear("vehicle:qnx", it.surface) }
             vehicleMapMirror?.close()
             vehicleMapMirror = null
         }
